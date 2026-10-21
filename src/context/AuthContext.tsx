@@ -1,0 +1,276 @@
+import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
+import { 
+  auth, 
+  db, 
+  googleProvider, 
+  signInWithPopup, 
+  signOut, 
+  onAuthStateChanged,
+  doc, 
+  getDoc, 
+  setDoc,
+  type User
+} from '../lib/firebase';
+import { UserProfile, UserRole } from '../types';
+
+export const SUPER_ADMIN_EMAILS = [
+  'castimamoise@gmail.com', 
+  'laperletourht@gmail.com'
+];
+
+export function isSuperAdminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  return SUPER_ADMIN_EMAILS.includes(email.trim().toLowerCase());
+}
+
+interface AuthContextType {
+  user: User | null;
+  profile: UserProfile | null;
+  role: UserRole;
+  roles: UserRole[];
+  loading: boolean;
+  isSuperAdmin: boolean;
+  canAccess: (moduleKey: string) => boolean;
+  loginWithGoogle: () => Promise<void>;
+  loginWithEmail: (email: string, pass: string) => Promise<void>;
+  registerWithEmail: (data: { email: string; pass: string; nom: string; telephone?: string }) => Promise<void>;
+  logout: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
+  admin: [
+    'dashboard', 'reservations', 'proformas', 'factures', 'clients', 
+    'eleves', 'abonnements', 'vehicules', 'chauffeurs', 'plannings', 
+    'paiements', 'finances', 'utilisateurs', 'vitrine', 'parametres'
+  ],
+  direction: [
+    'dashboard', 'reservations', 'proformas', 'factures', 'clients', 
+    'eleves', 'abonnements', 'vehicules', 'chauffeurs', 'plannings', 
+    'paiements', 'finances', 'vitrine', 'parametres'
+  ],
+  comptabilite: [
+    'dashboard', 'proformas', 'factures', 'clients', 'abonnements', 
+    'paiements', 'finances'
+  ],
+  secretaire: [
+    'dashboard', 'reservations', 'proformas', 'factures', 'clients', 
+    'eleves', 'abonnements', 'plannings'
+  ],
+  operations: [
+    'dashboard', 'reservations', 'vehicules', 'chauffeurs', 'plannings'
+  ],
+  chauffeur: [
+    'dashboard', 'plannings', 'vehicules'
+  ],
+  client: [
+    'dashboard', 'reservations', 'proformas', 'factures'
+  ],
+  prospect: [
+    'dashboard', 'reservations', 'proformas'
+  ],
+  lecture_seule: [
+    'dashboard', 'reservations', 'proformas', 'factures', 'clients', 
+    'eleves', 'abonnements', 'vehicules', 'chauffeurs', 'plannings', 
+    'paiements', 'finances'
+  ]
+};
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchProfile = async (firebaseUser: User) => {
+    try {
+      const userRef = doc(db, 'utilisateurs', firebaseUser.uid);
+      const snap = await getDoc(userRef);
+      const isSuper = isSuperAdminEmail(firebaseUser.email);
+
+      if (snap.exists()) {
+        const data = snap.data() as UserProfile;
+        const assignedRole: UserRole = isSuper ? 'admin' : (data.role || 'client');
+        const assignedRoles: UserRole[] = isSuper 
+          ? ['admin'] 
+          : (Array.isArray(data.roles) && data.roles.length ? data.roles : [assignedRole]);
+
+        const fullProfile: UserProfile = {
+          ...data,
+          id: firebaseUser.uid,
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || '',
+          name: data.nom || data.name || firebaseUser.displayName || 'Utilisateur',
+          role: assignedRole,
+          roles: assignedRoles,
+          status: data.status || 'actif'
+        };
+        setProfile(fullProfile);
+        return;
+      }
+
+      // Automatically initialize default profile for new user
+      const defaultRole: UserRole = isSuper ? 'admin' : 'client';
+      const newProfile: UserProfile = {
+        id: firebaseUser.uid,
+        uid: firebaseUser.uid,
+        email: firebaseUser.email || '',
+        nom: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Utilisateur',
+        name: firebaseUser.displayName || 'Utilisateur',
+        role: defaultRole,
+        roles: [defaultRole],
+        status: 'actif',
+        photoURL: firebaseUser.photoURL || '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      try {
+        await setDoc(userRef, newProfile);
+      } catch (writeErr) {
+        console.warn('Could not write initial profile to Firestore (using memory profile):', writeErr);
+      }
+      setProfile(newProfile);
+    } catch (err) {
+      console.error('Error fetching user profile:', err);
+      // Fallback
+      const isSuper = isSuperAdminEmail(firebaseUser.email);
+      setProfile({
+        id: firebaseUser.uid,
+        email: firebaseUser.email || '',
+        role: isSuper ? 'admin' : 'client',
+        roles: isSuper ? ['admin'] : ['client'],
+        status: 'actif',
+        name: firebaseUser.displayName || 'Utilisateur'
+      });
+    }
+  };
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        await fetchProfile(currentUser);
+      } else {
+        setProfile(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const isSuperAdmin = useMemo(() => {
+    return isSuperAdminEmail(user?.email || profile?.email);
+  }, [user?.email, profile?.email]);
+
+  const role: UserRole = useMemo(() => {
+    if (isSuperAdmin) return 'admin';
+    return profile?.role || 'lecture_seule';
+  }, [isSuperAdmin, profile?.role]);
+
+  const roles: UserRole[] = useMemo(() => {
+    if (isSuperAdmin) return ['admin'];
+    return profile?.roles || [role];
+  }, [isSuperAdmin, profile?.roles, role]);
+
+  const canAccess = (moduleKey: string): boolean => {
+    if (isSuperAdmin || role === 'admin') return true;
+    for (const r of roles) {
+      const allowed = ROLE_PERMISSIONS[r] || [];
+      if (allowed.includes(moduleKey)) return true;
+    }
+    return false;
+  };
+
+  const loginWithGoogle = async () => {
+    const cred = await signInWithPopup(auth, googleProvider);
+    if (cred.user) {
+      await fetchProfile(cred.user);
+    }
+  };
+
+  const loginWithEmail = async (email: string, pass: string) => {
+    const { signInWithEmailAndPassword } = await import('firebase/auth');
+    const cred = await signInWithEmailAndPassword(auth, email, pass);
+    if (cred.user) {
+      await fetchProfile(cred.user);
+    }
+  };
+
+  const registerWithEmail = async ({ email, pass, nom, telephone }: { email: string; pass: string; nom: string; telephone?: string }) => {
+    const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    if (cred.user) {
+      try {
+        await updateProfile(cred.user, { displayName: nom });
+      } catch (e) {}
+
+      const isSuper = isSuperAdminEmail(email);
+      const defaultRole: UserRole = isSuper ? 'admin' : 'client';
+      const initialProfile: UserProfile = {
+        id: cred.user.uid,
+        uid: cred.user.uid,
+        email,
+        nom,
+        name: nom,
+        telephone: telephone || '',
+        phone: telephone || '',
+        role: defaultRole,
+        roles: [defaultRole],
+        status: 'actif',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      try {
+        await setDoc(doc(db, 'utilisateurs', cred.user.uid), initialProfile);
+      } catch (e) {
+        console.warn('Initial registration setDoc fallback:', e);
+      }
+      setProfile(initialProfile);
+    }
+  };
+
+  const logout = async () => {
+    await signOut(auth);
+    setUser(null);
+    setProfile(null);
+  };
+
+  const refreshProfile = async () => {
+    if (user) {
+      await fetchProfile(user);
+    }
+  };
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        profile,
+        role,
+        roles,
+        loading,
+        isSuperAdmin,
+        canAccess,
+        loginWithGoogle,
+        loginWithEmail,
+        registerWithEmail,
+        logout,
+        refreshProfile
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};

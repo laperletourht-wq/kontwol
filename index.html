@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <title>Centre de Contrôle Laperle</title>
+  <meta name="description" content="Système de gestion et centre de contrôle opérationnel pour LAPERLE TOUR HT (Transport, Tourisme, Véhicules, Proformas, Factures).">
+  <meta property="og:title" content="Centre de Contrôle Laperle">
+  <meta property="og:description" content="Système de gestion et centre de contrôle opérationnel pour LAPERLE TOUR HT (Transport, Tourisme, Véhicules, Proformas, Factures).">
+  <link rel="icon" type="image/jpeg" href="/logo-laperle.jpg">
+  <link rel="stylesheet" href="/styles.css">
+  <script>
+    // Disable and silence Vite HMR WebSocket in Cloud Run iframe environment
+    (function() {
+      // 1. Intercept Vite HMR WebSocket connections
+      var OriginalWS = window.WebSocket;
+      if (OriginalWS) {
+        window.WebSocket = function(url, protocols) {
+          if (protocols === 'vite-hmr' || (typeof url === 'string' && (url.indexOf('vite-hmr') !== -1 || url.indexOf('/@vite/') !== -1))) {
+            var listeners = {};
+            var mock = {
+              readyState: 1, // OPEN
+              protocol: 'vite-hmr',
+              url: String(url),
+              bufferedAmount: 0,
+              extensions: '',
+              binaryType: 'blob',
+              send: function() {},
+              close: function() {},
+              addEventListener: function(type, fn) {
+                listeners[type] = listeners[type] || [];
+                listeners[type].push(fn);
+              },
+              removeEventListener: function(type, fn) {
+                if (listeners[type]) {
+                  listeners[type] = listeners[type].filter(function(cb) { return cb !== fn; });
+                }
+              },
+              dispatchEvent: function() { return true; },
+              onopen: null,
+              onclose: null,
+              onerror: null,
+              onmessage: null
+            };
+            return mock;
+          }
+          return new OriginalWS(url, protocols);
+        };
+        window.WebSocket.prototype = OriginalWS.prototype;
+        window.WebSocket.CONNECTING = 0;
+        window.WebSocket.OPEN = 1;
+        window.WebSocket.CLOSING = 2;
+        window.WebSocket.CLOSED = 3;
+      }
+
+      // 2. Intercept unhandledrejection & window error events
+      window.addEventListener('unhandledrejection', function(event) {
+        var str = String((event && event.reason && (event.reason.message || event.reason.stack || event.reason)) || '');
+        if (str.indexOf('WebSocket') !== -1 || str.indexOf('vite') !== -1) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }, true);
+
+      window.addEventListener('error', function(event) {
+        var str = String((event && (event.message || event.error)) || '');
+        if (str.indexOf('WebSocket') !== -1 || str.indexOf('vite') !== -1) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }, true);
+
+      // 3. Filter Vite WebSocket errors from console
+      var origError = console.error;
+      console.error = function() {
+        for (var i = 0; i < arguments.length; i++) {
+          var item = String(arguments[i] || '');
+          if (item.indexOf('failed to connect to websocket') !== -1 || item.indexOf('WebSocket closed without opened') !== -1) {
+            return;
+          }
+        }
+        origError.apply(console, arguments);
+      };
+
+      var origDebug = console.debug;
+      console.debug = function() {
+        for (var i = 0; i < arguments.length; i++) {
+          var item = String(arguments[i] || '');
+          if (item.indexOf('[vite] connecting') !== -1) {
+            return;
+          }
+        }
+        origDebug.apply(console, arguments);
+      };
+    })();
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>
