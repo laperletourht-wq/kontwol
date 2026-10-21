@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import { Facture } from '../../types';
 
 interface FacturesViewProps {
@@ -8,6 +9,9 @@ interface FacturesViewProps {
 
 export const FacturesView: React.FC<FacturesViewProps> = ({ onOpenModal }) => {
   const { factures, deleteFacture, saveFacture, setPrintSheetData, globalSearchQuery } = useApp();
+  const { role } = useAuth();
+  const isClient = role === 'client' || role === 'prospect';
+  const isChauffeur = role === 'chauffeur';
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -47,13 +51,19 @@ export const FacturesView: React.FC<FacturesViewProps> = ({ onOpenModal }) => {
     <div>
       <div className="section-head">
         <div>
-          <h2>Factures Officielles & Recouvrement</h2>
-          <p>Gestion comptable, encaissements et émission des factures conformes DGI.</p>
+          <h2>{isClient ? 'Mes Factures & Règlements' : 'Factures Officielles & Recouvrement'}</h2>
+          <p>
+            {isClient
+              ? 'Consultez l\'historique de vos factures, soldes et états de règlement.'
+              : 'Gestion comptable, encaissements et émission des factures conformes DGI.'}
+          </p>
         </div>
         <div className="actions">
-          <button type="button" className="primary" onClick={() => onOpenModal('facture')}>
-            + Nouvelle Facture
-          </button>
+          {!isClient && !isChauffeur && (
+            <button type="button" className="primary" onClick={() => onOpenModal('facture')}>
+              + Nouvelle Facture
+            </button>
+          )}
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 
 interface PaiementsViewProps {
   onOpenModal: (type: string, data?: any) => void;
@@ -7,6 +8,10 @@ interface PaiementsViewProps {
 
 export const PaiementsView: React.FC<PaiementsViewProps> = ({ onOpenModal }) => {
   const { paiements, deletePaiement, globalSearchQuery } = useApp();
+  const { role } = useAuth();
+  const isClient = role === 'client' || role === 'prospect';
+  const isChauffeur = role === 'chauffeur';
+  const canManagePayments = !isClient && !isChauffeur;
   const [searchTerm, setSearchTerm] = useState('');
 
   const effectiveSearch = (searchTerm || globalSearchQuery).toLowerCase();
@@ -27,13 +32,19 @@ export const PaiementsView: React.FC<PaiementsViewProps> = ({ onOpenModal }) => 
     <div>
       <div className="section-head">
         <div>
-          <h2>Caisse & Enregistrement des Paiements</h2>
-          <p>Consultez les encaissements par MonCash, Natcash, virement bancaire et espèces.</p>
+          <h2>{isClient ? 'Mes Règlements & Reçus de Paiement' : 'Caisse & Enregistrement des Paiements'}</h2>
+          <p>
+            {isClient
+              ? 'Consultez l\'historique de vos versements (MonCash, Natcash, virements bancaires).'
+              : 'Consultez les encaissements par MonCash, Natcash, virement bancaire et espèces.'}
+          </p>
         </div>
         <div className="actions">
-          <button type="button" className="primary" onClick={() => onOpenModal('paiement')}>
-            + Encaisser un Paiement
-          </button>
+          {!isChauffeur && (
+            <button type="button" className="primary" onClick={() => onOpenModal('paiement')}>
+              {isClient ? '+ Déclarer un Règlement' : '+ Encaisser un Paiement'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -93,26 +104,32 @@ export const PaiementsView: React.FC<PaiementsViewProps> = ({ onOpenModal }) => 
                     </td>
                     <td>
                       <div className="action-cell">
-                        <button
-                          type="button"
-                          className="tiny edit"
-                          onClick={() => onOpenModal('paiement', p)}
-                          title="Modifier"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          type="button"
-                          className="tiny delete"
-                          onClick={() => {
-                            if (window.confirm(`Supprimer le paiement ${p.reference} ?`)) {
-                              deletePaiement(p.id);
-                            }
-                          }}
-                          title="Supprimer"
-                        >
-                          🗑️
-                        </button>
+                        {canManagePayments ? (
+                          <>
+                            <button
+                              type="button"
+                              className="tiny edit"
+                              onClick={() => onOpenModal('paiement', p)}
+                              title="Modifier"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              type="button"
+                              className="tiny delete"
+                              onClick={() => {
+                                if (window.confirm(`Supprimer le paiement ${p.reference} ?`)) {
+                                  deletePaiement(p.id);
+                                }
+                              }}
+                              title="Supprimer"
+                            >
+                              🗑️
+                            </button>
+                          </>
+                        ) : (
+                          <span style={{ fontSize: '11px', color: '#94a3b8' }}>Reçu officiel</span>
+                        )}
                       </div>
                     </td>
                   </tr>

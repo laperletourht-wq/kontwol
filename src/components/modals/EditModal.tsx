@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types';
 
 interface EditModalProps {
@@ -9,6 +10,9 @@ interface EditModalProps {
 }
 
 export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => {
+  const { user, profile, role } = useAuth();
+  const isClientUser = role === 'client' || role === 'prospect';
+
   const { 
     saveReservation, 
     saveProforma, 
@@ -31,8 +35,16 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
   const [formData, setFormData] = useState<any>({});
 
   useEffect(() => {
-    setFormData(data || {});
-  }, [data]);
+    const initial = data ? { ...data } : {};
+    if (!data?.id && isClientUser) {
+      if (!initial.client) initial.client = profile?.nom || profile?.name || user?.displayName || '';
+      if (!initial.telephone) initial.telephone = profile?.telephone || profile?.phone || '';
+      if (!initial.email) initial.email = user?.email || profile?.email || '';
+      if (!initial.clientEmail) initial.clientEmail = user?.email || profile?.email || '';
+      if (!initial.clientId) initial.clientId = user?.uid || profile?.id || '';
+    }
+    setFormData(initial);
+  }, [data, isClientUser, profile, user]);
 
   if (!type) return null;
 

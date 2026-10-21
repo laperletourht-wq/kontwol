@@ -7,7 +7,9 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenModal }) => {
-  const { profile } = useAuth();
+  const { profile, role } = useAuth();
+  const isClient = role === 'client' || role === 'prospect';
+  const isChauffeur = role === 'chauffeur';
   const { 
     reservations, 
     proformas, 
@@ -44,7 +46,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenModal }) => 
         <div>
           <h2>Centre de Contrôle Laperle</h2>
           <p>
-            Bienvenue, <strong>{profile?.nom || 'Administrateur'}</strong>. Suivi opérationnel en temps réel de votre flotte et de votre facturation.
+            Bienvenue, <strong>{profile?.nom || profile?.name || 'Utilisateur'}</strong>. {isClient ? 'Espace personnel et suivi confidentiel de vos dossiers.' : isChauffeur ? 'Feuille de route et suivi opérationnel de vos missions.' : 'Suivi opérationnel en temps réel de votre flotte et de votre facturation.'}
           </p>
         </div>
         <div className="quote">
@@ -54,59 +56,130 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenModal }) => 
 
       {/* KPI Cards Grid */}
       <div className="kpis">
-        <div className="kpi" onClick={() => setCurrentModule('clients')} style={{ cursor: 'pointer' }}>
-          <div className="kpi-icon">👥</div>
-          <div>
-            <small>Clients Référencés</small>
-            <strong>{activeClients}</strong>
-            <a>Voir le répertoire →</a>
-          </div>
-        </div>
+        {isClient ? (
+          <>
+            <div className="kpi" onClick={() => setCurrentModule('reservations')} style={{ cursor: 'pointer' }}>
+              <div className="kpi-icon">📅</div>
+              <div>
+                <small>Mes Réservations</small>
+                <strong>{reservations.length}</strong>
+                <a>Voir mes courses →</a>
+              </div>
+            </div>
 
-        <div className="kpi" onClick={() => setCurrentModule('reservations')} style={{ cursor: 'pointer' }}>
-          <div className="kpi-icon">📅</div>
-          <div>
-            <small>Réservations Actives</small>
-            <strong>{pendingReservations}</strong>
-            <a>Gérer les courses →</a>
-          </div>
-        </div>
+            <div className="kpi" onClick={() => setCurrentModule('proformas')} style={{ cursor: 'pointer' }}>
+              <div className="kpi-icon">📋</div>
+              <div>
+                <small>Mes Devis / Proformas</small>
+                <strong>{proformas.length}</strong>
+                <a>Consulter mes devis →</a>
+              </div>
+            </div>
 
-        <div className="kpi" onClick={() => setCurrentModule('proformas')} style={{ cursor: 'pointer' }}>
-          <div className="kpi-icon">📋</div>
-          <div>
-            <small>Proformas (Devis)</small>
-            <strong>{pendingProformas} en attente</strong>
-            <a>Consulter les devis →</a>
-          </div>
-        </div>
+            <div className="kpi" onClick={() => setCurrentModule('factures')} style={{ cursor: 'pointer' }}>
+              <div className="kpi-icon">💳</div>
+              <div>
+                <small>Mes Factures</small>
+                <strong>{factures.length}</strong>
+                <a>Suivi des règlements →</a>
+              </div>
+            </div>
 
-        <div className="kpi" onClick={() => setCurrentModule('factures')} style={{ cursor: 'pointer' }}>
-          <div className="kpi-icon">💳</div>
-          <div>
-            <small>Factures Émises</small>
-            <strong>{factures.length}</strong>
-            <a>Suivi des règlements →</a>
-          </div>
-        </div>
+            <div className="kpi" onClick={() => setCurrentModule('paiements')} style={{ cursor: 'pointer' }}>
+              <div className="kpi-icon">💵</div>
+              <div>
+                <small>Mes Paiements Validés</small>
+                <strong>${totalRevenueUSD} USD</strong>
+                <a>Historique de caisse →</a>
+              </div>
+            </div>
+          </>
+        ) : isChauffeur ? (
+          <>
+            <div className="kpi" onClick={() => setCurrentModule('plannings')} style={{ cursor: 'pointer' }}>
+              <div className="kpi-icon">⏱️</div>
+              <div>
+                <small>Missions Assignées</small>
+                <strong>{plannings.length}</strong>
+                <a>Ma feuille de route →</a>
+              </div>
+            </div>
 
-        <div className="kpi" onClick={() => setCurrentModule('vehicules')} style={{ cursor: 'pointer' }}>
-          <div className="kpi-icon">🚗</div>
-          <div>
-            <small>Flotte en Ligne</small>
-            <strong>{activeVehicles} / {vehicules.length}</strong>
-            <a>État des véhicules →</a>
-          </div>
-        </div>
+            <div className="kpi" onClick={() => setCurrentModule('plannings')} style={{ cursor: 'pointer' }}>
+              <div className="kpi-icon">▶️</div>
+              <div>
+                <small>Courses en Cours</small>
+                <strong>{plannings.filter(p => p.statut === 'En cours').length}</strong>
+                <a>Suivi en direct →</a>
+              </div>
+            </div>
 
-        <div className="kpi" onClick={() => setCurrentModule('chauffeurs')} style={{ cursor: 'pointer' }}>
-          <div className="kpi-icon">👔</div>
-          <div>
-            <small>Chauffeurs Mobilisés</small>
-            <strong>{activeDrivers} / {chauffeurs.length}</strong>
-            <a>Planning conducteurs →</a>
-          </div>
-        </div>
+            <div className="kpi" onClick={() => setCurrentModule('vehicules')} style={{ cursor: 'pointer' }}>
+              <div className="kpi-icon">🚗</div>
+              <div>
+                <small>Flotte Opérationnelle</small>
+                <strong>{vehicules.length} véhicules</strong>
+                <a>Vérifier l'état →</a>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="kpi" onClick={() => setCurrentModule('clients')} style={{ cursor: 'pointer' }}>
+              <div className="kpi-icon">👥</div>
+              <div>
+                <small>Clients Référencés</small>
+                <strong>{activeClients}</strong>
+                <a>Voir le répertoire →</a>
+              </div>
+            </div>
+
+            <div className="kpi" onClick={() => setCurrentModule('reservations')} style={{ cursor: 'pointer' }}>
+              <div className="kpi-icon">📅</div>
+              <div>
+                <small>Réservations Actives</small>
+                <strong>{pendingReservations}</strong>
+                <a>Gérer les courses →</a>
+              </div>
+            </div>
+
+            <div className="kpi" onClick={() => setCurrentModule('proformas')} style={{ cursor: 'pointer' }}>
+              <div className="kpi-icon">📋</div>
+              <div>
+                <small>Proformas (Devis)</small>
+                <strong>{pendingProformas} en attente</strong>
+                <a>Consulter les devis →</a>
+              </div>
+            </div>
+
+            <div className="kpi" onClick={() => setCurrentModule('factures')} style={{ cursor: 'pointer' }}>
+              <div className="kpi-icon">💳</div>
+              <div>
+                <small>Factures Émises</small>
+                <strong>{factures.length}</strong>
+                <a>Suivi des règlements →</a>
+              </div>
+            </div>
+
+            <div className="kpi" onClick={() => setCurrentModule('vehicules')} style={{ cursor: 'pointer' }}>
+              <div className="kpi-icon">🚗</div>
+              <div>
+                <small>Flotte en Ligne</small>
+                <strong>{activeVehicles} / {vehicules.length}</strong>
+                <a>État des véhicules →</a>
+              </div>
+            </div>
+
+            <div className="kpi" onClick={() => setCurrentModule('chauffeurs')} style={{ cursor: 'pointer' }}>
+              <div className="kpi-icon">👔</div>
+              <div>
+                <small>Chauffeurs Mobilisés</small>
+                <strong>{activeDrivers} / {chauffeurs.length}</strong>
+                <a>Planning conducteurs →</a>
+              </div>
+            </div>
+          </>
+        )}
 
         <div className="kpi" onClick={() => setCurrentModule('paiements')} style={{ cursor: 'pointer' }}>
           <div className="kpi-icon">💵</div>
@@ -203,26 +276,56 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenModal }) => 
             <h3>Actions Rapides</h3>
           </div>
           <div className="quick-list">
-            <button type="button" onClick={() => onOpenModal('reservation')}>
-              <span>📅 Planifier une réservation</span>
-              <b>+</b>
-            </button>
-            <button type="button" onClick={() => onOpenModal('proforma')}>
-              <span>📋 Émettre un devis proforma</span>
-              <b>+</b>
-            </button>
-            <button type="button" onClick={() => onOpenModal('facture')}>
-              <span>💳 Émettre une facture officielle</span>
-              <b>+</b>
-            </button>
-            <button type="button" onClick={() => onOpenModal('planning')}>
-              <span>⏱️ Assigner un trajet de dispatch</span>
-              <b>+</b>
-            </button>
-            <button type="button" onClick={() => onOpenModal('paiement')}>
-              <span>💵 Encaisser un paiement caisse</span>
-              <b>+</b>
-            </button>
+            {isClient ? (
+              <>
+                <button type="button" onClick={() => onOpenModal('reservation')}>
+                  <span>📅 Réserver une course ou un circuit</span>
+                  <b>+</b>
+                </button>
+                <button type="button" onClick={() => onOpenModal('proforma')}>
+                  <span>📋 Demander un devis proforma</span>
+                  <b>+</b>
+                </button>
+                <button type="button" onClick={() => onOpenModal('paiement')}>
+                  <span>💵 Déclarer un règlement</span>
+                  <b>+</b>
+                </button>
+              </>
+            ) : isChauffeur ? (
+              <>
+                <button type="button" onClick={() => setCurrentModule('plannings')}>
+                  <span>⏱️ Voir ma feuille de route</span>
+                  <b>➔</b>
+                </button>
+                <button type="button" onClick={() => setCurrentModule('vehicules')}>
+                  <span>🚗 Consulter mon véhicule</span>
+                  <b>➔</b>
+                </button>
+              </>
+            ) : (
+              <>
+                <button type="button" onClick={() => onOpenModal('reservation')}>
+                  <span>📅 Planifier une réservation</span>
+                  <b>+</b>
+                </button>
+                <button type="button" onClick={() => onOpenModal('proforma')}>
+                  <span>📋 Émettre un devis proforma</span>
+                  <b>+</b>
+                </button>
+                <button type="button" onClick={() => onOpenModal('facture')}>
+                  <span>💳 Émettre une facture officielle</span>
+                  <b>+</b>
+                </button>
+                <button type="button" onClick={() => onOpenModal('planning')}>
+                  <span>⏱️ Assigner un trajet de dispatch</span>
+                  <b>+</b>
+                </button>
+                <button type="button" onClick={() => onOpenModal('paiement')}>
+                  <span>💵 Encaisser un paiement caisse</span>
+                  <b>+</b>
+                </button>
+              </>
+            )}
           </div>
         </div>
 

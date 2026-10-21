@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import { Proforma } from '../../types';
 
 interface ProformasViewProps {
@@ -8,6 +9,9 @@ interface ProformasViewProps {
 
 export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenModal }) => {
   const { proformas, deleteProforma, convertProformaToFacture, setPrintSheetData, globalSearchQuery } = useApp();
+  const { role } = useAuth();
+  const isClient = role === 'client' || role === 'prospect';
+  const isChauffeur = role === 'chauffeur';
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -37,13 +41,19 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenModal }) => 
     <div>
       <div className="section-head">
         <div>
-          <h2>Devis & Proformas Officielles</h2>
-          <p>Éditez, chiffrez et suivez vos propositions commerciales en $ USD et Gourdes HTG.</p>
+          <h2>{isClient ? 'Mes Devis & Proformas' : 'Devis & Proformas Officielles'}</h2>
+          <p>
+            {isClient
+              ? 'Consultez les devis et propositions personnalisées qui vous sont transmis.'
+              : 'Éditez, chiffrez et suivez vos propositions commerciales en $ USD et Gourdes HTG.'}
+          </p>
         </div>
         <div className="actions">
-          <button type="button" className="primary" onClick={() => onOpenModal('proforma')}>
-            + Nouvelle Proforma
-          </button>
+          {!isChauffeur && (
+            <button type="button" className="primary" onClick={() => onOpenModal('proforma')}>
+              {isClient ? '+ Demander un Devis' : '+ Nouvelle Proforma'}
+            </button>
+          )}
         </div>
       </div>
 

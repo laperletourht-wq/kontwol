@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { 
   db, 
   auth, 
@@ -487,6 +487,11 @@ interface AppContextType {
   chauffeurs: Chauffeur[];
   plannings: Planning[];
   paiements: Paiement[];
+  allReservations?: Reservation[];
+  allProformas?: Proforma[];
+  allFactures?: Facture[];
+  allPlannings?: Planning[];
+  allPaiements?: Paiement[];
   utilisateurs: UserProfile[];
   notifications: NotificationItem[];
   settings: CompanySettings;
@@ -525,7 +530,7 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, profile } = useAuth();
+  const { user, profile, role, roles, isSuperAdmin } = useAuth();
 
   // Navigation states
   const [currentModule, setCurrentModule] = useState<string>('dashboard');
@@ -538,17 +543,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [globalSearchQuery, setGlobalSearchQuery] = useState<string>('');
   const [firebaseOnline, setFirebaseOnline] = useState<boolean>(true);
 
-  // Data states with sensible seed defaults
-  const [reservations, setReservations] = useState<Reservation[]>(SEED_RESERVATIONS);
-  const [proformas, setProformas] = useState<Proforma[]>(SEED_PROFORMAS);
-  const [factures, setFactures] = useState<Facture[]>(SEED_FACTURES);
-  const [clients, setClients] = useState<Client[]>(SEED_CLIENTS);
-  const [eleves, setEleves] = useState<Eleve[]>(SEED_ELEVES);
-  const [abonnements, setAbonnements] = useState<Abonnement[]>(SEED_ABONNEMENTS);
-  const [vehicules, setVehicules] = useState<Vehicule[]>(SEED_VEHICULES);
-  const [chauffeurs, setChauffeurs] = useState<Chauffeur[]>(SEED_CHAUFFEURS);
-  const [plannings, setPlannings] = useState<Planning[]>(SEED_PLANNINGS);
-  const [paiements, setPaiements] = useState<Paiement[]>(SEED_PAIEMENTS);
+  // Raw Data states with sensible seed defaults
+  const [rawReservations, setRawReservations] = useState<Reservation[]>(SEED_RESERVATIONS);
+  const [rawProformas, setRawProformas] = useState<Proforma[]>(SEED_PROFORMAS);
+  const [rawFactures, setRawFactures] = useState<Facture[]>(SEED_FACTURES);
+  const [rawClients, setRawClients] = useState<Client[]>(SEED_CLIENTS);
+  const [rawEleves, setRawEleves] = useState<Eleve[]>(SEED_ELEVES);
+  const [rawAbonnements, setRawAbonnements] = useState<Abonnement[]>(SEED_ABONNEMENTS);
+  const [rawVehicules, setRawVehicules] = useState<Vehicule[]>(SEED_VEHICULES);
+  const [rawChauffeurs, setRawChauffeurs] = useState<Chauffeur[]>(SEED_CHAUFFEURS);
+  const [rawPlannings, setRawPlannings] = useState<Planning[]>(SEED_PLANNINGS);
+  const [rawPaiements, setRawPaiements] = useState<Paiement[]>(SEED_PAIEMENTS);
   const [utilisateurs, setUtilisateurs] = useState<UserProfile[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>(SEED_NOTIFICATIONS);
   const [settings, setSettings] = useState<CompanySettings>(DEFAULT_SETTINGS);
@@ -611,16 +616,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     };
 
-    syncCollection('reservations', setReservations, SEED_RESERVATIONS);
-    syncCollection('proformas', setProformas, SEED_PROFORMAS);
-    syncCollection('factures', setFactures, SEED_FACTURES);
-    syncCollection('clients', setClients, SEED_CLIENTS);
-    syncCollection('eleves', setEleves, SEED_ELEVES);
-    syncCollection('abonnements', setAbonnements, SEED_ABONNEMENTS);
-    syncCollection('vehicules', setVehicules, SEED_VEHICULES);
-    syncCollection('chauffeurs', setChauffeurs, SEED_CHAUFFEURS);
-    syncCollection('plannings', setPlannings, SEED_PLANNINGS);
-    syncCollection('paiements', setPaiements, SEED_PAIEMENTS);
+    syncCollection('reservations', setRawReservations, SEED_RESERVATIONS);
+    syncCollection('proformas', setRawProformas, SEED_PROFORMAS);
+    syncCollection('factures', setRawFactures, SEED_FACTURES);
+    syncCollection('clients', setRawClients, SEED_CLIENTS);
+    syncCollection('eleves', setRawEleves, SEED_ELEVES);
+    syncCollection('abonnements', setRawAbonnements, SEED_ABONNEMENTS);
+    syncCollection('vehicules', setRawVehicules, SEED_VEHICULES);
+    syncCollection('chauffeurs', setRawChauffeurs, SEED_CHAUFFEURS);
+    syncCollection('plannings', setRawPlannings, SEED_PLANNINGS);
+    syncCollection('paiements', setRawPaiements, SEED_PAIEMENTS);
     syncCollection('utilisateurs', setUtilisateurs, []);
     syncCollection('notifications', setNotifications, SEED_NOTIFICATIONS);
 
@@ -680,67 +685,350 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast(successMsg, 'info');
   };
 
-  // Explicit CRUD implementations
+  // --------------------------------------------------------------------------
+  // ROLE-BASED ACCESS & PARTITIONING LOGIC (1, 2 ou 3)
+  // --------------------------------------------------------------------------
+  // 1. Roles with global visibility: Direction, Administrateur et Comptabilité
+  const isGlobalRole = useMemo(() => {
+    if (isSuperAdmin) return true;
+    const globalRoles: string[] = ['admin', 'direction', 'comptabilite'];
+    if (globalRoles.includes(role)) return true;
+    if (Array.isArray(roles) && roles.some((r) => globalRoles.includes(r))) return true;
+    return false;
+  }, [isSuperAdmin, role, roles]);
+
+  const isSecretaireRole = useMemo(() => {
+    return role === 'secretaire' || (Array.isArray(roles) && roles.includes('secretaire'));
+  }, [role, roles]);
+
+  const isOperationsRole = useMemo(() => {
+    return role === 'operations' || (Array.isArray(roles) && roles.includes('operations'));
+  }, [role, roles]);
+
+  const isChauffeurRole = useMemo(() => {
+    return role === 'chauffeur' || (Array.isArray(roles) && roles.includes('chauffeur'));
+  }, [role, roles]);
+
+  const isClientRole = useMemo(() => {
+    return (
+      role === 'client' ||
+      role === 'prospect' ||
+      (!isGlobalRole && !isSecretaireRole && !isOperationsRole && !isChauffeurRole)
+    );
+  }, [role, isGlobalRole, isSecretaireRole, isOperationsRole, isChauffeurRole]);
+
+  // Name & Identity normalization helpers for multi-criteria matching
+  const nameVariants = useMemo(() => {
+    const list: string[] = [];
+    const addNorm = (s?: string | null) => {
+      if (!s) return;
+      const clean = s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      if (clean && clean.length > 1) list.push(clean);
+    };
+    addNorm(profile?.nom);
+    addNorm(profile?.prenom);
+    if (profile?.nom && profile?.prenom) {
+      addNorm(`${profile.prenom} ${profile.nom}`);
+      addNorm(`${profile.nom} ${profile.prenom}`);
+    }
+    addNorm(profile?.name);
+    addNorm(user?.displayName);
+    return Array.from(new Set(list));
+  }, [profile?.nom, profile?.prenom, profile?.name, user?.displayName]);
+
+  const userPhone = useMemo(() => {
+    const p = profile?.telephone || profile?.phone;
+    return p ? p.replace(/\D/g, '') : '';
+  }, [profile?.telephone, profile?.phone]);
+
+  const userEmail = useMemo(() => {
+    return (user?.email || profile?.email || '').trim().toLowerCase();
+  }, [user?.email, profile?.email]);
+
+  // Match Name helper
+  const matchName = useCallback(
+    (targetName?: string | null): boolean => {
+      if (!targetName) return false;
+      const cleanTarget = targetName.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      if (!cleanTarget) return false;
+      return nameVariants.some(
+        (v) => v === cleanTarget || (v.length >= 4 && (cleanTarget.includes(v) || v.includes(cleanTarget)))
+      );
+    },
+    [nameVariants]
+  );
+
+  // Match Phone helper (checks last 8 digits)
+  const matchPhone = useCallback(
+    (targetPhone?: string | null): boolean => {
+      if (!targetPhone || !userPhone || userPhone.length < 7) return false;
+      const cleanTarget = targetPhone.replace(/\D/g, '');
+      if (cleanTarget.length < 7) return false;
+      return cleanTarget.endsWith(userPhone.slice(-8)) || userPhone.endsWith(cleanTarget.slice(-8));
+    },
+    [userPhone]
+  );
+
+  // 1. Scoped Reservations
+  const reservations = useMemo(() => {
+    if (!user || isGlobalRole || isSecretaireRole || isOperationsRole) {
+      return rawReservations;
+    }
+    if (isChauffeurRole) {
+      // Driver only sees trips where assigned
+      return rawReservations.filter((r) => matchName(r.driver));
+    }
+    // Client / Prospect: Criterion 1 (UID/clientId), 2 (Email), 3 (Name or Phone)
+    return rawReservations.filter((r) => {
+      if (r.clientId && (r.clientId === user.uid || r.clientId === profile?.id)) return true;
+      if ((r as any).uid && ((r as any).uid === user.uid || (r as any).uid === profile?.id)) return true;
+      if (userEmail && r.email && r.email.trim().toLowerCase() === userEmail) return true;
+      if (userEmail && r.notes && r.notes.toLowerCase().includes(userEmail)) return true;
+      if (matchName(r.client)) return true;
+      if (matchPhone(r.telephone)) return true;
+      return false;
+    });
+  }, [rawReservations, user, isGlobalRole, isSecretaireRole, isOperationsRole, isChauffeurRole, profile?.id, userEmail, matchName, matchPhone]);
+
+  // 2. Scoped Proformas
+  const proformas = useMemo(() => {
+    if (!user || isGlobalRole || isSecretaireRole) {
+      return rawProformas;
+    }
+    if (isChauffeurRole || isOperationsRole) {
+      return []; // Proformas are strictly confidential to client & commercial/management
+    }
+    // Client / Prospect: Criterion 1 (UID/clientId), 2 (Email), 3 (Name or Phone)
+    return rawProformas.filter((p) => {
+      if (p.clientId && (p.clientId === user.uid || p.clientId === profile?.id)) return true;
+      if (userEmail && p.clientEmail && p.clientEmail.trim().toLowerCase() === userEmail) return true;
+      if (userEmail && (p as any).email && (p as any).email.trim().toLowerCase() === userEmail) return true;
+      if (userEmail && p.notes && p.notes.toLowerCase().includes(userEmail)) return true;
+      if (matchName(p.client)) return true;
+      if (matchPhone(p.telephone)) return true;
+      return false;
+    });
+  }, [rawProformas, user, isGlobalRole, isSecretaireRole, isChauffeurRole, isOperationsRole, profile?.id, userEmail, matchName, matchPhone]);
+
+  const clientProformaNumbers = useMemo(() => {
+    return new Set(proformas.map((p) => p.number).filter(Boolean));
+  }, [proformas]);
+
+  // 3. Scoped Factures
+  const factures = useMemo(() => {
+    if (!user || isGlobalRole || isSecretaireRole) {
+      return rawFactures;
+    }
+    if (isChauffeurRole || isOperationsRole) {
+      return []; // Invoices strictly confidential to client & accounting/management
+    }
+    // Client / Prospect: Criterion 1 (UID/clientId), 2 (Email/Proforma match), 3 (Name or Phone)
+    return rawFactures.filter((f) => {
+      if (f.clientId && (f.clientId === user.uid || f.clientId === profile?.id)) return true;
+      if (userEmail && f.clientEmail && f.clientEmail.trim().toLowerCase() === userEmail) return true;
+      if (f.proformaNumber && clientProformaNumbers.has(f.proformaNumber)) return true;
+      if (matchName(f.client)) return true;
+      if (matchPhone(f.telephone)) return true;
+      return false;
+    });
+  }, [rawFactures, user, isGlobalRole, isSecretaireRole, isChauffeurRole, isOperationsRole, profile?.id, userEmail, clientProformaNumbers, matchName, matchPhone]);
+
+  const clientFactureNumbers = useMemo(() => {
+    return new Set(factures.map((f) => f.number).filter(Boolean));
+  }, [factures]);
+
+  // 4. Scoped Paiements
+  const paiements = useMemo(() => {
+    if (!user || isGlobalRole || isSecretaireRole) {
+      return rawPaiements;
+    }
+    if (isChauffeurRole || isOperationsRole) {
+      return []; // Payments are strictly confidential to client & finance
+    }
+    // Client / Prospect
+    return rawPaiements.filter((p) => {
+      if (p.clientId && (p.clientId === user.uid || p.clientId === profile?.id)) return true;
+      if (userEmail && p.clientEmail && p.clientEmail.trim().toLowerCase() === userEmail) return true;
+      if (p.factureAssociee && clientFactureNumbers.has(p.factureAssociee)) return true;
+      if (p.proformaAssociee && clientProformaNumbers.has(p.proformaAssociee)) return true;
+      if (matchName(p.client)) return true;
+      return false;
+    });
+  }, [rawPaiements, user, isGlobalRole, isSecretaireRole, isChauffeurRole, isOperationsRole, profile?.id, userEmail, clientFactureNumbers, clientProformaNumbers, matchName]);
+
+  // 5. Scoped Plannings (Feuille de Route)
+  const plannings = useMemo(() => {
+    if (!user || isGlobalRole || isSecretaireRole || isOperationsRole) {
+      return rawPlannings;
+    }
+    if (isChauffeurRole) {
+      // Driver only sees their assigned courses
+      return rawPlannings.filter((p) => {
+        if (p.chauffeurId && (p.chauffeurId === user.uid || p.chauffeurId === profile?.id)) return true;
+        if ((p as any).driverId && ((p as any).driverId === user.uid || (p as any).driverId === profile?.id)) return true;
+        return matchName(p.chauffeur);
+      });
+    }
+    // Client only sees confirmed plannings for their personal trips
+    return rawPlannings.filter((p) => {
+      if (p.clientId && (p.clientId === user.uid || p.clientId === profile?.id)) return true;
+      return matchName(p.client);
+    });
+  }, [rawPlannings, user, isGlobalRole, isSecretaireRole, isOperationsRole, isChauffeurRole, profile?.id, matchName]);
+
+  // 6. Scoped Eleves (Navette Scolaire)
+  const eleves = useMemo(() => {
+    if (!user || isGlobalRole || isSecretaireRole) {
+      return rawEleves;
+    }
+    if (isChauffeurRole) {
+      return rawEleves.filter((e) => matchName(e.chauffeurAssigne));
+    }
+    return rawEleves.filter((e) => {
+      if (e.clientId && (e.clientId === user.uid || e.clientId === profile?.id)) return true;
+      if (userEmail && e.parentEmail && e.parentEmail.trim().toLowerCase() === userEmail) return true;
+      if (matchName(e.parentNom)) return true;
+      if (matchPhone(e.parentTelephone)) return true;
+      return false;
+    });
+  }, [rawEleves, user, isGlobalRole, isSecretaireRole, isChauffeurRole, profile?.id, userEmail, matchName, matchPhone]);
+
+  // 7. Scoped Abonnements
+  const abonnements = useMemo(() => {
+    if (!user || isGlobalRole || isSecretaireRole) {
+      return rawAbonnements;
+    }
+    if (isChauffeurRole || isOperationsRole) {
+      return [];
+    }
+    const clientEleveNames = new Set(eleves.map((e) => `${e.prenom} ${e.nom}`.toLowerCase().trim()));
+    return rawAbonnements.filter((a) => {
+      if (a.clientId && (a.clientId === user.uid || a.clientId === profile?.id)) return true;
+      if (userEmail && a.clientEmail && a.clientEmail.trim().toLowerCase() === userEmail) return true;
+      if (matchName(a.client)) return true;
+      if (a.eleveNom && clientEleveNames.has(a.eleveNom.toLowerCase().trim())) return true;
+      return false;
+    });
+  }, [rawAbonnements, user, isGlobalRole, isSecretaireRole, isChauffeurRole, isOperationsRole, profile?.id, userEmail, eleves, matchName]);
+
+  // 8. Scoped Clients Directory
+  const clients = useMemo(() => {
+    if (!user || isGlobalRole || isSecretaireRole || isOperationsRole) {
+      return rawClients;
+    }
+    if (isChauffeurRole) return [];
+    return rawClients.filter((c) => {
+      if (c.id === user.uid || c.id === profile?.id) return true;
+      if (userEmail && c.email && c.email.trim().toLowerCase() === userEmail) return true;
+      if (matchName(c.name)) return true;
+      if (matchPhone(c.telephone)) return true;
+      return false;
+    });
+  }, [rawClients, user, isGlobalRole, isSecretaireRole, isOperationsRole, isChauffeurRole, profile?.id, userEmail, matchName, matchPhone]);
+
+  // 9. Vehicules (Accessible to staff and client showcase)
+  const vehicules = useMemo(() => {
+    return rawVehicules;
+  }, [rawVehicules]);
+
+  // 10. Chauffeurs
+  const chauffeurs = useMemo(() => {
+    if (!user || isGlobalRole || isSecretaireRole || isOperationsRole) {
+      return rawChauffeurs;
+    }
+    if (isChauffeurRole) {
+      return rawChauffeurs.filter((c) => c.id === user.uid || matchName(`${c.prenom} ${c.nom}`));
+    }
+    return [];
+  }, [rawChauffeurs, user, isGlobalRole, isSecretaireRole, isOperationsRole, isChauffeurRole, matchName]);
+
+  // --------------------------------------------------------------------------
+  // ENRICHED CRUD IMPLEMENTATIONS WITH AUTOMATIC ATTRIBUTION
+  // --------------------------------------------------------------------------
   const saveReservation = async (item: Partial<Reservation>) => {
-    await saveItemToCollection('reservations', item, setReservations, 'Réservation enregistrée avec succès');
+    const isRestricted = isClientRole && user;
+    const enriched: Partial<Reservation> = {
+      ...item,
+      clientId: item.clientId || (isRestricted ? user.uid : undefined),
+      email: item.email || (isRestricted && user.email ? user.email : undefined),
+      telephone: item.telephone || (isRestricted ? (profile?.telephone || profile?.phone) : undefined),
+      client: item.client || (isRestricted ? (profile?.nom || profile?.name || user.displayName || 'Client') : 'Client Divers')
+    };
+    await saveItemToCollection('reservations', enriched, setRawReservations, 'Réservation enregistrée avec succès');
   };
   const deleteReservation = async (id: string) => {
-    await deleteItemFromCollection('reservations', id, setReservations, 'Réservation supprimée');
+    await deleteItemFromCollection('reservations', id, setRawReservations, 'Réservation supprimée');
   };
 
   const saveProforma = async (item: Partial<Proforma>) => {
-    await saveItemToCollection('proformas', item, setProformas, 'Devis proforma enregistré');
+    const isRestricted = isClientRole && user;
+    const enriched: Partial<Proforma> = {
+      ...item,
+      clientId: item.clientId || (isRestricted ? user.uid : undefined),
+      clientEmail: item.clientEmail || (isRestricted && user.email ? user.email : undefined),
+      telephone: item.telephone || (isRestricted ? (profile?.telephone || profile?.phone) : undefined),
+      client: item.client || (isRestricted ? (profile?.nom || profile?.name || user.displayName || 'Client') : 'Client Divers')
+    };
+    await saveItemToCollection('proformas', enriched, setRawProformas, 'Devis proforma enregistré');
   };
   const deleteProforma = async (id: string) => {
-    await deleteItemFromCollection('proformas', id, setProformas, 'Proforma supprimée');
+    await deleteItemFromCollection('proformas', id, setRawProformas, 'Proforma supprimée');
   };
 
   const saveFacture = async (item: Partial<Facture>) => {
-    await saveItemToCollection('factures', item, setFactures, 'Facture enregistrée');
+    const isRestricted = isClientRole && user;
+    const enriched: Partial<Facture> = {
+      ...item,
+      clientId: item.clientId || (isRestricted ? user.uid : undefined),
+      clientEmail: item.clientEmail || (isRestricted && user.email ? user.email : undefined),
+      telephone: item.telephone || (isRestricted ? (profile?.telephone || profile?.phone) : undefined),
+      client: item.client || (isRestricted ? (profile?.nom || profile?.name || user.displayName || 'Client') : 'Client')
+    };
+    await saveItemToCollection('factures', enriched, setRawFactures, 'Facture enregistrée');
   };
   const deleteFacture = async (id: string) => {
-    await deleteItemFromCollection('factures', id, setFactures, 'Facture supprimée');
+    await deleteItemFromCollection('factures', id, setRawFactures, 'Facture supprimée');
   };
 
   const saveClient = async (item: Partial<Client>) => {
-    await saveItemToCollection('clients', item, setClients, 'Client enregistré');
+    await saveItemToCollection('clients', item, setRawClients, 'Client enregistré');
   };
   const deleteClient = async (id: string) => {
-    await deleteItemFromCollection('clients', id, setClients, 'Client supprimé');
+    await deleteItemFromCollection('clients', id, setRawClients, 'Client supprimé');
   };
 
   const saveEleve = async (item: Partial<Eleve>) => {
-    await saveItemToCollection('eleves', item, setEleves, 'Élève enregistré');
+    await saveItemToCollection('eleves', item, setRawEleves, 'Élève enregistré');
   };
   const deleteEleve = async (id: string) => {
-    await deleteItemFromCollection('eleves', id, setEleves, 'Élève supprimé');
+    await deleteItemFromCollection('eleves', id, setRawEleves, 'Élève supprimé');
   };
 
   const saveAbonnement = async (item: Partial<Abonnement>) => {
-    await saveItemToCollection('abonnements', item, setAbonnements, 'Abonnement enregistré');
+    await saveItemToCollection('abonnements', item, setRawAbonnements, 'Abonnement enregistré');
   };
   const deleteAbonnement = async (id: string) => {
-    await deleteItemFromCollection('abonnements', id, setAbonnements, 'Abonnement supprimé');
+    await deleteItemFromCollection('abonnements', id, setRawAbonnements, 'Abonnement supprimé');
   };
 
   const saveVehicule = async (item: Partial<Vehicule>) => {
-    await saveItemToCollection('vehicules', item, setVehicules, 'Véhicule mis à jour dans la flotte');
+    await saveItemToCollection('vehicules', item, setRawVehicules, 'Véhicule mis à jour dans la flotte');
   };
   const deleteVehicule = async (id: string) => {
-    await deleteItemFromCollection('vehicules', id, setVehicules, 'Véhicule retiré de la flotte');
+    await deleteItemFromCollection('vehicules', id, setRawVehicules, 'Véhicule retiré de la flotte');
   };
 
   const saveChauffeur = async (item: Partial<Chauffeur>) => {
-    await saveItemToCollection('chauffeurs', item, setChauffeurs, 'Chauffeur enregistré');
+    await saveItemToCollection('chauffeurs', item, setRawChauffeurs, 'Chauffeur enregistré');
   };
   const deleteChauffeur = async (id: string) => {
-    await deleteItemFromCollection('chauffeurs', id, setChauffeurs, 'Chauffeur supprimé');
+    await deleteItemFromCollection('chauffeurs', id, setRawChauffeurs, 'Chauffeur supprimé');
   };
 
   const savePlanning = async (item: Partial<Planning>) => {
-    // 1. Détection préventive des conflits horaires
+    // 1. Détection préventive des conflits horaires sur l'ensemble de la flotte
     if (item.date && (item.chauffeur || item.vehicule)) {
-      const conflict = plannings.find(
+      const conflict = rawPlannings.find(
         (p) =>
           p.id !== item.id &&
           p.date === item.date &&
@@ -758,11 +1046,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     // 2. Sauvegarde du planning
-    await saveItemToCollection('plannings', item, setPlannings, 'Trajet et planning dispatchés');
+    await saveItemToCollection('plannings', item, setRawPlannings, 'Trajet et planning dispatchés');
 
     // 3. Synchronisation automatique des statuts de flotte et de chauffeurs
     if (item.vehicule) {
-      const targetVeh = vehicules.find(
+      const targetVeh = rawVehicules.find(
         (v) =>
           v.plaque.toLowerCase() === item.vehicule?.toLowerCase() ||
           item.vehicule?.toLowerCase().includes(v.plaque.toLowerCase()) ||
@@ -778,7 +1066,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     if (item.chauffeur) {
-      const targetChf = chauffeurs.find(
+      const targetChf = rawChauffeurs.find(
         (c) =>
           `${c.prenom} ${c.nom}`.toLowerCase() === item.chauffeur?.toLowerCase() ||
           item.chauffeur?.toLowerCase().includes(c.nom.toLowerCase())
@@ -793,15 +1081,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
   const deletePlanning = async (id: string) => {
-    await deleteItemFromCollection('plannings', id, setPlannings, 'Planning annulé');
+    await deleteItemFromCollection('plannings', id, setRawPlannings, 'Planning annulé');
   };
 
   const savePaiement = async (item: Partial<Paiement>) => {
-    await saveItemToCollection('paiements', item, setPaiements, 'Paiement encaissé et enregistré');
+    const isRestricted = isClientRole && user;
+    const enriched: Partial<Paiement> = {
+      ...item,
+      clientId: item.clientId || (isRestricted ? user.uid : undefined),
+      clientEmail: item.clientEmail || (isRestricted && user.email ? user.email : undefined),
+      client: item.client || (isRestricted ? (profile?.nom || profile?.name || user.displayName || 'Client') : 'Client Divers')
+    };
+
+    await saveItemToCollection('paiements', enriched, setRawPaiements, 'Paiement encaissé et enregistré');
 
     // Liaison Métier Clé : Mise à jour automatique du solde et du statut de la facture liée
     if (item.factureAssociee && (item.statut === 'Validé' || !item.statut)) {
-      const targetFacture = factures.find(
+      const targetFacture = rawFactures.find(
         (f) => f.number === item.factureAssociee || f.id === item.factureAssociee
       );
       if (targetFacture) {
@@ -813,14 +1109,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await saveItemToCollection(
           'factures',
           { ...targetFacture, paidAmount: newPaid, status: newStatus },
-          setFactures,
+          setRawFactures,
           `Facture ${targetFacture.number} mise à jour : Statut [${newStatus}] ($${newPaid}/$${targetFacture.amount})`
         );
       }
     }
   };
   const deletePaiement = async (id: string) => {
-    await deleteItemFromCollection('paiements', id, setPaiements, 'Paiement supprimé');
+    await deleteItemFromCollection('paiements', id, setRawPaiements, 'Paiement supprimé');
   };
 
   const saveSettings = async (item: Partial<CompanySettings>) => {
@@ -870,6 +1166,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       proformaNumber: proforma.number,
       client: proforma.client,
       clientId: proforma.clientId,
+      clientEmail: proforma.clientEmail,
       telephone: proforma.telephone,
       service: proforma.service,
       date: new Date().toISOString().slice(0, 10),
@@ -898,6 +1195,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       number,
       client: res.client,
       clientId: res.clientId,
+      clientEmail: res.email,
       telephone: res.telephone,
       service: res.service || 'Transfert & Course VIP',
       date: res.date || new Date().toISOString().slice(0, 10),
@@ -927,14 +1225,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Passerelle 2 : Réservation ➔ Planning Dispatch Flotte
   const convertReservationToPlanning = async (res: Reservation) => {
     const planningId = `PLN-${Date.now().toString().slice(-6)}`;
-    const driverName = res.driver || (chauffeurs.length > 0 ? `${chauffeurs[0].prenom} ${chauffeurs[0].nom}` : 'Jean-Baptiste Pierre');
-    const vehName = res.vehicle || (vehicules.length > 0 ? `${vehicules[0].modele} (${vehicules[0].plaque})` : 'Toyota Prado TXL (AA-98124)');
+    const driverName = res.driver || (rawChauffeurs.length > 0 ? `${rawChauffeurs[0].prenom} ${rawChauffeurs[0].nom}` : 'Jean-Baptiste Pierre');
+    const vehName = res.vehicle || (rawVehicules.length > 0 ? `${rawVehicules[0].modele} (${rawVehicules[0].plaque})` : 'Toyota Prado TXL (AA-98124)');
 
     const newPlanning: Planning = {
       id: planningId,
       date: res.date || new Date().toISOString().slice(0, 10),
       heure: res.time || '08:30',
       client: res.client,
+      clientId: res.clientId,
       service: res.service || 'Course VIP',
       depart: res.origin || 'Port-au-Prince',
       destination: res.destination || 'Côte des Arcadins',
@@ -960,6 +1259,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newAbonnement: Abonnement = {
       id: abonnId,
       client: eleve.parentNom,
+      clientId: eleve.clientId,
+      clientEmail: eleve.parentEmail,
       eleveNom: `${eleve.prenom} ${eleve.nom}`,
       typeAbonnement: 'Scolaire',
       tarifMensuel: fee,
@@ -976,6 +1277,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: factureNumber,
       number: factureNumber,
       client: eleve.parentNom,
+      clientId: eleve.clientId,
+      clientEmail: eleve.parentEmail,
       telephone: eleve.parentTelephone,
       service: `Abonnement Navette Scolaire Mensuelle - ${eleve.prenom} ${eleve.nom}`,
       date: now.toISOString().slice(0, 10),
@@ -1031,6 +1334,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         chauffeurs,
         plannings,
         paiements,
+        allReservations: rawReservations,
+        allProformas: rawProformas,
+        allFactures: rawFactures,
+        allPlannings: rawPlannings,
+        allPaiements: rawPaiements,
         utilisateurs,
         notifications,
         settings,

@@ -1,0 +1,6 @@
+{
+  "summary":  "Plan d'implémentation pour le cloisonnement strict des données par rôle : chaque client et chauffeur ne voit que les éléments (réservations, proformas, factures, plannings, paiements) qui lui sont destinés, tandis que la Direction, l'Administration et la Comptabilité conservent une visibilité globale.",
+  "updatedAt":  "2026-10-21T17:43:08.069600360Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

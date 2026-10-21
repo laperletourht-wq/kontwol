@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 
 interface PlanningsViewProps {
   onOpenModal: (type: string, data?: any) => void;
@@ -7,6 +8,10 @@ interface PlanningsViewProps {
 
 export const PlanningsView: React.FC<PlanningsViewProps> = ({ onOpenModal }) => {
   const { plannings, deletePlanning, savePlanning, globalSearchQuery } = useApp();
+  const { role } = useAuth();
+  const isChauffeur = role === 'chauffeur';
+  const isClient = role === 'client' || role === 'prospect';
+  const canDispatch = !isChauffeur && !isClient;
   const [searchTerm, setSearchTerm] = useState('');
 
   const effectiveSearch = (searchTerm || globalSearchQuery).toLowerCase();
@@ -27,13 +32,19 @@ export const PlanningsView: React.FC<PlanningsViewProps> = ({ onOpenModal }) => 
     <div>
       <div className="section-head">
         <div>
-          <h2>Planning des Départs & Dispatch Flotte</h2>
-          <p>Organisez les missions, assignez chauffeurs et véhicules, et prévenez les conflits d'horaires.</p>
+          <h2>{isChauffeur ? 'Ma Feuille de Route & Missions Dispatchées' : 'Planning des Départs & Dispatch Flotte'}</h2>
+          <p>
+            {isChauffeur
+              ? 'Consultez vos départs, passagers et itinéraires qui vous sont expressément confiés.'
+              : 'Organisez les missions, assignez chauffeurs et véhicules, et prévenez les conflits d\'horaires.'}
+          </p>
         </div>
         <div className="actions">
-          <button type="button" className="primary" onClick={() => onOpenModal('planning')}>
-            + Programmer un Trajet
-          </button>
+          {canDispatch && (
+            <button type="button" className="primary" onClick={() => onOpenModal('planning')}>
+              + Programmer un Trajet
+            </button>
+          )}
         </div>
       </div>
 
@@ -117,26 +128,30 @@ export const PlanningsView: React.FC<PlanningsViewProps> = ({ onOpenModal }) => 
                             ✅ Achever
                           </button>
                         )}
-                        <button
-                          type="button"
-                          className="tiny edit"
-                          onClick={() => onOpenModal('planning', p)}
-                          title="Modifier"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          type="button"
-                          className="tiny delete"
-                          onClick={() => {
-                            if (window.confirm('Supprimer ce planning de trajet ?')) {
-                              deletePlanning(p.id);
-                            }
-                          }}
-                          title="Supprimer"
-                        >
-                          🗑️
-                        </button>
+                        {canDispatch && (
+                          <>
+                            <button
+                              type="button"
+                              className="tiny edit"
+                              onClick={() => onOpenModal('planning', p)}
+                              title="Modifier"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              type="button"
+                              className="tiny delete"
+                              onClick={() => {
+                                if (window.confirm('Supprimer ce planning de trajet ?')) {
+                                  deletePlanning(p.id);
+                                }
+                              }}
+                              title="Supprimer"
+                            >
+                              🗑️
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -90,6 +90,7 @@ export interface Facture {
   proformaNumber?: string;
   client: string;
   clientId?: string;
+  clientEmail?: string;
   telephone?: string;
   service?: string;
   date: string;
@@ -131,6 +132,8 @@ export interface Eleve {
   parentNom: string;
   parentTelephone: string;
   parentEmail?: string;
+  clientId?: string;
+  chauffeurId?: string;
   chauffeurAssigne?: string;
   vehiculeAssigne?: string;
   statut: 'Actif' | 'En pause' | 'Suspendu';
@@ -143,6 +146,8 @@ export interface Eleve {
 export interface Abonnement {
   id: string;
   client: string;
+  clientId?: string;
+  clientEmail?: string;
   eleveNom?: string;
   typeAbonnement: 'Scolaire' | 'Corporate' | 'Navette Entreprise' | 'VIP Mensuel';
   tarifMensuel: number;
@@ -202,11 +207,13 @@ export interface Planning {
   heure: string;
   heureRetour?: string;
   client: string;
+  clientId?: string;
   service: string;
   depart: string;
   destination: string;
   passagers: number;
   chauffeur: string;
+  chauffeurId?: string;
   vehicule: string;
   statut: 'Programmé' | 'En cours' | 'Achevé' | 'Retardé' | 'Annulé';
   notes?: string;
@@ -220,6 +227,8 @@ export interface Paiement {
   reference: string;
   date: string;
   client: string;
+  clientId?: string;
+  clientEmail?: string;
   montant: number;
   devise: 'USD' | 'HTG';
   modePaiement: 'MonCash' | 'Natcash' | 'Virement Bancaire' | 'Espèces' | 'Carte de Crédit' | 'Chèque';
