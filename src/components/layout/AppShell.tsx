@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
 
+import { ProfileReminderBanner } from '../common/ProfileReminderBanner';
+import { ClientProfileModal } from '../modals/ClientProfileModal';
+
 interface AppShellProps {
   children: React.ReactNode;
 }
@@ -13,6 +16,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
     setCurrentModule, 
     setIsPublicLanding, 
     setChatModalOpen, 
+    setClientProfileModalOpen,
     notifications, 
     markNotificationAsRead,
     reservations,
@@ -87,6 +91,26 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
         className={`sidebar ${mobileSidebarOpen ? 'open' : ''}`}
         id="sidebar"
       >
+        {/* Mobile-only Drawer Top Bar */}
+        <div className="sidebar-mobile-bar">
+          <div className="sidebar-mobile-brand" onClick={() => { setIsPublicLanding(true); setMobileSidebarOpen(false); }}>
+            <img src="/logo-laperle.jpg" alt="LAPERLE TOUR HT" />
+            <div className="sidebar-mobile-title">
+              <strong>LAPERLE TOUR HT</strong>
+              <small>Centre de Contrôle</small>
+            </div>
+          </div>
+          <button 
+            type="button" 
+            className="sidebar-close-btn" 
+            onClick={() => setMobileSidebarOpen(false)}
+            aria-label="Fermer le menu"
+            title="Fermer le menu"
+          >
+            ✕
+          </button>
+        </div>
+
         <div 
           className="side-brand" 
           style={{ cursor: 'pointer', position: 'relative' }} 
@@ -94,6 +118,21 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           onClick={() => setIsPublicLanding(true)}
         >
           <img src="/logo-laperle.jpg" alt="LAPERLE TOUR HT" id="sidebarLogoImg" />
+        </div>
+
+        {/* User Mini Card in Drawer (Mobile & Tablet) */}
+        <div className="sidebar-user-card">
+          <span className="user-avatar-circle">
+            {profile?.nom?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
+          </span>
+          <div className="sidebar-user-details">
+            <strong className="sidebar-user-name">
+              {profile?.nom?.split(' ')[0] || user?.displayName || 'Utilisateur'}
+            </strong>
+            <span className={`user-role-tag ${(role || 'client').toLowerCase()}`}>
+              {role.toUpperCase()}
+            </span>
+          </div>
         </div>
 
         <nav id="mainNav">
@@ -173,6 +212,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
               <img src="/logo-laperle.jpg" alt="LAPERLE TOUR HT" />
             </div>
             <div className="header-brand-text">
+              <span className="brand-name-mobile">LAPERLE TOUR</span>
               <div className="header-brand-top">
                 <span className="brand-name">LAPERLE TOUR HT</span>
                 <span className="brand-dot">·</span>
@@ -307,8 +347,14 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
               <button 
                 className="header-user-pill" 
                 id="profileBtn"
-                onClick={() => setCurrentModule('parametres')}
-                title="Modifier mon profil et préférences"
+                onClick={() => {
+                  if (role === 'client' || role === 'prospect') {
+                    setClientProfileModalOpen(true);
+                  } else {
+                    setCurrentModule('parametres');
+                  }
+                }}
+                title={role === 'client' ? "Gérer mon profil client (nom, tél, adresse, NIF)" : "Paramètres et profil"}
               >
                 <span className="user-avatar-circle" id="headerAvatar">
                   {profile?.nom?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
@@ -337,10 +383,14 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           </div>
         </header>
 
-        {/* Dynamic Page Container */}
+        {/* Dynamic Page Container with Client Reminder Banner */}
         <main id="page" className="page">
+          <ProfileReminderBanner />
           {children}
         </main>
+
+        {/* Global Client Profile Modal */}
+        <ClientProfileModal />
       </div>
     </div>
   );

@@ -1,106 +1,97 @@
-# Cloisonnement & Confidentialité des Données par Rôle (Clients, Chauffeurs et Direction)
+# Plan d'Implémentation Révisé : Résolution Firestore, Profil Client Complet & Fluidité Multi-Écrans
 
-Mise en place d'un système robuste d'isolation et de restriction d'accès aux données : chaque client ou chauffeur n'accède qu'à ses propres réservations, devis proforma, factures, plannings et paiements, tandis que les rôles de gestion conservent une vue exhaustive.
-
-### User Review & Critical Decisions
-
-> [!IMPORTANT]
-> Les choix de conception validés avec vous lors de la phase de clarification :
-> - **Visibilité globale accordée** : `Direction`, `Administrateur` et `Comptabilité` conservent une visibilité intégrale sur l'ensemble des dossiers et des transactions financières de l'entreprise.
-> - **Critères d'attribution multi-niveaux (1, 2 et 3 combinés)** : Pour garantir qu'aucun dossier ne soit égaré, l'association d'un dossier à un client ou chauffeur s'effectue par :
->   1. Identifiant unique (`uid` / `clientId`)
->   2. Adresse e-mail du compte connecté
->   3. Concordance du Nom complet et/ou du numéro de téléphone.
+Ce plan révisé intègre la résolution de l'ensemble des anomalies identifiées sur **Firebase Firestore**, la mise en place de la **complétion du profil client** (nom complet, téléphone, adresse, société, numéro fiscal) et l'optimisation **responsive fluide** sur smartphone, tablette et PC.
 
 ---
 
-### 1. Vue d'ensemble & Objectif
+## 1. Diagnostic des Problèmes Firestore Identifiés
 
-- **Objectif métier** : Garantir la confidentialité stricte des données sensibles (montants facturés, trajets réservés, coordonnées, plannings de course). Aucun client ne doit pouvoir apercevoir les devis ou factures d'un autre client, et aucun chauffeur ne doit voir les courses ou plannings d'autres conducteurs.
-- **Rôles concernés** :
-  - **Client / Prospect** : Visualise exclusivement ses propres réservations, devis proforma reçus, factures à régler, paiements effectués, ainsi que ses abonnements scolaires ou corporatifs.
-  - **Chauffeur** : Visualise exclusivement les missions, ramassages et plannings qui lui sont expressément assignés, ainsi que la fiche du véhicule qu'il conduit.
-  - **Secrétariat & Opérations** : Visualisent l'opérationnel nécessaire à leur fonction (planning de courses, gestion des réservations et flotte).
-  - **Direction, Administrateur, Comptabilité** : Accès global à 100% des documents administratifs, comptables et logistiques.
-
----
-
-### 2. Expérience Utilisateur & Comportement de l'Interface
-
-- **Pour le Client connecté** :
-  - Le tableau de bord affiche son solde personnel, ses réservations en cours et ses dernières factures.
-  - Les modules *Réservations*, *Devis*, *Factures* et *Paiements* ne listent que ses dossiers.
-  - Lors d'une nouvelle réservation ou demande de devis, le système pré-remplit et verrouille automatiquement son nom, son e-mail, son téléphone et son `clientId` pour garantir l'attribution instantanée.
-  - Message vide informatif personnalisé : *"Vous n'avez aucune facture en attente"* avec action rapide pour réserver ou demander un devis.
-- **Pour le Chauffeur connecté** :
-  - Le module *Plannings* n'affiche que sa feuille de route (courses programmées, départs, passagers et horaires qui lui sont confiés).
-  - Les modules financiers et les factures lui sont inaccessibles conformément aux permissions de son rôle.
-- **Pour la Direction & Comptabilité** :
-  - Visibilité exhaustive avec sélecteur de filtre client/chauffeur pour inspecter facilement un dossier particulier ou avoir la vue d'ensemble de l'entreprise.
+1. **Test de connexion échouant (`/test/connection`)** :
+   - Dans `src/lib/firebase.ts`, `testConnection()` appelle `getDocFromServer(doc(db, 'test', 'connection'))`.
+   - Or, `firestore.rules` applique un déni global (`match /{document=**} { allow read, write: if false; }`) sans règle autorisant la lecture du document de test. Cela renvoie une erreur de permission et marque `firebaseOnline` comme faux ou instable.
+2. **Blocage de mise à jour du profil utilisateur dans `firestore.rules`** :
+   - Dans `match /utilisateurs/{utilisateurId}`, la règle `update` restreint strictement les champs autorisés via `affectedKeys().hasOnly(['name', 'nom', 'prenom', ...])`.
+   - Les champs nécessaires au profil client (`adresse`, `ville`, `societe`, `numeroFiscal`, `profileComplete`) ne font pas partie de la liste et sont rejetés par Firestore avec une erreur `permission-denied`.
+   - La fonction `isValidUtilisateur()` doit également valider ces nouveaux champs.
+3. **Souscriptions `onSnapshot` non filtrées par rôle dans `AppContext.tsx`** :
+   - Actuellement, `syncCollection` tente d'écouter toutes les collections (`utilisateurs`, `vehicules`, `chauffeurs`, `paiements`, etc.) sans tenir compte du rôle de l'utilisateur connecté.
+   - Les règles de sécurité Firestore interdisent légitimement à un simple client ou chauffeur d'énumérer l'intégralité des utilisateurs ou véhicules administratifs. Ces écoutes globales échouent en boucle dans la console avec `Missing or insufficient permissions`.
+   - **Solution** : Adapter conditionnellement les souscriptions en temps réel selon les habilitations du rôle actif (`canAccess`), et cibler les requêtes par identifiant pour les clients et chauffeurs.
+4. **Déploiement des règles Firestore** :
+   - Déployer les nouvelles règles optimisées via l'outil dédié `deploy_firebase` afin de synchroniser immédiatement le projet Firebase distant (`laperletourht-28ad8`).
 
 ---
 
-### 3. Décisions Clés & Architecture Technique
+## 2. Modifications Proposées
 
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                   Authentification (AuthContext)                       │
-│     Profil Utilisateur (uid, role, nom, email, telephone, clientId)     │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                      Moteur de Filtrage Centralisé                     │
-│                           (AppContext.tsx)                             │
-├────────────────────────────────────────────────────────────────────────┤
-│  Est-ce un profil Superviseur ? (Admin / Direction / Comptabilité)     │
-│  ├─► OUI : Retourne la liste complète sans restriction                 │
-│  └─► NON : Filtre par correspondance multi-critères :                  │
-│       • item.clientId === user.uid || item.clientId === profile.id     │
-│       • item.clientEmail === user.email || item.email === user.email   │
-│       • item.client.toLowerCase() === profile.nom.toLowerCase()       │
-│       • item.telephone === profile.telephone                           │
-│       • Pour Chauffeur : item.chauffeur === profile.nom                │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │
-        ┌───────────────────────────┼───────────────────────────┐
-        ▼                           ▼                           ▼
-┌──────────────┐            ┌──────────────┐            ┌──────────────┐
-│ Réservations │            │  Proformas   │            │   Factures   │
-│  filtrées    │            │   filtrés    │            │   filtrées   │
-└──────────────┘            └──────────────┘            └──────────────┘
-```
+### A. Résolution Firestore & Sécurité des Données
+#### `firestore.rules`
+- **Ajout de la règle de test de connectivité** :
+  - `match /test/{docId} { allow read: if true; }` pour que `testConnection()` confirme avec certitude l'état en ligne de la base.
+- **Autorisation des champs de profil client dans `isValidUtilisateur`** :
+  - Autoriser et typer `adresse`, `ville`, `societe`, `numeroFiscal`, `profileComplete`.
+- **Mise à jour de `match /utilisateurs/{utilisateurId}`** :
+  - Ajouter `adresse`, `ville`, `societe`, `numeroFiscal`, `profileComplete` dans la liste `affectedKeys().hasOnly(...)` de la règle de modification par l'utilisateur connecté.
+- **Raffinement des requêtes de lecture / listage** pour les clients et chauffeurs afin d'éviter tout rejet par Firestore.
+- **Déploiement automatique** : Exécuter `deploy_firebase` après validation des modifications.
 
-#### A. Centralisation dans `AppContext.tsx`
-- Définition d'une fonction utilitaire réactive de vérification de propriété : `isItemOwnedByUser(item, user, profile, type)`.
-- Création de sélecteurs mémorisés (`scopedReservations`, `scopedProformas`, `scopedFactures`, `scopedPlannings`, `scopedPaiements`, `scopedAbonnements`).
-- Les vues consommatrices accèdent automatiquement aux collections cloisonnées sans altérer les boutons d'actions ou les calculs de totaux.
-
-#### B. Marquage Automatique à la Création
-- Lors de l'ajout d'une réservation, proforma ou facture, injection automatique de :
-  - `clientId`: `user.uid`
-  - `client`: `profile.nom` ou raison sociale
-  - `email`: `user.email`
-  - `telephone`: `profile.telephone`
-
-#### C. Règles de Sécurité Firestore (`firestore.rules`)
-- Consolidation des règles d'accès pour s'assurer que les rôles `direction`, `admin` et `comptabilite` bénéficient des permissions complètes de lecture sur les collections, tandis que les requêtes directes des clients et chauffeurs sont strictement cantonnées à leurs propres identifiants.
+#### `src/context/AppContext.tsx`
+- **Souscriptions Firestore adaptatives et sécurisées** :
+  - N'écouter la collection `utilisateurs` que si l'utilisateur est `admin` ou `secretaire`.
+  - Pour les clients : souscrire uniquement aux réservations, proformas, factures et notifications qui leur appartiennent ou leur sont destinées (`where("clientId", "==", user.uid)` ou filtrage scoped sécurisé).
+  - Éviter toute tentative d'écoute sur des collections restreintes qui génère des erreurs de permission dans la console.
+  - Gestion robuste des erreurs dans les callbacks `onError` des `onSnapshot` pour garantir la stabilité de l'interface en mode connecté ou hors-ligne.
 
 ---
 
-### 4. Plan de Déploiement & Étapes d'Exécution
+### B. Parcours Profil Client Complet
+#### `src/types/index.ts`
+- Enrichir `UserProfile` avec `adresse`, `ville`, `societe`, `numeroFiscal`, `profileComplete`.
 
-1. **Étape 1 : Moteur de filtrage et sélecteurs de données dans `src/context/AppContext.tsx`**
-   - Implémenter la logique multi-critères (UID + Email + Nom/Téléphone).
-   - Exposer les listes cloisonnées selon le rôle de l'utilisateur connecté.
-   - Injecter les métadonnées de l'utilisateur connecté lors des créations de devis / réservations.
+#### `src/context/AuthContext.tsx`
+- Ajouter `updateUserProfile(data: Partial<UserProfile>)` qui enregistre dans `utilisateurs/{uid}` et recalcule automatiquement `profileComplete` (vrai si `nom`, `telephone`, `adresse`, `societe` et `numeroFiscal` sont renseignés).
 
-2. **Étape 2 : Harmonisation des vues de modules**
-   - Vérifier que `ReservationsView`, `ProformasView`, `FacturesView`, `PlanningsView` et `PaiementsView` utilisent la source de données appropriée.
-   - Adapter les totaux et résumés financiers pour qu'un client ne voie que ses totaux personnels.
+#### `src/components/modals/ClientProfileModal.tsx` *(Nouveau composant)*
+- Modal fluide permettant de renseigner en direct les 5 informations obligatoires :
+  1. Nom complet (Prénom & Nom)
+  2. Téléphone WhatsApp
+  3. Adresse et Ville
+  4. Raison Sociale / Société (avec bouton raccourci "Particulier")
+  5. Numéro fiscal (NIF / CIF)
 
-3. **Étape 3 : Mise à niveau des règles de sécurité Firestore (`firestore.rules`)**
-   - Aligner les prédicats de lecture Firestore pour refléter les rôles `direction` et `comptabilite` sur les collections partagées.
+#### `src/components/common/ProfileReminderBanner.tsx` *(Nouveau composant)*
+- Bannière interactive en haut du tableau de bord indiquant les informations manquantes et ouvrant directement la modal d'édition. Se masque automatiquement une fois le profil 100% renseigné.
 
-4. **Étape 4 : Validation & Compilation**
-   - Exécuter `lint_applet` et `compile_applet` pour garantir l'intégrité du code.
+#### `src/components/modules/ParametresView.tsx`
+- Ajouter un onglet « Mon Profil Personnel » pour modifier ces informations à tout moment.
+
+---
+
+### C. Fluidité & Réactivité Multi-Écrans (Mobile, Tablette, PC)
+#### `src/components/layout/AppShell.tsx`
+- Menu tiroir hamburger classique en haut d'écran sur smartphone et tablette avec bouton tactile accessible (44px), overlay assombrissant et fermeture automatique au clic d'un lien.
+- En-tête adaptatif : logo compact, barre de recherche repliable sur tablette, icônes tactiles directes.
+
+#### `styles.css`
+- **Sélecteur ciblé (`div#root > div#app > div:nth-of-type(2) > main#page > div:nth-of-type(1) > div:nth-of-type(2)`)** :
+  - Grille responsive fluide : 4 colonnes sur PC, 2 colonnes sur tablette (768px-1024px), 1 colonne sur smartphone (<768px).
+- **Zéro débordement horizontal** (`overflow-x: hidden`), cartes KPI fluides, tableaux de bord avec défilement tactile (`.table-wrap`), formulaires adaptés au tactile.
+
+---
+
+## 3. Plan de Vérification
+
+1. **Vérification Firestore** :
+   - Tester l'indicateur de connexion Firestore en ligne (`testConnection()`).
+   - Tester l'enregistrement d'un profil client complet avec les 5 champs et s'assurer de l'absence d'erreur `permission-denied`.
+   - Vérifier qu'aucune erreur `Missing or insufficient permissions` n'apparaît dans la console lors de la navigation avec un compte client ou chauffeur.
+   - Déployer avec succès les règles via `deploy_firebase`.
+2. **Vérification Profil Client** :
+   - Simuler une connexion client : la bannière de rappel s'affiche avec la progression.
+   - Compléter le profil via la modal : vérifier la persistance dans Firestore et la disparition de la bannière.
+3. **Vérification Multi-Écrans** :
+   - Smartphone (<768px) : ouverture/fermeture du tiroir hamburger, absence de défilement horizontal.
+   - Tablette (768px-1024px) : disposition à 2 colonnes bien équilibrée.
+   - PC (>1024px) : affichage complet fluide.
+4. **Build & Lint** :
+   - Exécuter `compile_applet` et `lint_applet` sans aucune erreur.

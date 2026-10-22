@@ -25,6 +25,11 @@ export interface UserProfile {
   statutCompte?: string;
   statutClient?: string;
   photoURL?: string;
+  adresse?: string;
+  ville?: string;
+  societe?: string;
+  numeroFiscal?: string;
+  profileComplete?: boolean;
   permissions?: Record<string, boolean>;
   createdAt?: string;
   updatedAt?: string;

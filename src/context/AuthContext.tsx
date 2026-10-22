@@ -30,10 +30,12 @@ interface AuthContextType {
   roles: UserRole[];
   loading: boolean;
   isSuperAdmin: boolean;
+  isProfileComplete: boolean;
   canAccess: (moduleKey: string) => boolean;
   loginWithGoogle: () => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   registerWithEmail: (data: { email: string; pass: string; nom: string; telephone?: string }) => Promise<void>;
+  updateUserProfile: (data: Partial<UserProfile>) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -63,13 +65,13 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'dashboard', 'reservations', 'vehicules', 'chauffeurs', 'plannings'
   ],
   chauffeur: [
-    'dashboard', 'plannings', 'vehicules'
+    'dashboard', 'plannings', 'vehicules', 'parametres'
   ],
   client: [
-    'dashboard', 'reservations', 'proformas', 'factures'
+    'dashboard', 'reservations', 'proformas', 'factures', 'parametres'
   ],
   prospect: [
-    'dashboard', 'reservations', 'proformas'
+    'dashboard', 'reservations', 'proformas', 'parametres'
   ],
   lecture_seule: [
     'dashboard', 'reservations', 'proformas', 'factures', 'clients', 
@@ -233,6 +235,78 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const isProfileComplete = useMemo(() => {
+    if (!profile) return false;
+    const hasNom = Boolean(profile.nom?.trim() || profile.name?.trim());
+    const hasPhone = Boolean(profile.telephone?.trim() || profile.phone?.trim());
+    const hasAdresse = Boolean(profile.adresse?.trim());
+    const hasSociete = Boolean(profile.societe?.trim());
+    const hasNif = Boolean(profile.numeroFiscal?.trim());
+    return Boolean(hasNom && hasPhone && hasAdresse && hasSociete && hasNif);
+  }, [profile]);
+
+  const updateUserProfile = async (data: Partial<UserProfile>) => {
+    if (!user) throw new Error("Utilisateur non connecté");
+
+    const nomVal = (data.nom ?? profile?.nom ?? data.name ?? profile?.name ?? '').trim();
+    const phoneVal = (data.telephone ?? profile?.telephone ?? data.phone ?? profile?.phone ?? '').trim();
+    const adresseVal = (data.adresse ?? profile?.adresse ?? '').trim();
+    const villeVal = (data.ville ?? profile?.ville ?? '').trim();
+    const societeVal = (data.societe ?? profile?.societe ?? '').trim();
+    const nifVal = (data.numeroFiscal ?? profile?.numeroFiscal ?? '').trim();
+
+    const isComplete = Boolean(nomVal && phoneVal && adresseVal && societeVal && nifVal);
+
+    const updatedProfile: UserProfile = {
+      ...(profile || {
+        id: user.uid,
+        email: user.email || '',
+        role: 'client',
+        roles: ['client'],
+        status: 'actif'
+      }),
+      ...data,
+      id: user.uid,
+      uid: user.uid,
+      email: user.email || profile?.email || '',
+      nom: nomVal,
+      name: nomVal,
+      telephone: phoneVal,
+      phone: phoneVal,
+      adresse: adresseVal,
+      ville: villeVal,
+      societe: societeVal,
+      numeroFiscal: nifVal,
+      profileComplete: isComplete,
+      updatedAt: new Date().toISOString()
+    };
+
+    try {
+      const userRef = doc(db, 'utilisateurs', user.uid);
+      await setDoc(userRef, {
+        nom: nomVal,
+        name: nomVal,
+        telephone: phoneVal,
+        phone: phoneVal,
+        adresse: adresseVal,
+        ville: villeVal,
+        societe: societeVal,
+        numeroFiscal: nifVal,
+        profileComplete: isComplete,
+        updatedAt: updatedProfile.updatedAt,
+        status: updatedProfile.status || 'actif',
+        statutCompte: updatedProfile.statutCompte || 'actif',
+        statutClient: updatedProfile.statutClient || 'client',
+        role: updatedProfile.role || 'client',
+        roles: updatedProfile.roles || [updatedProfile.role || 'client']
+      }, { merge: true });
+    } catch (err) {
+      console.warn("Mise à jour Firestore en attente / mémoire locale :", err);
+    }
+
+    setProfile(updatedProfile);
+  };
+
   const logout = async () => {
     await signOut(auth);
     setUser(null);
@@ -254,10 +328,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         roles,
         loading,
         isSuperAdmin,
+        isProfileComplete,
         canAccess,
         loginWithGoogle,
         loginWithEmail,
         registerWithEmail,
+        updateUserProfile,
         logout,
         refreshProfile
       }}

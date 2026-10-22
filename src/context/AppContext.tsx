@@ -468,6 +468,8 @@ interface AppContextType {
   setAuthView: (v: 'login' | 'register' | 'verify' | 'forgot') => void;
   chatModalOpen: boolean;
   setChatModalOpen: (val: boolean) => void;
+  clientProfileModalOpen: boolean;
+  setClientProfileModalOpen: (val: boolean) => void;
   printSheetData: { type: 'proforma' | 'facture'; data: any } | null;
   setPrintSheetData: (data: { type: 'proforma' | 'facture'; data: any } | null) => void;
   toast: { message: string; type?: 'info' | 'success' | 'warning' | 'error' } | null;
@@ -538,6 +540,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
   const [authView, setAuthView] = useState<'login' | 'register' | 'verify' | 'forgot'>('login');
   const [chatModalOpen, setChatModalOpen] = useState<boolean>(false);
+  const [clientProfileModalOpen, setClientProfileModalOpen] = useState<boolean>(false);
   const [printSheetData, setPrintSheetData] = useState<{ type: 'proforma' | 'facture'; data: any } | null>(null);
   const [toast, setToast] = useState<{ message: string; type?: 'info' | 'success' | 'warning' | 'error' } | null>(null);
   const [globalSearchQuery, setGlobalSearchQuery] = useState<string>('');
@@ -616,23 +619,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     };
 
+    const isStaff = isSuperAdmin || role === 'admin' || role === 'direction' || role === 'comptabilite' || role === 'secretaire' || role === 'operations';
+
     syncCollection('reservations', setRawReservations, SEED_RESERVATIONS);
     syncCollection('proformas', setRawProformas, SEED_PROFORMAS);
     syncCollection('factures', setRawFactures, SEED_FACTURES);
-    syncCollection('clients', setRawClients, SEED_CLIENTS);
-    syncCollection('eleves', setRawEleves, SEED_ELEVES);
-    syncCollection('abonnements', setRawAbonnements, SEED_ABONNEMENTS);
-    syncCollection('vehicules', setRawVehicules, SEED_VEHICULES);
-    syncCollection('chauffeurs', setRawChauffeurs, SEED_CHAUFFEURS);
-    syncCollection('plannings', setRawPlannings, SEED_PLANNINGS);
-    syncCollection('paiements', setRawPaiements, SEED_PAIEMENTS);
-    syncCollection('utilisateurs', setUtilisateurs, []);
     syncCollection('notifications', setNotifications, SEED_NOTIFICATIONS);
+
+    if (isStaff) {
+      syncCollection('clients', setRawClients, SEED_CLIENTS);
+      syncCollection('eleves', setRawEleves, SEED_ELEVES);
+      syncCollection('abonnements', setRawAbonnements, SEED_ABONNEMENTS);
+      syncCollection('vehicules', setRawVehicules, SEED_VEHICULES);
+      syncCollection('chauffeurs', setRawChauffeurs, SEED_CHAUFFEURS);
+      syncCollection('plannings', setRawPlannings, SEED_PLANNINGS);
+      syncCollection('paiements', setRawPaiements, SEED_PAIEMENTS);
+      if (role === 'admin' || role === 'secretaire' || isSuperAdmin) {
+        syncCollection('utilisateurs', setUtilisateurs, []);
+      }
+    } else if (role === 'chauffeur') {
+      syncCollection('vehicules', setRawVehicules, SEED_VEHICULES);
+      syncCollection('plannings', setRawPlannings, SEED_PLANNINGS);
+      syncCollection('eleves', setRawEleves, SEED_ELEVES);
+    }
 
     return () => {
       unsubs.forEach((u) => u());
     };
-  }, [user]);
+  }, [user, role, roles, isSuperAdmin]);
 
   // Generic Save and Delete helper methods
   const saveItemToCollection = async <T extends { id: string }>(
@@ -1317,6 +1331,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setAuthView,
         chatModalOpen,
         setChatModalOpen,
+        clientProfileModalOpen,
+        setClientProfileModalOpen,
         printSheetData,
         setPrintSheetData,
         toast,
