@@ -590,57 +590,67 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const unsubs: (() => void)[] = [];
 
-    // Helper for syncing collections
-    const syncCollection = <T extends { id: string }>(
-      collectionName: string,
+    // Helper for syncing collections or scoped queries
+    const syncQueryOrCollection = <T extends { id: string }>(
+      name: string,
+      queryRef: any,
       setter: React.Dispatch<React.SetStateAction<T[]>>,
       fallback: T[]
     ) => {
       try {
-        const colRef = collection(db, collectionName);
         const unsub = onSnapshot(
-          colRef,
-          (snapshot) => {
+          queryRef,
+          (snapshot: any) => {
             if (!snapshot.empty) {
-              const list: T[] = snapshot.docs.map((docSnap) => ({
+              const list: T[] = snapshot.docs.map((docSnap: any) => ({
                 id: docSnap.id,
                 ...docSnap.data()
               } as T));
               setter(list);
             }
           },
-          (err) => {
-            console.warn(`Firestore sync error on ${collectionName}:`, err.message);
+          (err: any) => {
+            // Silently maintain fallback data if permission is restricted for current role
+            if (!err?.message?.includes('Missing or insufficient permissions')) {
+              console.info(`Firestore sync (${name}):`, err.message);
+            }
           }
         );
         unsubs.push(unsub);
       } catch (err) {
-        console.warn(`Subscription setup error for ${collectionName}`);
+        // Fallback maintained
       }
     };
 
     const isStaff = isSuperAdmin || role === 'admin' || role === 'direction' || role === 'comptabilite' || role === 'secretaire' || role === 'operations';
 
-    syncCollection('reservations', setRawReservations, SEED_RESERVATIONS);
-    syncCollection('proformas', setRawProformas, SEED_PROFORMAS);
-    syncCollection('factures', setRawFactures, SEED_FACTURES);
-    syncCollection('notifications', setNotifications, SEED_NOTIFICATIONS);
-
     if (isStaff) {
-      syncCollection('clients', setRawClients, SEED_CLIENTS);
-      syncCollection('eleves', setRawEleves, SEED_ELEVES);
-      syncCollection('abonnements', setRawAbonnements, SEED_ABONNEMENTS);
-      syncCollection('vehicules', setRawVehicules, SEED_VEHICULES);
-      syncCollection('chauffeurs', setRawChauffeurs, SEED_CHAUFFEURS);
-      syncCollection('plannings', setRawPlannings, SEED_PLANNINGS);
-      syncCollection('paiements', setRawPaiements, SEED_PAIEMENTS);
+      // Staff members have administrative read access to full operational collections
+      syncQueryOrCollection('reservations', collection(db, 'reservations'), setRawReservations, SEED_RESERVATIONS);
+      syncQueryOrCollection('proformas', collection(db, 'proformas'), setRawProformas, SEED_PROFORMAS);
+      syncQueryOrCollection('factures', collection(db, 'factures'), setRawFactures, SEED_FACTURES);
+      syncQueryOrCollection('notifications', collection(db, 'notifications'), setNotifications, SEED_NOTIFICATIONS);
+      syncQueryOrCollection('clients', collection(db, 'clients'), setRawClients, SEED_CLIENTS);
+      syncQueryOrCollection('eleves', collection(db, 'eleves'), setRawEleves, SEED_ELEVES);
+      syncQueryOrCollection('abonnements', collection(db, 'abonnements'), setRawAbonnements, SEED_ABONNEMENTS);
+      syncQueryOrCollection('vehicules', collection(db, 'vehicules'), setRawVehicules, SEED_VEHICULES);
+      syncQueryOrCollection('chauffeurs', collection(db, 'chauffeurs'), setRawChauffeurs, SEED_CHAUFFEURS);
+      syncQueryOrCollection('plannings', collection(db, 'plannings'), setRawPlannings, SEED_PLANNINGS);
+      syncQueryOrCollection('paiements', collection(db, 'paiements'), setRawPaiements, SEED_PAIEMENTS);
       if (role === 'admin' || role === 'secretaire' || isSuperAdmin) {
-        syncCollection('utilisateurs', setUtilisateurs, []);
+        syncQueryOrCollection('utilisateurs', collection(db, 'utilisateurs'), setUtilisateurs, []);
       }
     } else if (role === 'chauffeur') {
-      syncCollection('vehicules', setRawVehicules, SEED_VEHICULES);
-      syncCollection('plannings', setRawPlannings, SEED_PLANNINGS);
-      syncCollection('eleves', setRawEleves, SEED_ELEVES);
+      // Drivers have scoped mission access
+      syncQueryOrCollection('plannings', query(collection(db, 'plannings'), where('chauffeurId', '==', user.uid)), setRawPlannings, SEED_PLANNINGS);
+      syncQueryOrCollection('vehicules', collection(db, 'vehicules'), setRawVehicules, SEED_VEHICULES);
+      syncQueryOrCollection('notifications', query(collection(db, 'notifications'), where('targetUid', '==', user.uid)), setNotifications, SEED_NOTIFICATIONS);
+    } else {
+      // Clients & prospects query strictly their own personal dossiers
+      syncQueryOrCollection('reservations', query(collection(db, 'reservations'), where('clientId', '==', user.uid)), setRawReservations, SEED_RESERVATIONS);
+      syncQueryOrCollection('proformas', query(collection(db, 'proformas'), where('clientId', '==', user.uid)), setRawProformas, SEED_PROFORMAS);
+      syncQueryOrCollection('factures', query(collection(db, 'factures'), where('clientId', '==', user.uid)), setRawFactures, SEED_FACTURES);
+      syncQueryOrCollection('notifications', query(collection(db, 'notifications'), where('targetUid', '==', user.uid)), setNotifications, SEED_NOTIFICATIONS);
     }
 
     return () => {

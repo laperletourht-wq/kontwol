@@ -552,7 +552,11 @@ service cloud.firestore {
     // 10. Proformas (/proformas and alias /quotes)
     match /proformas/{proformaId} {
       allow get, list: if canReadFinances() || 
-        ((isClient() || isProspect()) && isClientDoc(existing()));
+        (isSignedIn() && (
+          isClientDoc(existing()) ||
+          (('clientId' in existing()) && existing().clientId == request.auth.uid) ||
+          (('uid' in existing()) && existing().uid == request.auth.uid)
+        ));
       allow create: if (canManageFinances() || isSecretaire()) && isValidId(proformaId) && isValidProforma(incoming());
       allow update: if isValidId(proformaId) && (
         ((canManageFinances() || isSecretaire()) && isValidProforma(incoming())) ||
@@ -563,12 +567,12 @@ service cloud.firestore {
     }
     match /demandesProformas/{requestId} {
       allow get, list: if canReadFinances() ||
-        ((isClient() || isProspect()) && isClientDoc(existing()));
+        (isSignedIn() && (isClientDoc(existing()) || (('clientId' in existing()) && existing().clientId == request.auth.uid)));
       // Requests are created and processed only through trusted server operations.
       allow create, update, delete: if false;
     }
     match /quotes/{quoteId} {
-      allow get, list: if canReadFinances() || ((isClient() || isProspect()) && isClientDoc(existing()));
+      allow get, list: if canReadFinances() || (isSignedIn() && (isClientDoc(existing()) || (('clientId' in existing()) && existing().clientId == request.auth.uid)));
       allow create, update: if (canManageFinances() || isSecretaire()) && isValidId(quoteId);
       allow delete: if isAdmin() && isValidId(quoteId);
     }
@@ -576,7 +580,11 @@ service cloud.firestore {
     // 11. Factures (/factures and alias /invoices)
     match /factures/{factureId} {
       allow get, list: if canReadFinances() || 
-        ((isClient() || isProspect()) && isClientDoc(existing()));
+        (isSignedIn() && (
+          isClientDoc(existing()) ||
+          (('clientId' in existing()) && existing().clientId == request.auth.uid) ||
+          (('uid' in existing()) && existing().uid == request.auth.uid)
+        ));
       allow create: if (canManageFinances() || isSecretaire()) && isValidId(factureId) && isValidFacture(incoming());
       allow update: if isValidId(factureId) && (
         ((canManageFinances() || isSecretaire()) && isValidFacture(incoming())) ||
@@ -640,6 +648,7 @@ service cloud.firestore {
           resource.data.targetUid == 'broadcast' ||
           resource.data.broadcast == true ||
           (('userId' in resource.data) && resource.data.userId == request.auth.uid) ||
+          (('clientId' in resource.data) && resource.data.clientId == request.auth.uid) ||
           (('uid' in resource.data) && resource.data.uid == request.auth.uid)
         )
       );
