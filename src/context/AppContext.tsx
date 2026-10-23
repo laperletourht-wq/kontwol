@@ -609,13 +609,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const unsub = onSnapshot(
           queryRef,
           (snapshot: any) => {
-            if (!snapshot.empty) {
-              const list: T[] = snapshot.docs.map((docSnap: any) => ({
-                id: docSnap.id,
-                ...docSnap.data()
-              } as T));
-              setter(list);
-            }
+            const list: T[] = snapshot.docs.map((docSnap: any) => ({
+              id: docSnap.id,
+              ...docSnap.data()
+            } as T));
+            setter(list);
           },
           (err: any) => {
             // Silently maintain fallback data if permission is restricted for current role
@@ -651,17 +649,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else if (role === 'chauffeur') {
       // Drivers have scoped mission access
       if (user?.uid) {
-        syncQueryOrCollection('plannings', query(collection(db, 'plannings'), where('chauffeurId', '==', user.uid)), setRawPlannings, SEED_PLANNINGS);
+        syncQueryOrCollection('plannings', query(collection(db, 'plannings'), where('chauffeurId', '==', user.uid)), setRawPlannings, []);
         syncQueryOrCollection('vehicules', collection(db, 'vehicules'), setRawVehicules, SEED_VEHICULES);
-        syncQueryOrCollection('notifications', query(collection(db, 'notifications'), where('targetUid', '==', user.uid)), setNotifications, SEED_NOTIFICATIONS);
+        syncQueryOrCollection('notifications', query(collection(db, 'notifications'), where('targetUid', '==', user.uid)), setNotifications, []);
       }
     } else {
       // Clients & prospects query strictly their own personal dossiers
       if (user?.uid) {
-        syncQueryOrCollection('reservations', query(collection(db, 'reservations'), where('clientId', '==', user.uid)), setRawReservations, SEED_RESERVATIONS);
-        syncQueryOrCollection('proformas', query(collection(db, 'proformas'), where('clientId', '==', user.uid)), setRawProformas, SEED_PROFORMAS);
-        syncQueryOrCollection('factures', query(collection(db, 'factures'), where('clientId', '==', user.uid)), setRawFactures, SEED_FACTURES);
-        syncQueryOrCollection('notifications', query(collection(db, 'notifications'), where('targetUid', '==', user.uid)), setNotifications, SEED_NOTIFICATIONS);
+        syncQueryOrCollection('reservations', query(collection(db, 'reservations'), where('clientId', '==', user.uid)), setRawReservations, []);
+        syncQueryOrCollection('proformas', query(collection(db, 'proformas'), where('clientId', '==', user.uid)), setRawProformas, []);
+        syncQueryOrCollection('factures', query(collection(db, 'factures'), where('clientId', '==', user.uid)), setRawFactures, []);
+        syncQueryOrCollection('notifications', query(collection(db, 'notifications'), where('targetUid', '==', user.uid)), setNotifications, []);
       }
     }
 

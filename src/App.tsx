@@ -22,10 +22,11 @@ import { PaiementsView } from './components/modules/PaiementsView';
 import { FinancesView } from './components/modules/FinancesView';
 import { UtilisateursView } from './components/modules/UtilisateursView';
 import { VitrineCMSView } from './components/modules/VitrineCMSView';
-import { ParametresView } from './components/modules/ParametresView';
+import { useAuth } from './context/AuthContext';
 
 const MainRouter: React.FC = () => {
   const { isPublicLanding, currentModule, toast } = useApp();
+  const { canAccess } = useAuth();
   const [modalType, setModalType] = useState<string | null>(null);
   const [modalData, setModalData] = useState<any>(null);
 
@@ -35,6 +36,10 @@ const MainRouter: React.FC = () => {
   };
 
   const renderModule = () => {
+    // Strict RBAC route guard
+    if (currentModule !== 'dashboard' && !canAccess(currentModule)) {
+      return <DashboardView onOpenModal={handleOpenModal} />;
+    }
     switch (currentModule) {
       case 'dashboard':
         return <DashboardView onOpenModal={handleOpenModal} />;

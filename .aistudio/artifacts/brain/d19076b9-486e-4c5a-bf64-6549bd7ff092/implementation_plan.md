@@ -1,60 +1,119 @@
-# Plan d'Implémentation - Cohérence Métier, Déconnexion & Expérience Mobile/PC
+# Isolation des Rôles & Portail Client Sécurisé (Laperle Tour HT)
 
-Ce plan détaille les correctifs et améliorations à apporter suite à vos retours et réponses aux questions de cadrage :
-1. **Redirection déconnexion** : retour propre vers la vitrine publique d'accueil avec réinitialisation de l'état.
-2. **Menu Notifications interactif** : fenêtre flottante auto-fermante au clic extérieur, action « Tout marquer comme lu » et « Effacer », redirection fluide.
-3. **Chaîne métier automatisée (1-clic)** : Réservation ➔ Devis Proforma ➔ Facture ➔ Enregistrement de Paiement ➔ Planning Dispatch avec mise à jour immédiate des statuts liés.
-4. **Audit de cohérence Responsive Mobile & PC** : boutons 100% visibles et tactiles (min 44px), élimination de tout débordement horizontal, affichage optimisé des tableaux et formulaires.
+Mise en place d'un cloisonnement strict des accès par rôle (RBAC) pour garantir que les comptes clients ne puissent en aucun cas voir les finances globales de l'entreprise, la trésorerie générale, la gestion de la flotte ou les modules internes, tout en bénéficiant d'un espace client clair et personnalisé.
 
----
+### Décisions de revue et choix critiques
 
-## 1. Déconnexion Fiable & Redirection Vitrine (`#headerLogoutBtn`)
-- **Problème identifié** : Le clic sur `#headerLogoutBtn` déconnectait la session Firebase mais ne réinitialisait pas l'affichage de l'application vers la vitrine publique (`setIsPublicLanding(true)`), laissant l'utilisateur dans l'interface interne sans profil actif.
-- **Actions** :
-  - Dans `AppShell.tsx`, enrichir le gestionnaire de clic de `#headerLogoutBtn` avec `await logout()`, `setIsPublicLanding(true)` et une notification toast bienveillante.
-  - Dans `AuthContext.tsx`, garantir que `logout()` purge complètement l'état utilisateur, les caches locaux éventuels et réinitialise le rôle par défaut.
-  - S'assurer que le bouton dispose d'un retour visuel instantané et d'un état désactivé durant l'exécution pour éviter les doubles clics.
+> [!IMPORTANT]
+> Les réponses aux questions de clarification ont défini les règles de cloisonnement suivantes :
+> - **Tableau de bord client** : Remplacement des KPI de trésorerie et flotte de l'entreprise par les indicateurs personnels du client (ses réservations actives, ses devis en attente, ses factures à régler et ses courses terminées).
+> - **Navigation latérale (Menu Client)** : Filtrage strict masquant tous les modules internes (Trésorerie, Flotte, Chauffeurs, Navette scolaire, Clients & Comptes, Planning général, Paramètres). Le menu client affiche uniquement : *Tableau de Bord*, *Mes Réservations*, *Mes Devis*, *Mes Factures* et *Support & Dispatch*.
+> - **Espace Chauffeur** : Vue focalisée sur les missions assignées du jour, la fiche véhicule et la radio de bord.
+> - **Direction / Super Admin** : Conservation de la vue complète (finance, trésorerie, régulation de flotte, gestion des utilisateurs et vitrine).
 
 ---
 
-## 2. Menu Déroulant des Notifications (`#notifDropdown`)
-- **Problème identifié** : Le menu de notifications ne se refermait pas lorsqu'on cliquait ailleurs sur l'écran (absence d'écouteur de clic extérieur), et pouvait dépasser sur les écrans mobiles étroits (largeur fixe de 320px).
-- **Actions** :
-  - Ajouter un hook `useRef` et un écouteur d'événement (`mousedown` / `touchstart`) dans `AppShell.tsx` pour fermer automatiquement `#notifDropdown` lors d'un clic en dehors.
-  - Adapter le style CSS pour mobile : `max-width: calc(100vw - 24px)`, largeur fluide et positionnement relatif sécurisé évitant tout débordement.
-  - Ajouter l'action « Tout marquer comme lu » (`markAllNotificationsAsRead`) dans `AppContext.tsx` et dans l'en-tête du dropdown.
-  - Permettre le clic sur chaque notification pour naviguer directement vers le document concerné (réservation, facture, planning) et fermer le menu.
+## 1. Vue d'ensemble & Cloisonnement des Données
+
+### Ce que le système apporte
+1. **Protection absolue des données financières** :
+   - Les recettes totales encaissées, le solde net de trésorerie, les dépenses d'exploitation et la liste des autres clients sont réservés exclusivement aux administrateurs (`admin`), directeurs (`direction`) et comptables (`comptable`).
+2. **Espace Client Dédié** :
+   - Un client connecté (ex. `beto`) accède directement à son espace personnel avec un accueil chaleureux, des boutons d'action rapide (*Réserver une Course*, *Demander un Devis*), le suivi en temps réel de ses courses et l'historique de ses factures.
+3. **Sécurité et Filtrage Automatique des Données** :
+   - Les requêtes et affichages de réservations, devis et factures filtrent automatiquement les documents selon l'identifiant (`userId` / `clientId`) ou le nom du client connecté afin qu'aucun compte ne voie les courses d'un tiers.
 
 ---
 
-## 3. Chaîne Métier & Interconnexion Fluide des Pages (1-Clic)
-- **Objectif** : Transformer les pages isolées en un flux commercial et opérationnel continu et professionnel.
-- **Actions** :
-  - **Réservations ➔ Devis & Planning** :
-    - Dans `ReservationsView.tsx`, ajouter des boutons d'action rapide dans le tableau et la fiche :
-      - *« Convertir en Devis »* : génère automatiquement la proforma avec montants, TVA et items, met à jour le statut de réservation en « Devis envoyé » et bascule vers l'onglet Proformas.
-      - *« Envoyer au Planning / Dispatch »* : assigne un véhicule et un chauffeur par défaut, crée le trajet dans `Plannings`, passe la réservation en « Confirmée » et bascule vers l'onglet Plannings.
-  - **Devis Proforma ➔ Facture Officielle** :
-    - Dans `ProformasView.tsx`, bouton d'action *« Convertir en Facture »* : génère la facture officielle `FAC-XXXXXX`, marque le devis comme « Validé & Facturé », et redirige l'utilisateur vers Factures.
-  - **Facture ➔ Enregistrement du Paiement Caisse/Banque** :
-    - Dans `AppContext.tsx`, créer `convertFactureToPaiement(facture, modePaiement, reference)` pour encaisser instantanément une facture en 1 clic.
-    - Dans `FacturesView.tsx`, pour toute facture non soldée, ajouter le bouton rapide *« Encaisser le paiement »* qui génère le reçu dans `Paiements`, met à jour le montant payé et bascule la facture en « Payée ».
-  - **Élèves Navette ➔ Abonnement** :
-    - Renforcer le lien direct dans `ElevesView.tsx` pour générer en 1 clic l'abonnement mensuel et la facture récurrente.
+## 2. Expérience Utilisateur & Design d'Interface
+
+### Navigation Latérale (Sidebar) par Rôle
+```
+┌─────────────────────────────────────────────────────────┐
+│ COMPTE CLIENT (Client / Particulier / Entreprise)        │
+├─────────────────────────────────────────────────────────┤
+│ • Tableau de Bord (Portail Client Personnel)           │
+│ • Mes Réservations & Courses                            │
+│ • Mes Devis / Proformas                                 │
+│ • Mes Factures & Règlements                             │
+│ • Support & Dispatch (Assistance directe)               │
+└─────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────┐
+│ COMPTE CHAUFFEUR (Conducteur VIP / Navette)             │
+├─────────────────────────────────────────────────────────┤
+│ • Missions du Jour & Trajets Assignés                   │
+│ • Fiche & État du Véhicule                              │
+│ • Radio de Bord & Dispatch                              │
+└─────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────┐
+│ COMPTE ADMIN / DIRECTION / COMPTABILITÉ                 │
+├─────────────────────────────────────────────────────────┤
+│ • Tableau de Bord Global (KPIs Entreprise & Trésorerie) │
+│ • Planning & Dispatch Complet                           │
+│ • Flotte Véhicules & Chauffeurs Staff                   │
+│ • Navette Scolaire & Abonnements                        │
+│ • Répertoire Clients & Comptes                         │
+│ • Devis & Facturation Générale                          │
+│ • Trésorerie & Dépenses d'Exploitation                 │
+│ • Paramètres Société & Vitrine CMS                      │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Tableau de Bord Client (Nouvelle Vue Dédiée)
+- **Bannière d'accueil client** : Salutation personnalisée avec statut client et accès en 1 clic pour commander un transport ou solliciter un devis proforma.
+- **Grille de 4 cartes KPI Client** (chiffres réels et isolés) :
+  1. *Mes Réservations en cours* (avec raccourci vers la liste)
+  2. *Mes Devis à valider* (avec montant total devisé)
+  3. *Mes Factures à régler* (avec alerte bienveillante et bouton de règlement)
+  4. *Courses Effectuées* (historique et fidélité)
+- **Section inférieure scindée en 2 blocs** :
+  - *Gauche - Mes Prochaines Courses* : Affiche uniquement les trajets réservés par le client connecté (dates, lieux de prise en charge et de destination, chauffeur assigné si confirmé).
+  - *Droite - Centre d'Assistance & Service Client* : Permet au client de poser une question directe à l'équipe de régulation, d'accéder au numéro d'urgence Laperle Tour et de consulter les consignes de prise en charge.
 
 ---
 
-## 4. Audit de Cohérence & Ergonomie Globale (Mobile & Desktop)
-- **Actions** :
-  - Vérifier toutes les vues (`ReservationsView`, `ProformasView`, `FacturesView`, `PlanningsView`, `VehiculesView`, `ChauffeursView`, `ClientsView`, `ParametresView`, `FinancesView`) :
-    - Conteneurs défilables horizontalement sans casser la mise en page (`table-wrap` avec scrollbar douce).
-    - Boutons d'action tactiles accessibles ($\ge 44\text{px}$) et bien espacés sur smartphone.
-    - Uniformité des badges de statuts (Vert = Validé/Payé/Disponible, Orange = En attente/En cours, Rouge = Annulé/En retard).
-    - Masquage des colonnes secondaires sur mobile au profit d'une présentation claire ou d'un bouton d'expansion.
+## 3. Architecture Technique & Flux de Données
+
+```
+ ┌─────────────────────────────────────────────────────────────────┐
+ │                      Session Utilisateur                        │
+ │               (useAuth: user, profile, role)                    │
+ └───────────────────────────────┬─────────────────────────────────┘
+                                 │
+             ┌───────────────────┴───────────────────┐
+             ▼                                       ▼
+     [role === 'client']                  [role === 'admin' | ...]
+             │                                       │
+ ┌───────────┴─────────────┐             ┌───────────┴─────────────┐
+ │ Menu & Vues Restreints  │             │ Menu & Vues Complètes   │
+ │ • ClientDashboardView   │             │ • AdminDashboardView    │
+ │ • Filter: where(userId) │             │ • KPIs Trésorerie       │
+ │ • Hidden: Trésorerie,   │             │ • Flotte & Staff        │
+ │   Flotte, Staff, etc.   │             │ • Gestion Comptes       │
+ └─────────────────────────┘             └─────────────────────────┘
+```
+
+### Composants et Fichiers Modifiés
+1. **`src/components/layout/AppShell.tsx`** :
+   - Conditionnement dynamique de `navGroups` selon `role`.
+   - Si `role === 'client'`, génération exclusive des entrées *Tableau de Bord*, *Mes Réservations*, *Mes Devis*, *Mes Factures* et *Support*.
+   - Protection de l'accès aux routes directes pour empêcher tout contournement par clic.
+2. **`src/components/modules/DashboardView.tsx`** :
+   - Intégration d'un sous-rendu conditionnel : si `role === 'client'`, affichage d'un tableau de bord 100% orienté client avec ses métriques privées.
+   - Retrait immédiat de toute mention de solde d'entreprise, recettes globales, dépenses et liste des autres comptes pour les clients.
+3. **`src/context/AppContext.tsx`** :
+   - Vérification du filtrage strict des listes locales et des écouteurs Firestore : les états `reservations`, `proformas`, `factures` présentés à un client ne contiennent que ses propres enregistrements (`user.uid` ou `profile.nom`).
+4. **`firestore.rules` & Règles de Sécurité** :
+   - Déploiement et maintien des règles garantissant que seuls les administrateurs ont le droit de lister la collection `paiements` ou `finances`.
 
 ---
 
-## 5. Validation & Vérification
-- Validation avec `compile_applet` pour s'assurer de 0 erreur TypeScript/React.
-- Validation avec `lint_applet` pour vérifier la conformité du code.
-- Test visuel et logique de l'ensemble du cycle de vie de transport et de facturation.
+## 4. Vérification & Tests de Non-Régression
+- Connexion avec un compte `client` :
+  - Vérifier que la sidebar ne comporte aucun onglet financier ni flotte.
+  - Vérifier que le tableau de bord affiche les 4 indicateurs client et aucune recette de l'entreprise.
+- Connexion avec un compte `admin` (`laperletourht@gmail.com`) :
+  - Vérifier que tous les modules opérationnels, financiers et de gestion de flotte restent pleinement fonctionnels.
+- Validation de la compilation via `compile_applet`.

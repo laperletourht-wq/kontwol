@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan complet pour la résolution des problèmes de déconnexion, l'optimisation et la fermeture du volet de notifications, l'audit et la cohérence de l'ensemble des pages sur mobile et PC, et l'interconnexion fluide de la chaîne métier (Réservations ➔ Devis ➔ Factures ➔ Paiements ➔ Dispatch).",
-  "updatedAt":  "2026-10-23T17:37:20.455771031Z",
+  "summary":  "Implementation plan for strict Role-Based Access Control (RBAC) and client data isolation. Restricts client accounts from viewing company financial KPIs, internal fleet/driver registries, and administrative modules, replacing them with a dedicated Client Portal dashboard and personal navigation.",
+  "updatedAt":  "2026-10-23T19:57:24.071369294Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
