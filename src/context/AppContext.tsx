@@ -7,7 +7,9 @@ import {
   setDoc, 
   deleteDoc, 
   onSnapshot, 
-  testConnection 
+  testConnection,
+  query,
+  where
 } from '../lib/firebase';
 import { 
   Reservation, 
@@ -648,15 +650,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     } else if (role === 'chauffeur') {
       // Drivers have scoped mission access
-      syncQueryOrCollection('plannings', query(collection(db, 'plannings'), where('chauffeurId', '==', user.uid)), setRawPlannings, SEED_PLANNINGS);
-      syncQueryOrCollection('vehicules', collection(db, 'vehicules'), setRawVehicules, SEED_VEHICULES);
-      syncQueryOrCollection('notifications', query(collection(db, 'notifications'), where('targetUid', '==', user.uid)), setNotifications, SEED_NOTIFICATIONS);
+      if (user?.uid) {
+        syncQueryOrCollection('plannings', query(collection(db, 'plannings'), where('chauffeurId', '==', user.uid)), setRawPlannings, SEED_PLANNINGS);
+        syncQueryOrCollection('vehicules', collection(db, 'vehicules'), setRawVehicules, SEED_VEHICULES);
+        syncQueryOrCollection('notifications', query(collection(db, 'notifications'), where('targetUid', '==', user.uid)), setNotifications, SEED_NOTIFICATIONS);
+      }
     } else {
       // Clients & prospects query strictly their own personal dossiers
-      syncQueryOrCollection('reservations', query(collection(db, 'reservations'), where('clientId', '==', user.uid)), setRawReservations, SEED_RESERVATIONS);
-      syncQueryOrCollection('proformas', query(collection(db, 'proformas'), where('clientId', '==', user.uid)), setRawProformas, SEED_PROFORMAS);
-      syncQueryOrCollection('factures', query(collection(db, 'factures'), where('clientId', '==', user.uid)), setRawFactures, SEED_FACTURES);
-      syncQueryOrCollection('notifications', query(collection(db, 'notifications'), where('targetUid', '==', user.uid)), setNotifications, SEED_NOTIFICATIONS);
+      if (user?.uid) {
+        syncQueryOrCollection('reservations', query(collection(db, 'reservations'), where('clientId', '==', user.uid)), setRawReservations, SEED_RESERVATIONS);
+        syncQueryOrCollection('proformas', query(collection(db, 'proformas'), where('clientId', '==', user.uid)), setRawProformas, SEED_PROFORMAS);
+        syncQueryOrCollection('factures', query(collection(db, 'factures'), where('clientId', '==', user.uid)), setRawFactures, SEED_FACTURES);
+        syncQueryOrCollection('notifications', query(collection(db, 'notifications'), where('targetUid', '==', user.uid)), setNotifications, SEED_NOTIFICATIONS);
+      }
     }
 
     return () => {

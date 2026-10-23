@@ -222,6 +222,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: defaultRole,
         roles: [defaultRole],
         status: 'actif',
+        statutCompte: 'actif',
+        statutClient: defaultRole === 'admin' ? 'admin' : 'client',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
