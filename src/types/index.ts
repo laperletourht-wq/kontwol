@@ -264,6 +264,7 @@ export interface NotificationItem {
   date: string;
   read: boolean;
   link?: string;
+  targetId?: string;
 }
 
 export interface ChatMessage {

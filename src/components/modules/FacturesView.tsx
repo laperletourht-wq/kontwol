@@ -8,7 +8,14 @@ interface FacturesViewProps {
 }
 
 export const FacturesView: React.FC<FacturesViewProps> = ({ onOpenModal }) => {
-  const { factures, deleteFacture, saveFacture, setPrintSheetData, globalSearchQuery } = useApp();
+  const { 
+    factures, 
+    deleteFacture, 
+    saveFacture, 
+    setPrintSheetData, 
+    globalSearchQuery,
+    convertFactureToPaiement
+  } = useApp();
   const { role } = useAuth();
   const isClient = role === 'client' || role === 'prospect';
   const isChauffeur = role === 'chauffeur';
@@ -135,8 +142,17 @@ export const FacturesView: React.FC<FacturesViewProps> = ({ onOpenModal }) => {
                         >
                           🖨️ Imprimer
                         </button>
-                        {f.status !== 'Payée' && (
+                        {f.status !== 'Payée' ? (
                           <>
+                            <button
+                              type="button"
+                              className="tiny"
+                              style={{ background: '#ecfdf5', color: '#047857', fontWeight: 600, border: '1px solid #a7f3d0' }}
+                              onClick={() => convertFactureToPaiement(f)}
+                              title="Encaisser immédiatement la facture en caisse (1-clic)"
+                            >
+                              ⚡ Encaisser Direct
+                            </button>
                             <button
                               type="button"
                               className="tiny edit"
@@ -147,19 +163,23 @@ export const FacturesView: React.FC<FacturesViewProps> = ({ onOpenModal }) => {
                                 factureAssociee: f.number,
                                 motif: `Règlement facture ${f.number}`
                               })}
-                              title="Encaisser paiement"
+                              title="Encaisser avec mode de paiement personnalisé"
                             >
-                              💵 Encaisser
+                              💵 Mode
                             </button>
                             <button
                               type="button"
                               className="tiny"
                               onClick={() => sendWhatsAppReminder(f)}
-                              title="Envoyer un rappel WhatsApp"
+                              title="Envoyer un rappel WhatsApp au client"
                             >
-                              💬 Relancer
+                              💬 Relance
                             </button>
                           </>
+                        ) : (
+                          <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                            ✓ Soldée
+                          </span>
                         )}
                         <button
                           type="button"

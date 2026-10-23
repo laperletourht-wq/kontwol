@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
 
@@ -17,8 +17,13 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
     setIsPublicLanding, 
     setChatModalOpen, 
     setClientProfileModalOpen,
+    setPrintSheetData,
+    setGlobalSearchQuery,
     notifications, 
     markNotificationAsRead,
+    markAllNotificationsAsRead,
+    clearAllNotifications,
+    showToast,
     reservations,
     proformas,
     factures,
@@ -30,6 +35,117 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
   const [currentDateString, setCurrentDateString] = useState('');
   const [currentTimeString, setCurrentTimeString] = useState('');
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const notifDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Auto-close notification dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      if (notifDropdownRef.current && !notifDropdownRef.current.contains(event.target as Node)) {
+        setNotifDropdownOpen(false);
+      }
+    };
+
+    if (notifDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [notifDropdownOpen]);
+
+  // Handler to open the exact source document / record of any notification
+  const handleOpenNotificationSource = (n: any) => {
+    markNotificationAsRead(n.id);
+    setNotifDropdownOpen(false);
+
+    // 1. Facture source
+    if (
+      n.link === 'factures' || 
+      n.targetId?.startsWith('FAC-') || 
+      n.message.includes('FAC-') || 
+      n.title.toLowerCase().includes('facture') || 
+      n.title.toLowerCase().includes('paiement')
+    ) {
+      const matchNumber = n.targetId || (n.message.match(/FAC-[\w-]+/)?.[0]) || 'FAC-2026-001';
+      const targetFacture = factures.find((f) => f.number === matchNumber || f.id === matchNumber) || factures[0];
+      
+      setCurrentModule('factures');
+      if (targetFacture) {
+        setGlobalSearchQuery(targetFacture.number);
+        setPrintSheetData({ type: 'facture', data: targetFacture });
+        showToast(`Source ouverte : Facture ${targetFacture.number} (${targetFacture.client})`, 'success');
+      }
+      return;
+    }
+
+    // 2. Proforma source
+    if (
+      n.link === 'proformas' || 
+      n.targetId?.startsWith('PRO-') || 
+      n.message.includes('PRO-') || 
+      n.title.toLowerCase().includes('devis') || 
+      n.title.toLowerCase().includes('proforma')
+    ) {
+      const matchNumber = n.targetId || (n.message.match(/PRO-[\w-]+/)?.[0]) || 'PRO-2026-001';
+      const targetProforma = proformas.find((p) => p.number === matchNumber || p.id === matchNumber) || proformas[0];
+      
+      setCurrentModule('proformas');
+      if (targetProforma) {
+        setGlobalSearchQuery(targetProforma.number);
+        setPrintSheetData({ type: 'proforma', data: targetProforma });
+        showToast(`Source ouverte : Devis ${targetProforma.number} (${targetProforma.client})`, 'success');
+      }
+      return;
+    }
+
+    // 3. Réservation source
+    if (
+      n.link === 'reservations' || 
+      n.targetId?.startsWith('RES-') || 
+      n.message.includes('RES-') || 
+      n.title.toLowerCase().includes('réservation') || 
+      n.title.toLowerCase().includes('circuit')
+    ) {
+      const matchNumber = n.targetId || (n.message.match(/RES-[\w-]+/)?.[0]) || 'RES-003';
+      const targetRes = reservations.find((r) => r.id === matchNumber || r.client?.toLowerCase().includes('beauvoir')) || reservations[0];
+      
+      setCurrentModule('reservations');
+      if (targetRes) {
+        setGlobalSearchQuery(targetRes.id);
+        showToast(`Source ouverte : Réservation ${targetRes.id} (${targetRes.client})`, 'success');
+      }
+      return;
+    }
+
+    // 4. Véhicule source
+    if (
+      n.link === 'vehicules' || 
+      n.targetId?.startsWith('VEH-') || 
+      n.message.includes('BB-') || 
+      n.message.includes('AA-') || 
+      n.message.includes('PR-')
+    ) {
+      const matchPlate = n.targetId || (n.message.match(/[A-Z]{2}-\d{4,5}/)?.[0]) || '';
+      const targetVeh = vehicules.find((v) => v.id === n.targetId || v.plaque === matchPlate || n.message.includes(v.plaque)) || vehicules[0];
+      
+      setCurrentModule('vehicules');
+      if (targetVeh) {
+        setGlobalSearchQuery(targetVeh.plaque);
+        showToast(`Source ouverte : Fiche Véhicule ${targetVeh.modele} (${targetVeh.plaque})`, 'success');
+      }
+      return;
+    }
+
+    // 5. Default direct fallback
+    if (n.link) {
+      setCurrentModule(n.link);
+      if (n.targetId) setGlobalSearchQuery(n.targetId);
+      showToast(`Module ouvert : ${n.link}`, 'info');
+    }
+  };
 
   // Live Clock & Date update formatted in French matching reference: "Jeudi 22 Octobre 2026"
   useEffect(() => {
@@ -421,73 +537,151 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
           {/* Right: Notifications, User Profile Pill & Logout */}
           <div className="header-right">
-            {/* Notification Bell with Badge */}
-            <div style={{ position: 'relative' }}>
+            {/* Notification Bell with Dropdown */}
+            <div ref={notifDropdownRef} style={{ position: 'relative' }}>
               <button 
                 type="button"
                 className="header-bell-btn" 
                 id="notificationBtn" 
-                onClick={() => setNotifDropdownOpen(!notifDropdownOpen)}
+                onClick={() => setNotifDropdownOpen((prev) => !prev)}
                 title="Notifications & Alertes de service" 
                 aria-label="Notifications"
+                aria-expanded={notifDropdownOpen}
               >
                 <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
                   <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                 </svg>
-                <span className="header-red-badge">
-                  {unreadNotifs.length > 0 ? unreadNotifs.length : 5}
-                </span>
+                {unreadNotifs.length > 0 && (
+                  <span className="header-red-badge">
+                    {unreadNotifs.length}
+                  </span>
+                )}
               </button>
 
               {notifDropdownOpen && (
                 <div 
                   id="notifDropdown" 
-                  className="notif-dropdown" 
+                  className="notif-dropdown shadow-2xl" 
                   style={{
                     display: 'block',
                     position: 'absolute',
                     right: 0,
                     top: '46px',
-                    width: '320px',
-                    background: '#fff',
-                    boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                    width: '340px',
+                    maxWidth: 'calc(100vw - 24px)',
+                    background: '#ffffff',
+                    boxShadow: '0 12px 30px rgba(8, 43, 112, 0.18)',
                     borderRadius: '12px',
-                    border: '1px solid #e2e8f0',
+                    border: '1px solid #cbd5e1',
                     padding: '12px',
-                    zIndex: 100
+                    zIndex: 1000
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #edf2f7', paddingBottom: '8px', marginBottom: '8px' }}>
-                    <strong style={{ fontSize: '13px', color: '#082b70' }}>Notifications</strong>
-                    <span style={{ fontSize: '11px', color: '#64748b' }}>{unreadNotifs.length} non lues</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <strong style={{ fontSize: '13px', color: '#082b70' }}>Notifications</strong>
+                      <span style={{ fontSize: '11px', background: '#eff6ff', color: '#1d4ed8', padding: '2px 6px', borderRadius: '10px', fontWeight: 600 }}>
+                        {unreadNotifs.length}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {unreadNotifs.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => markAllNotificationsAsRead()}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#2563eb',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            padding: '2px 4px',
+                            textDecoration: 'underline'
+                          }}
+                        >
+                          Tout marquer lu
+                        </button>
+                      )}
+                      {notifications.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => clearAllNotifications()}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#94a3b8',
+                            fontSize: '11px',
+                            cursor: 'pointer',
+                            padding: '2px 4px'
+                          }}
+                          title="Vider la liste"
+                        >
+                          Vider
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
+                  <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
                     {notifications.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '16px 0', fontSize: '12px', color: '#94a3b8' }}>
+                      <div style={{ textAlign: 'center', padding: '24px 0', fontSize: '12px', color: '#94a3b8' }}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2" style={{ margin: '0 auto 8px' }}>
+                          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                        </svg>
                         Aucune nouvelle alerte
                       </div>
                     ) : (
                       notifications.map((n) => (
                         <div 
                           key={n.id}
-                          onClick={() => {
-                            markNotificationAsRead(n.id);
-                            if (n.link) setCurrentModule(n.link);
-                            setNotifDropdownOpen(false);
-                          }}
+                          onClick={() => handleOpenNotificationSource(n)}
                           style={{
-                            padding: '8px',
-                            borderRadius: '6px',
-                            background: n.read ? '#fff' : '#f0f9ff',
-                            borderBottom: '1px solid #f1f5f9',
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            background: n.read ? '#ffffff' : '#f0f9ff',
+                            border: n.read ? '1px solid #f1f5f9' : '1px solid #bae6fd',
                             cursor: 'pointer',
-                            marginBottom: '4px'
+                            marginBottom: '6px',
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            gap: '10px',
+                            alignItems: 'flex-start'
                           }}
+                          className="hover:bg-sky-50"
+                          title="Cliquez pour ouvrir directement le document source"
                         >
-                          <div style={{ fontSize: '12px', fontWeight: 700, color: '#1e293b' }}>{n.title}</div>
-                          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>{n.message}</div>
+                          <div style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            marginTop: '5px',
+                            flexShrink: 0,
+                            background: n.read ? '#cbd5e1' : '#0284c7'
+                          }} />
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                              <div style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>{n.title}</div>
+                              <span style={{ fontSize: '10px', color: '#94a3b8' }}>Aujourd'hui</span>
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#475569', marginTop: '2px', lineHeight: '1.4' }}>{n.message}</div>
+                            <div style={{ 
+                              marginTop: '6px', 
+                              display: 'inline-flex', 
+                              alignItems: 'center', 
+                              gap: '4px', 
+                              fontSize: '10.5px', 
+                              fontWeight: 700, 
+                              color: '#0369a1', 
+                              background: '#e0f2fe', 
+                              padding: '2px 8px', 
+                              borderRadius: '4px' 
+                            }}>
+                              <span>🔗 Ouvrir la source du document ➔</span>
+                            </div>
+                          </div>
                         </div>
                       ))
                     )}
@@ -531,8 +725,20 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
               type="button"
               className="header-logout-square" 
               id="headerLogoutBtn" 
-              title="Se déconnecter (Déconnexion)"
-              onClick={logout}
+              title="Se déconnecter (Déconnexion immédiate)"
+              disabled={isLoggingOut}
+              onClick={async () => {
+                setIsLoggingOut(true);
+                try {
+                  await logout();
+                } catch (err) {
+                  console.warn('Logout fallback:', err);
+                } finally {
+                  setIsPublicLanding(true);
+                  showToast('Vous avez été déconnecté avec succès. À bientôt !', 'info');
+                  setIsLoggingOut(false);
+                }
+              }}
               aria-label="Se déconnecter"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">

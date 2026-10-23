@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan d'implémentation pour corriger les erreurs de permissions Firestore (Missing or insufficient permissions) sur les réservations, proformas, factures et notifications en adaptant les requêtes selon le rôle (requêtes ciblées par identifiant client au lieu d'une écoute globale non autorisée) et en affinant les règles de listage Firestore.",
-  "updatedAt":  "2026-10-22T16:25:01.012039821Z",
+  "summary":  "Plan complet pour la résolution des problèmes de déconnexion, l'optimisation et la fermeture du volet de notifications, l'audit et la cohérence de l'ensemble des pages sur mobile et PC, et l'interconnexion fluide de la chaîne métier (Réservations ➔ Devis ➔ Factures ➔ Paiements ➔ Dispatch).",
+  "updatedAt":  "2026-10-23T17:37:20.455771031Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

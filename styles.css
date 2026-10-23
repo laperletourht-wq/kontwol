@@ -9661,6 +9661,46 @@ div#app > div.main > main#page > div:nth-of-type(2) > div:nth-of-type(4) {
     width: 100% !important;
     min-height: 44px !important;
   }
+
+  /* 6. En-tête Mobile & Notifications & Boutons d'Action */
+  .header-right {
+    gap: 8px !important;
+  }
+  .header-logout-square,
+  #headerLogoutBtn {
+    min-width: 42px !important;
+    min-height: 42px !important;
+    width: 42px !important;
+    height: 42px !important;
+  }
+  .header-bell-btn {
+    min-width: 42px !important;
+    min-height: 42px !important;
+    width: 42px !important;
+    height: 42px !important;
+  }
+  #notifDropdown {
+    position: fixed !important;
+    top: 56px !important;
+    left: 12px !important;
+    right: 12px !important;
+    width: auto !important;
+    max-width: calc(100vw - 24px) !important;
+    box-shadow: 0 16px 36px rgba(8, 43, 112, 0.25) !important;
+    z-index: 9999 !important;
+  }
+  .action-cell {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    min-width: 160px !important;
+  }
+  .action-cell .tiny {
+    min-height: 36px !important;
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+    touch-action: manipulation !important;
+  }
 }
 
 

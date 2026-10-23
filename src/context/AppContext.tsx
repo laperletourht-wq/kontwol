@@ -413,7 +413,8 @@ const SEED_NOTIFICATIONS: NotificationItem[] = [
     type: 'info',
     date: new Date().toISOString(),
     read: false,
-    link: 'reservations'
+    link: 'reservations',
+    targetId: 'RES-003'
   },
   {
     id: 'notif-2',
@@ -422,7 +423,8 @@ const SEED_NOTIFICATIONS: NotificationItem[] = [
     type: 'success',
     date: new Date().toISOString(),
     read: false,
-    link: 'factures'
+    link: 'factures',
+    targetId: 'FAC-2026-001'
   },
   {
     id: 'notif-3',
@@ -431,7 +433,8 @@ const SEED_NOTIFICATIONS: NotificationItem[] = [
     type: 'warning',
     date: new Date().toISOString(),
     read: false,
-    link: 'vehicules'
+    link: 'vehicules',
+    targetId: 'BB-44210'
   }
 ];
 
@@ -523,9 +526,12 @@ interface AppContextType {
   saveSettings: (item: Partial<CompanySettings>) => Promise<void>;
   sendChatMessage: (text: string, channelId?: string) => Promise<void>;
   markNotificationAsRead: (id: string) => void;
+  markAllNotificationsAsRead: () => void;
+  clearAllNotifications: () => void;
   convertProformaToFacture: (proforma: Proforma) => Promise<void>;
   convertReservationToProforma: (res: Reservation) => Promise<void>;
   convertReservationToPlanning: (res: Reservation) => Promise<void>;
+  convertFactureToPaiement: (facture: Facture, modePaiement?: string, reference?: string) => Promise<void>;
   generateEleveAbonnementEtFacture: (eleve: Eleve) => Promise<void>;
 }
 
@@ -1182,6 +1188,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
+  const markAllNotificationsAsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    showToast('Toutes les notifications sont marquées comme lues', 'info');
+  };
+
+  const clearAllNotifications = () => {
+    setNotifications([]);
+    showToast('Boîte de notifications vidée', 'info');
+  };
+
   const convertProformaToFacture = async (proforma: Proforma) => {
     const factureNumber = `FAC-${Date.now().toString().slice(-6)}`;
     const newFacture: Facture = {
@@ -1328,6 +1344,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentModule('factures');
   };
 
+  // Passerelle 4 : Facture ➔ Enregistrement Instantané de Paiement Caisse
+  const convertFactureToPaiement = async (
+    facture: Facture,
+    modePaiement: string = 'Espèces Caisse',
+    reference?: string
+  ) => {
+    const resteAPayer = Math.max(0, (Number(facture.amount) || 0) - (Number(facture.paidAmount) || 0));
+    const montantPaye = resteAPayer > 0 ? resteAPayer : (Number(facture.amount) || 100);
+    const refPaiement = reference || `REC-${Date.now().toString().slice(-6)}`;
+    const paymentId = `PAI-${Date.now().toString().slice(-6)}`;
+
+    const newPaiement: Paiement = {
+      id: paymentId,
+      reference: refPaiement,
+      date: new Date().toISOString().slice(0, 10),
+      client: facture.client,
+      clientId: facture.clientId,
+      clientEmail: facture.clientEmail,
+      montant: montantPaye,
+      devise: facture.currency || 'USD',
+      modePaiement,
+      motif: `Règlement Facture ${facture.number} - ${facture.service || 'Prestation VIP'}`,
+      factureAssociee: facture.number,
+      statut: 'Validé',
+      recuPar: profile?.nom || profile?.name || user?.displayName || 'Caisse Centrale Laperle'
+    };
+
+    await savePaiement(newPaiement);
+
+    // Mettre à jour la facture comme intégralement payée
+    await saveFacture({
+      ...facture,
+      paidAmount: Number(facture.amount) || montantPaye,
+      status: 'Payée',
+      updatedAt: new Date().toISOString()
+    });
+
+    showToast(`Paiement de $${montantPaye} ${facture.currency || 'USD'} encaissé avec succès pour la facture ${facture.number} !`, 'success');
+    setCurrentModule('paiements');
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -1392,9 +1449,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         saveSettings,
         sendChatMessage,
         markNotificationAsRead,
+        markAllNotificationsAsRead,
+        clearAllNotifications,
         convertProformaToFacture,
         convertReservationToProforma,
         convertReservationToPlanning,
+        convertFactureToPaiement,
         generateEleveAbonnementEtFacture
       }}
     >
