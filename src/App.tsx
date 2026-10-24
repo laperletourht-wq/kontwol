@@ -23,6 +23,7 @@ import { PaiementsView } from './components/modules/PaiementsView';
 import { FinancesView } from './components/modules/FinancesView';
 import { UtilisateursView } from './components/modules/UtilisateursView';
 import { VitrineCMSView } from './components/modules/VitrineCMSView';
+import { ParametresView } from './components/modules/ParametresView';
 import { useAuth } from './context/AuthContext';
 
 const MainRouter: React.FC = () => {
