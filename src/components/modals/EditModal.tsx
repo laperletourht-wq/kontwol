@@ -25,6 +25,7 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
     savePlanning, 
     savePaiement,
     showToast,
+    addNotification,
     settings,
     clients,
     vehicules,
@@ -55,10 +56,56 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      if (type === 'facture' && isClientUser) {
+        showToast('Les clients ne peuvent pas créer de factures.', 'error');
+        onClose();
+        return;
+      }
+
+      if (type === 'demande-devis' || (type === 'proforma' && isClientUser)) {
+        const clientName = formData.client || profile?.nom || profile?.name || user?.displayName || 'Client';
+        const clientEmail = formData.email || formData.clientEmail || user?.email || profile?.email || '';
+        const clientPhone = formData.telephone || profile?.telephone || profile?.phone || '';
+        const service = formData.service || 'Transfert VIP / Course Privée';
+        const devisNumber = `DEV-${Date.now().toString().slice(-6)}`;
+        
+        await saveProforma({
+          ...formData,
+          number: devisNumber,
+          client: clientName,
+          clientId: user?.uid || profile?.id || '',
+          clientEmail,
+          telephone: clientPhone,
+          service,
+          date: formData.date || new Date().toISOString().slice(0, 10),
+          amount: 0,
+          tva: 0,
+          totalTTC: 0,
+          status: 'En attente',
+          notes: `Demande de devis client:\n- Prestation : ${service}\n- Trajet : ${formData.origin || 'Port-au-Prince'} ➔ ${formData.destination || 'À définir'}\n- Date & Heure souhaitées : ${formData.date || ''} à ${formData.time || '09:00'}\n- Passagers : ${formData.passengers || 1}\n- Véhicule souhaité : ${formData.vehicleType || 'SUV / Berline VIP'}\n- Remarques particulières : ${formData.specialRequests || 'Aucune'}`
+        });
+
+        await addNotification({
+          title: `Nouvelle demande de devis : ${service}`,
+          message: `${clientName} (${clientEmail} / ${clientPhone}) demande un chiffrage pour ${formData.origin || 'Port-au-Prince'} ➔ ${formData.destination || 'Destination'}.`,
+          type: 'info',
+          link: 'proformas'
+        });
+
+        showToast('Votre demande de devis a bien été transmise à notre équipe commerciale !', 'success');
+        onClose();
+        return;
+      }
+
       switch (type) {
         case 'reservation':
           await saveReservation({
             ...formData,
+            client: isClientUser ? (profile?.nom || profile?.name || user?.displayName || formData.client) : formData.client,
+            clientId: isClientUser ? (user?.uid || profile?.id) : formData.clientId,
+            telephone: isClientUser ? (profile?.telephone || profile?.phone || formData.telephone) : formData.telephone,
+            email: isClientUser ? (user?.email || profile?.email) : formData.email,
+            status: isClientUser ? 'En attente' : (formData.status || 'En attente'),
             passengers: Number(formData.passengers) || 1,
             amount: Number(formData.amount) || 0
           });
@@ -148,9 +195,12 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
   };
 
   const getTitle = () => {
+    if (type === 'demande-devis' || (type === 'proforma' && isClientUser)) {
+      return 'Demander un Devis Personnalisé';
+    }
     const isEdit = Boolean(data?.id);
     switch (type) {
-      case 'reservation': return isEdit ? 'Modifier la Réservation' : 'Nouvelle Réservation';
+      case 'reservation': return isEdit ? 'Modifier la Réservation' : isClientUser ? 'Réserver un Trajet avec Chauffeur' : 'Nouvelle Réservation';
       case 'proforma': return isEdit ? 'Modifier le Devis Proforma' : 'Émettre un Devis Proforma';
       case 'facture': return isEdit ? 'Modifier la Facture' : 'Émettre une Facture';
       case 'client': return isEdit ? 'Modifier le Client' : 'Nouveau Client';
@@ -278,63 +328,201 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
                 />
               </div>
 
+              {!isClientUser && (
+                <>
+                  <div className="field">
+                    <label>Conducteur Assigné (Optionnel) :</label>
+                    <select
+                      value={formData.driver || ''}
+                      onChange={(e) => handleChange('driver', e.target.value)}
+                    >
+                      <option value="">-- Aucun conducteur assigné --</option>
+                      {chauffeurs.map((c) => (
+                        <option key={c.id} value={`${c.prenom} ${c.nom}`}>
+                          {c.prenom} {c.nom} ({c.statut})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="field">
+                    <label>Véhicule Assigné (Optionnel) :</label>
+                    <select
+                      value={formData.vehicle || ''}
+                      onChange={(e) => handleChange('vehicle', e.target.value)}
+                    >
+                      <option value="">-- Aucun véhicule assigné --</option>
+                      {vehicules.map((v) => (
+                        <option key={v.id} value={`${v.modele} (${v.plaque})`}>
+                          {v.modele} - {v.plaque} ({v.statut})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="field">
+                    <label>Montant Estimé ($ USD) :</label>
+                    <input
+                      type="number"
+                      value={formData.amount || 120}
+                      onChange={(e) => handleChange('amount', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label>Statut de la Réservation :</label>
+                    <select
+                      value={formData.status || 'En attente'}
+                      onChange={(e) => handleChange('status', e.target.value)}
+                    >
+                      <option value="En attente">En attente</option>
+                      <option value="Confirmée">Confirmée</option>
+                      <option value="En cours">En cours</option>
+                      <option value="Terminée">Terminée</option>
+                      <option value="Annulée">Annulée</option>
+                    </select>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* CLIENT QUOTE REQUEST FORM */}
+          {(type === 'demande-devis' || (type === 'proforma' && isClientUser)) && (
+            <div className="form-grid">
+              <div className="field full" style={{ background: '#f0f5ff', padding: '12px 14px', borderRadius: '10px', border: '1px solid #dbeafe', marginBottom: '8px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 750, color: '#082b70', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>📋</span>
+                  <span>Formulaire de Demande de Devis Personnalisé</span>
+                </div>
+                <div style={{ fontSize: '12px', color: '#475569', marginTop: '2px' }}>
+                  Renseignez vos souhaits de trajet. Notre équipe commerciale étudie votre itinéraire et vous transmet un devis officiel détaillé sous 2 heures.
+                </div>
+              </div>
+
               <div className="field">
-                <label>Conducteur Assigné (Optionnel) :</label>
+                <label>Prestation Souhaitée :</label>
                 <select
-                  value={formData.driver || ''}
-                  onChange={(e) => handleChange('driver', e.target.value)}
+                  value={formData.service || 'Transfert Aéroport Toussaint Louverture'}
+                  onChange={(e) => handleChange('service', e.target.value)}
+                  required
                 >
-                  <option value="">-- Aucun conducteur assigné --</option>
-                  {chauffeurs.map((c) => (
-                    <option key={c.id} value={`${c.prenom} ${c.nom}`}>
-                      {c.prenom} {c.nom} ({c.statut})
-                    </option>
-                  ))}
+                  <option value="Transfert Aéroport Toussaint Louverture">Transfert Aéroport Toussaint Louverture</option>
+                  <option value="Location SUV / Berline VIP avec Chauffeur">Location SUV / 4x4 VIP avec Chauffeur</option>
+                  <option value="Circuit Touristique Côte des Arcadins">Circuit Touristique Côte des Arcadins</option>
+                  <option value="Circuit Découverte Citadelle & Cap-Haïtien">Circuit Citadelle & Cap-Haïtien</option>
+                  <option value="Circuit Balnéaire Jacmel & Sud">Circuit Balnéaire Jacmel & Sud</option>
+                  <option value="Transport Corporate / Missions Diplomatiques">Transport Corporate / Missions Diplomatiques</option>
+                  <option value="Transport de Groupe / Navette Événementielle">Transport de Groupe (Minibus / Bus)</option>
+                  <option value="Autre prestation sur mesure">Autre prestation sur mesure</option>
                 </select>
               </div>
 
               <div className="field">
-                <label>Véhicule Assigné (Optionnel) :</label>
+                <label>Type de Véhicule Souhaité :</label>
                 <select
-                  value={formData.vehicle || ''}
-                  onChange={(e) => handleChange('vehicle', e.target.value)}
+                  value={formData.vehicleType || 'SUV 4x4 VIP (Toyota Prado)'}
+                  onChange={(e) => handleChange('vehicleType', e.target.value)}
                 >
-                  <option value="">-- Aucun véhicule assigné --</option>
-                  {vehicules.map((v) => (
-                    <option key={v.id} value={`${v.modele} (${v.plaque})`}>
-                      {v.modele} - {v.plaque} ({v.statut})
-                    </option>
-                  ))}
+                  <option value="SUV 4x4 VIP (Toyota Prado)">SUV 4x4 VIP (Toyota Prado TXL)</option>
+                  <option value="Berline Confort VIP">Berline Confort VIP</option>
+                  <option value="Minibus VIP Grand Cabin (10-14 pers)">Minibus VIP HiAce (10-14 pers)</option>
+                  <option value="Bus Scolaire / Autocar Coaster (30 pers)">Bus Coaster (30 pers)</option>
+                  <option value="Véhicule Blindé VIP">Véhicule Blindé VIP (sur demande)</option>
                 </select>
               </div>
 
               <div className="field">
-                <label>Montant Estimé ($ USD) :</label>
+                <label>Point de Prise en Charge (Départ) :</label>
                 <input
-                  type="number"
-                  value={formData.amount || 120}
-                  onChange={(e) => handleChange('amount', e.target.value)}
+                  type="text"
+                  value={formData.origin || ''}
+                  onChange={(e) => handleChange('origin', e.target.value)}
+                  placeholder="Ex: Aéroport Toussaint Louverture / Pétion-Ville"
+                  required
                 />
               </div>
 
               <div className="field">
-                <label>Statut de la Réservation :</label>
-                <select
-                  value={formData.status || 'En attente'}
-                  onChange={(e) => handleChange('status', e.target.value)}
-                >
-                  <option value="En attente">En attente</option>
-                  <option value="Confirmée">Confirmée</option>
-                  <option value="En cours">En cours</option>
-                  <option value="Terminée">Terminée</option>
-                  <option value="Annulée">Annulée</option>
-                </select>
+                <label>Lieu de Destination :</label>
+                <input
+                  type="text"
+                  value={formData.destination || ''}
+                  onChange={(e) => handleChange('destination', e.target.value)}
+                  placeholder="Ex: Hôtel Karibe, Decameron Côte des Arcadins..."
+                  required
+                />
+              </div>
+
+              <div className="field">
+                <label>Date Souhaitée :</label>
+                <input
+                  type="date"
+                  value={formData.date || new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => handleChange('date', e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="field">
+                <label>Heure Prévue :</label>
+                <input
+                  type="time"
+                  value={formData.time || '09:00'}
+                  onChange={(e) => handleChange('time', e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="field">
+                <label>Nombre de Passagers :</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={formData.passengers || 1}
+                  onChange={(e) => handleChange('passengers', e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="field">
+                <label>Votre Numéro WhatsApp / Téléphone :</label>
+                <input
+                  type="tel"
+                  value={formData.telephone || ''}
+                  onChange={(e) => handleChange('telephone', e.target.value)}
+                  placeholder="+509 XXXX XXXX"
+                  required
+                />
+              </div>
+
+              <div className="field full">
+                <label>Votre Adresse Email pour recevoir le devis :</label>
+                <input
+                  type="email"
+                  value={formData.email || ''}
+                  onChange={(e) => handleChange('email', e.target.value)}
+                  placeholder="votre-email@exemple.com"
+                  required
+                />
+              </div>
+
+              <div className="field full">
+                <label>Précisions, bagages ou demandes spécifiques :</label>
+                <textarea
+                  value={formData.specialRequests || ''}
+                  onChange={(e) => handleChange('specialRequests', e.target.value)}
+                  placeholder="Ex: 4 grosses valises, besoin d'un chauffeur anglophone, trajet aller-retour prévu..."
+                  rows={2}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                />
               </div>
             </div>
           )}
 
-          {/* PROFORMA FORM */}
-          {type === 'proforma' && (
+          {/* STAFF PROFORMA FORM */}
+          {type === 'proforma' && !isClientUser && (
             <div className="form-grid">
               <div className="field">
                 <label>Numéro de Devis :</label>
@@ -404,7 +592,7 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
           )}
 
           {/* FACTURE FORM */}
-          {type === 'facture' && (
+          {type === 'facture' && !isClientUser && (
             <div className="form-grid">
               <div className="field">
                 <label>Numéro de Facture :</label>

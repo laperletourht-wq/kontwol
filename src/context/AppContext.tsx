@@ -475,8 +475,8 @@ interface AppContextType {
   setChatModalOpen: (val: boolean) => void;
   clientProfileModalOpen: boolean;
   setClientProfileModalOpen: (val: boolean) => void;
-  printSheetData: { type: 'proforma' | 'facture'; data: any } | null;
-  setPrintSheetData: (data: { type: 'proforma' | 'facture'; data: any } | null) => void;
+  printSheetData: { type: 'proforma' | 'facture' | 'reservation' | 'paiement'; data: any } | null;
+  setPrintSheetData: (data: { type: 'proforma' | 'facture' | 'reservation' | 'paiement'; data: any } | null) => void;
   toast: { message: string; type?: 'info' | 'success' | 'warning' | 'error' } | null;
   showToast: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
   globalSearchQuery: string;
@@ -530,6 +530,18 @@ interface AppContextType {
   markNotificationAsRead: (id: string) => void;
   markAllNotificationsAsRead: () => void;
   clearAllNotifications: () => void;
+  addNotification: (item: { 
+    title: string; 
+    message: string; 
+    type?: 'info' | 'warning' | 'success' | 'danger'; 
+    link?: string; 
+    targetId?: string;
+    targetAudience?: 'admin' | 'client' | 'chauffeur' | 'all';
+    targetUid?: string;
+    authorUid?: string;
+  }) => Promise<void>;
+  requestDocumentSend: (docType: 'facture' | 'proforma', docNumber: string, amount: number, method: 'email' | 'whatsapp' | 'both', clientNotes?: string) => Promise<void>;
+  requestReservationDoc: (res: Reservation, docType: 'devis' | 'facture', notes?: string) => Promise<void>;
   convertProformaToFacture: (proforma: Proforma) => Promise<void>;
   convertReservationToProforma: (res: Reservation) => Promise<void>;
   convertReservationToPlanning: (res: Reservation) => Promise<void>;
@@ -566,7 +578,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [rawPlannings, setRawPlannings] = useState<Planning[]>(SEED_PLANNINGS);
   const [rawPaiements, setRawPaiements] = useState<Paiement[]>(SEED_PAIEMENTS);
   const [utilisateurs, setUtilisateurs] = useState<UserProfile[]>([]);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(SEED_NOTIFICATIONS);
+  const [rawNotifications, setRawNotifications] = useState<NotificationItem[]>(SEED_NOTIFICATIONS);
   const [settings, setSettings] = useState<CompanySettings>(DEFAULT_SETTINGS);
   const [messages, setMessages] = useState<ChatMessage[]>(SEED_MESSAGES);
 
@@ -635,7 +647,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       syncQueryOrCollection('reservations', collection(db, 'reservations'), setRawReservations, SEED_RESERVATIONS);
       syncQueryOrCollection('proformas', collection(db, 'proformas'), setRawProformas, SEED_PROFORMAS);
       syncQueryOrCollection('factures', collection(db, 'factures'), setRawFactures, SEED_FACTURES);
-      syncQueryOrCollection('notifications', collection(db, 'notifications'), setNotifications, SEED_NOTIFICATIONS);
+      syncQueryOrCollection('notifications', collection(db, 'notifications'), setRawNotifications, SEED_NOTIFICATIONS);
       syncQueryOrCollection('clients', collection(db, 'clients'), setRawClients, SEED_CLIENTS);
       syncQueryOrCollection('eleves', collection(db, 'eleves'), setRawEleves, SEED_ELEVES);
       syncQueryOrCollection('abonnements', collection(db, 'abonnements'), setRawAbonnements, SEED_ABONNEMENTS);
@@ -651,7 +663,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (user?.uid) {
         syncQueryOrCollection('plannings', query(collection(db, 'plannings'), where('chauffeurId', '==', user.uid)), setRawPlannings, []);
         syncQueryOrCollection('vehicules', collection(db, 'vehicules'), setRawVehicules, SEED_VEHICULES);
-        syncQueryOrCollection('notifications', query(collection(db, 'notifications'), where('targetUid', '==', user.uid)), setNotifications, []);
+        syncQueryOrCollection('notifications', query(collection(db, 'notifications'), where('targetUid', '==', user.uid)), setRawNotifications, []);
       }
     } else {
       // Clients & prospects query strictly their own personal dossiers
@@ -659,7 +671,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         syncQueryOrCollection('reservations', query(collection(db, 'reservations'), where('clientId', '==', user.uid)), setRawReservations, []);
         syncQueryOrCollection('proformas', query(collection(db, 'proformas'), where('clientId', '==', user.uid)), setRawProformas, []);
         syncQueryOrCollection('factures', query(collection(db, 'factures'), where('clientId', '==', user.uid)), setRawFactures, []);
-        syncQueryOrCollection('notifications', query(collection(db, 'notifications'), where('targetUid', '==', user.uid)), setNotifications, []);
+        syncQueryOrCollection('notifications', query(collection(db, 'notifications'), where('targetUid', '==', user.uid)), setRawNotifications, []);
       }
     }
 
@@ -976,6 +988,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return [];
   }, [rawChauffeurs, user, isGlobalRole, isSecretaireRole, isOperationsRole, isChauffeurRole, matchName]);
 
+  // 11. Scoped Notifications: Strict Recipient Isolation
+  const notifications = useMemo(() => {
+    if (!user) return rawNotifications;
+    if (isGlobalRole || isSecretaireRole || isOperationsRole) {
+      // Staff members receive all admin alerts, operations alerts, and client requests
+      return rawNotifications.filter((n) => n.targetAudience !== 'chauffeur' || isSuperAdmin);
+    }
+    if (isChauffeurRole) {
+      return rawNotifications.filter((n) => 
+        n.targetUid === user.uid || 
+        n.targetAudience === 'chauffeur' || 
+        n.targetAudience === 'all'
+      );
+    }
+    // Client / Prospect:
+    // - NEVER show their own requests to themselves (avoid self-spam)
+    // - NEVER show admin-targeted notifications
+    // - Only show notifications targeted to them specifically, or to 'client'/'all'
+    return rawNotifications.filter((n) => {
+      if (n.authorUid && (n.authorUid === user.uid || n.authorUid === profile?.id)) {
+        return false;
+      }
+      if (n.targetAudience === 'admin') {
+        return false;
+      }
+      if (n.targetUid && (n.targetUid === user.uid || n.targetUid === profile?.id)) {
+        return true;
+      }
+      if (n.targetAudience === 'client' || n.targetAudience === 'all') {
+        return true;
+      }
+      return false;
+    });
+  }, [rawNotifications, user, isGlobalRole, isSecretaireRole, isOperationsRole, isChauffeurRole, isSuperAdmin, profile?.id]);
+
   // --------------------------------------------------------------------------
   // ENRICHED CRUD IMPLEMENTATIONS WITH AUTOMATIC ATTRIBUTION
   // --------------------------------------------------------------------------
@@ -1187,19 +1234,111 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const markNotificationAsRead = (id: string) => {
-    setNotifications((prev) =>
+    setRawNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read: true } : n))
     );
   };
 
   const markAllNotificationsAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setRawNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     showToast('Toutes les notifications sont marquées comme lues', 'info');
   };
 
   const clearAllNotifications = () => {
-    setNotifications([]);
+    setRawNotifications([]);
     showToast('Boîte de notifications vidée', 'info');
+  };
+
+  const addNotification = async (item: {
+    title: string;
+    message: string;
+    type?: 'info' | 'warning' | 'success' | 'danger';
+    link?: string;
+    targetId?: string;
+    targetAudience?: 'admin' | 'client' | 'chauffeur' | 'all';
+    targetUid?: string;
+    authorUid?: string;
+  }) => {
+    const newNotif: NotificationItem = {
+      id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      title: item.title,
+      message: item.message,
+      type: item.type || 'info',
+      date: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+      read: false,
+      link: item.link,
+      targetId: item.targetId,
+      targetAudience: item.targetAudience || 'all',
+      targetUid: item.targetUid,
+      authorUid: item.authorUid
+    };
+    setRawNotifications((prev) => [newNotif, ...prev]);
+    try {
+      if (auth.currentUser) {
+        await setDoc(doc(db, 'notifications', newNotif.id), newNotif);
+      }
+    } catch (e) {}
+  };
+
+  const requestDocumentSend = async (
+    docType: 'facture' | 'proforma',
+    docNumber: string,
+    amount: number,
+    method: 'email' | 'whatsapp' | 'both',
+    clientNotes?: string
+  ) => {
+    const clientName = profile?.nom || profile?.name || user?.displayName || 'Client';
+    const clientEmail = user?.email || profile?.email || 'Non renseigné';
+    const clientPhone = profile?.telephone || profile?.phone || 'Non renseigné';
+    const typeLabel = docType === 'facture' ? 'Facture' : 'Devis';
+
+    const notifTitle = `Demande d'envoi de ${typeLabel} N° ${docNumber}`;
+    const methodDesc = method === 'both' ? 'Email & WhatsApp' : method === 'email' ? 'Email' : 'WhatsApp';
+    const notifMessage = `Le client ${clientName} a demandé l'envoi de son document officiel (${amount} USD) par ${methodDesc}.\nEmail : ${clientEmail} | Tél : ${clientPhone}${clientNotes ? `\nPrécisions : ${clientNotes}` : ''}`;
+
+    await addNotification({
+      title: notifTitle,
+      message: notifMessage,
+      type: 'info',
+      link: docType === 'facture' ? 'factures' : 'proformas',
+      targetId: docNumber,
+      targetAudience: 'admin',
+      authorUid: user?.uid
+    });
+
+    showToast(`Votre demande d'envoi pour ${typeLabel} N° ${docNumber} a bien été enregistrée. L'équipe Laperle Tour vous l'adressera très rapidement !`, 'success');
+  };
+
+  // Client requests a quote (Devis) or Invoice (Facture) on a reservation
+  const requestReservationDoc = async (
+    res: Reservation,
+    docType: 'devis' | 'facture',
+    notes?: string
+  ) => {
+    const clientName = profile?.nom ? `${profile.prenom || ''} ${profile.nom}`.trim() : user?.displayName || res.client || 'Client';
+    const typeLabel = docType === 'facture' ? 'Facture' : 'Devis';
+
+    // 1. Mark the reservation
+    const updatedRes: Reservation = {
+      ...res,
+      demandeDevis: docType === 'devis' ? true : res.demandeDevis,
+      demandeFacture: docType === 'facture' ? true : res.demandeFacture,
+      updatedAt: new Date().toISOString()
+    };
+    await saveReservation(updatedRes);
+
+    // 2. Alert administration ONLY (the client will not receive their own request in their bell!)
+    await addNotification({
+      title: `Demande de ${typeLabel} sur Réservation ${res.id}`,
+      message: `${clientName} sollicite l'émission d'un ${typeLabel.toLowerCase()} officiel pour sa réservation (${res.origin || 'Départ'} ➔ ${res.destination || 'Arrivée'}).${notes ? `\nPrécisions : ${notes}` : ''}`,
+      type: 'info',
+      link: 'reservations',
+      targetId: res.id,
+      targetAudience: 'admin',
+      authorUid: user?.uid
+    });
+
+    showToast(`Votre demande de ${typeLabel.toLowerCase()} pour la réservation ${res.id} a été envoyée avec succès à notre équipe !`, 'success');
   };
 
   const convertProformaToFacture = async (proforma: Proforma) => {
@@ -1226,6 +1365,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     await saveFacture(newFacture);
     await saveProforma({ ...proforma, status: 'Convertie en facture' });
+
+    // Notify the client that their invoice is ready!
+    if (proforma.clientId || proforma.clientEmail) {
+      await addNotification({
+        title: `Votre Facture ${factureNumber} a été émise`,
+        message: `Bonjour ${proforma.client}, votre facture officielle N° ${factureNumber} ($${newFacture.amount} USD) a été générée et est disponible dans votre espace.`,
+        type: 'success',
+        link: 'factures',
+        targetId: factureNumber,
+        targetAudience: 'client',
+        targetUid: proforma.clientId,
+        authorUid: user?.uid
+      });
+    }
+
     showToast(`Proforma ${proforma.number} convertie en facture ${factureNumber} avec succès !`, 'success');
   };
 
@@ -1262,6 +1416,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updatedAt: new Date().toISOString()
     };
     await saveProforma(newProforma);
+
+    // Update reservation with devisRef
+    await saveReservation({
+      ...res,
+      devisRef: number
+    });
+
+    // Notify the client that their proforma has been prepared!
+    if (res.clientId || res.email) {
+      await addNotification({
+        title: `Votre Devis Proforma ${number} est prêt`,
+        message: `Bonjour ${res.client}, votre devis officiel pour votre course (${res.origin || 'Départ'} ➔ ${res.destination || 'Arrivée'}) a été préparé ($${amount + tva} USD).`,
+        type: 'info',
+        link: 'proformas',
+        targetId: number,
+        targetAudience: 'client',
+        targetUid: res.clientId,
+        authorUid: user?.uid
+      });
+    }
+
     showToast(`Devis Proforma ${number} généré avec succès pour ${res.client} !`, 'success');
     setCurrentModule('proformas');
   };
@@ -1455,6 +1630,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         markNotificationAsRead,
         markAllNotificationsAsRead,
         clearAllNotifications,
+        addNotification,
+        requestDocumentSend,
+        requestReservationDoc,
         convertProformaToFacture,
         convertReservationToProforma,
         convertReservationToPlanning,

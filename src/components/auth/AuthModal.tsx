@@ -173,7 +173,10 @@ export const AuthModal: React.FC = () => {
 
           <div style={{ position: 'relative', zIndex: 2 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-              <img src="/logo-laperle.jpg" alt="Logo Laperle" style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#fff', padding: '2px' }} />
+              <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: 'linear-gradient(135deg, #082b70 0%, #05183d 100%)', border: '2px solid #f59e0b', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(8,43,112,0.3)', flexShrink: 0 }}>
+                <span style={{ fontSize: '18px', fontWeight: 900, color: '#f59e0b', fontFamily: 'serif', lineHeight: 1 }}>LT</span>
+                <span style={{ fontSize: '7px', fontWeight: 800, letterSpacing: '0.8px', color: '#93c5fd', textTransform: 'uppercase', marginTop: '2px' }}>HAÏTI</span>
+              </div>
               <div>
                 <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#fff' }}>LAPERLE TOUR HT</h3>
                 <span style={{ fontSize: '12px', color: '#ffd285', fontStyle: 'italic' }}>« Un coup d'œil sur Haïti »</span>

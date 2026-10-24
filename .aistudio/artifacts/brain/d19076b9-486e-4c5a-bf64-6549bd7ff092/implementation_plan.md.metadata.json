@@ -1,6 +1,6 @@
 {
-  "summary":  "Implementation plan for strict Role-Based Access Control (RBAC) and client data isolation. Restricts client accounts from viewing company financial KPIs, internal fleet/driver registries, and administrative modules, replacing them with a dedicated Client Portal dashboard and personal navigation.",
-  "updatedAt":  "2026-10-23T19:57:24.071369294Z",
+  "summary":  "Plan de mise en œuvre révisé avec isolation stricte des tableaux de bord par rôle, traçabilité des références cliquables, routage asymétrique des notifications, justificatifs de paiement multi-modes (MonCash, Virement, Chèque, Cash) et double conversion USD/HTG.",
+  "updatedAt":  "2026-10-24T16:53:20.749998018Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

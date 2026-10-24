@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
+import { DualPrice } from '../common/DualPrice';
+import { DocRefBadge } from '../common/DocRefBadge';
 
 interface DashboardViewProps {
   onOpenModal: (type: string, data?: any) => void;
@@ -19,7 +21,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenModal }) => 
     paiements, 
     setCurrentModule,
     setChatModalOpen,
-    sendChatMessage
+    sendChatMessage,
+    requestReservationDoc
   } = useApp();
 
   const [dispatchText, setDispatchText] = useState('');
@@ -86,7 +89,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenModal }) => 
               <button 
                 type="button" 
                 className="btn-hero-secondary"
-                onClick={() => onOpenModal('proforma')}
+                onClick={() => onOpenModal('demande-devis')}
                 aria-label="Demander un devis sur mesure"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -97,7 +100,66 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenModal }) => 
                 </svg>
                 <span>Demander un Devis</span>
               </button>
+
+              <button 
+                type="button" 
+                className="btn-hero-secondary"
+                style={{ borderColor: '#fed7aa', color: '#c2410c', background: '#fffaf5' }}
+                onClick={() => onOpenModal('demande-envoi', { type: 'facture' })}
+                aria-label="Demander une facture officielle au support"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="4" width="20" height="16" rx="2"/>
+                  <line x1="6" y1="8" x2="18" y2="8"/>
+                  <line x1="6" y1="12" x2="14" y2="12"/>
+                  <line x1="6" y1="16" x2="10" y2="16"/>
+                </svg>
+                <span>Demander une Facture</span>
+              </button>
             </div>
+          </div>
+        </div>
+
+        {/* Quick Document Request Banner from Support */}
+        <div style={{
+          background: 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)',
+          border: '1px solid #e2e8f0',
+          borderRadius: '14px',
+          padding: '18px 24px',
+          marginBottom: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px',
+          flexWrap: 'wrap',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+        }}>
+          <div>
+            <div style={{ fontSize: '15px', fontWeight: 800, color: '#082b70', display: 'flex', alignItems: 'center', gap: '8px', lineHeight: 1.5 }}>
+              <span>📄</span>
+              <span>Besoin d'un devis chiffré ou d'une facture officielle ?</span>
+            </div>
+            <p style={{ margin: '6px 0 0', fontSize: '13.5px', color: '#475569', lineHeight: 1.6 }}>
+              Sollicitez immédiatement notre équipe support pour l'édition ou la transmission directe de vos documents par email et WhatsApp.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn-card-action primary-subtle"
+              onClick={() => onOpenModal('demande-devis')}
+              style={{ padding: '9px 16px', fontSize: '13px', borderRadius: '10px' }}
+            >
+              📋 Demander un devis
+            </button>
+            <button
+              type="button"
+              className="btn-card-action amber-subtle"
+              onClick={() => onOpenModal('demande-envoi', { type: 'facture' })}
+              style={{ padding: '9px 16px', fontSize: '13px', borderRadius: '10px' }}
+            >
+              🧾 Demander une facture
+            </button>
           </div>
         </div>
 
@@ -162,7 +224,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenModal }) => 
               {unpaidClientFactures.length}
             </div>
             <div className="kpi-sub-text">
-              {unpaidAmount > 0 ? `$${unpaidAmount.toLocaleString()} USD en attente` : 'Tout est à jour ✓'}
+              {unpaidAmount > 0 ? (
+                <span>${unpaidAmount.toLocaleString()} USD (~{Math.round(unpaidAmount * 132).toLocaleString()} HTG)</span>
+              ) : 'Tout est à jour ✓'}
             </div>
           </div>
 
@@ -232,33 +296,73 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenModal }) => 
                 </div>
               ) : (
                 reservations.slice(0, 3).map((r) => (
-                  <div key={r.id} className="mission-item-box" style={{ marginBottom: '12px' }}>
+                  <div key={r.id} className="mission-item-box" style={{ marginBottom: '18px' }}>
                     <div className="mission-item-top">
                       <div className="mission-type-cluster">
-                        <span className="mission-type-title">{r.service || 'Transfert & Course'}</span>
+                        <span className="mission-type-title">{r.service || 'Transfert VIP & Course'}</span>
                         <span className={`badge-${r.status === 'Confirmée' ? 'confirmed' : 'pending'}`}>
                           {r.status || 'En attente'}
                         </span>
                       </div>
                       <div className="mission-price-cluster">
-                        <span className="mission-price-val">${r.montant || 0} USD</span>
-                        <span className="mission-date-val">{r.dateDepart || 'Date à convenir'} à {r.heureDepart || '08:00'}</span>
+                        <DualPrice amount={r.amount ?? r.montant ?? 0} currency={r.currency || 'USD'} size="sm" />
+                        <span className="mission-date-val">{r.date || r.dateDepart || 'Date à convenir'} à {r.time || r.heureDepart || '08:00'}</span>
                       </div>
                     </div>
 
                     <div className="mission-route-row">
                       <span className="route-pin">📍</span>
-                      <span className="route-text">
-                        {r.lieuPriseEnCharge || 'Port-au-Prince'} ➔ {r.destination || 'Destination'}
+                      <span className="route-text" style={{ lineHeight: 1.6 }}>
+                        <strong>{r.origin || r.lieuPriseEnCharge || 'Port-au-Prince'}</strong>
+                        <span style={{ color: '#f7941d', margin: '0 8px', fontWeight: 800 }}>➔</span>
+                        <strong>{r.destination || 'Destination'}</strong>
                       </span>
                     </div>
 
-                    <div className="mission-parties-row">
-                      <span>Dossier : <strong>{r.id}</strong></span>
+                    <div className="mission-parties-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <DocRefBadge reference={r.id} type="reservation" />
                       <span className="parties-separator">·</span>
                       <span>
                         Chauffeur : <strong>{r.driver || r.chauffeur || 'Assignation en cours'}</strong>
                       </span>
+                      {r.vehicle && (
+                        <>
+                          <span className="parties-separator">·</span>
+                          <span>Véhicule : <strong>{r.vehicle}</strong></span>
+                        </>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f1f5f9', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className="btn-card-action primary-subtle"
+                        onClick={() => requestReservationDoc(r, 'facture')}
+                        style={{ padding: '6px 12px', fontSize: '12px' }}
+                        title="Demander à l'équipe Laperle de préparer et d'envoyer votre facture"
+                      >
+                        🧾 Demander une Facture
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn-card-action primary-subtle"
+                        onClick={() => requestReservationDoc(r, 'devis')}
+                        style={{ padding: '6px 12px', fontSize: '12px' }}
+                        title="Demander à l'équipe commerciale un devis pour ce trajet"
+                      >
+                        📋 Demander un Devis
+                      </button>
+
+                      <a
+                        href={`https://wa.me/50944408687?text=${encodeURIComponent(`Bonjour Laperle Tour, je vous contacte concernant ma réservation ${r.id} (${r.service || 'Course'}).`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-card-action success-subtle"
+                        style={{ padding: '6px 12px', fontSize: '12px', textDecoration: 'none' }}
+                      >
+                        💬 WhatsApp
+                      </a>
                     </div>
                   </div>
                 ))

@@ -185,7 +185,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   // Guard current module: if user is on a module they are not permitted to see, redirect to dashboard
   useEffect(() => {
     if (isClient) {
-      const allowedClientModules = ['dashboard', 'reservations', 'proformas', 'factures'];
+      const allowedClientModules = ['dashboard', 'reservations', 'proformas', 'factures', 'paiements'];
       if (!allowedClientModules.includes(currentModule)) {
         setCurrentModule('dashboard');
       }
@@ -257,6 +257,18 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
                   <line x1="1" y1="10" x2="23" y2="10"/>
+                </svg>
+              )
+            },
+            {
+              key: 'paiements',
+              label: 'Mes Règlements & Reçus',
+              icon: (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="5" width="20" height="14" rx="2"/>
+                  <line x1="2" y1="10" x2="22" y2="10"/>
+                  <path d="M7 15h.01"/>
+                  <path d="M11 15h2"/>
                 </svg>
               )
             }
@@ -587,7 +599,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
         {/* Mobile-only Drawer Header */}
         <div className="sidebar-mobile-bar">
           <div className="sidebar-mobile-brand" onClick={() => { setIsPublicLanding(true); setMobileSidebarOpen(false); }}>
-            <img src="/logo-laperle.jpg" alt="LAPERLE TOUR HT" />
+            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, #082b70 0%, #05183d 100%)', border: '1.5px solid #f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b', fontWeight: 900, fontFamily: 'serif', fontSize: '14px', flexShrink: 0 }}>
+              LT
+            </div>
             <div className="sidebar-mobile-title">
               <strong>LAPERLE TOUR HT</strong>
               <small>CENTRE DE CONTRÔLE</small>
@@ -610,8 +624,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           title="Consulter la vitrine publique LAPERLE TOUR HT"
           onClick={() => setIsPublicLanding(true)}
         >
-          <div className="brand-logo-circle">
-            <img src="/logo-laperle.jpg" alt="LAPERLE TOUR HT" id="sidebarLogoImg" />
+          <div className="brand-logo-circle" style={{ background: 'linear-gradient(135deg, #082b70 0%, #05183d 100%)', border: '1.5px solid #f59e0b', color: '#f59e0b', fontFamily: 'serif', fontWeight: 900, fontSize: '17px' }}>
+            LT
           </div>
           <div className="brand-titles">
             <div className="brand-name-row">
@@ -693,8 +707,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
               onClick={() => setIsPublicLanding(true)}
               title="Consulter la vitrine publique LAPERLE TOUR HT"
             >
-              <div className="header-logo-badge">
-                <img src="/logo-laperle.jpg" alt="LAPERLE TOUR HT" />
+              <div className="header-logo-badge" style={{ background: 'linear-gradient(135deg, #082b70 0%, #05183d 100%)', border: '1px solid #f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b', fontWeight: 900, fontFamily: 'serif', fontSize: '13px' }}>
+                LT
               </div>
               <div className="header-brand-names">
                 <div className="brand-title-top">

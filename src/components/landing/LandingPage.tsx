@@ -123,7 +123,9 @@ export const LandingPage: React.FC = () => {
       <header className="pl-navbar">
         <div className="pl-nav-inner">
           <a href="#plHero" className="pl-nav-brand" title="LAPERLE TOUR HT - Accueil" onClick={(e) => { e.preventDefault(); scrollToSection('plHero'); }}>
-            <img src="/logo-laperle.jpg" alt="Logo LAPERLE TOUR HT" className="pl-nav-logo" />
+            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, #082b70 0%, #05183d 100%)', border: '1.5px solid #f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b', fontWeight: 900, fontFamily: 'serif', fontSize: '15px', flexShrink: 0 }}>
+              LT
+            </div>
             <div className="pl-brand-text">
               <span className="pl-brand-name">LAPERLE <em>TOUR HT</em></span>
               <span className="pl-brand-slogan">« Un coup d'œil sur Haïti »</span>

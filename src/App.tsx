@@ -7,6 +7,7 @@ import { AuthModal } from './components/auth/AuthModal';
 import { PrintSheetModal } from './components/modals/PrintSheetModal';
 import { LiveChatModal } from './components/modals/LiveChatModal';
 import { EditModal } from './components/modals/EditModal';
+import { DemandeEnvoiModal } from './components/modals/DemandeEnvoiModal';
 
 import { DashboardView } from './components/modules/DashboardView';
 import { ReservationsView } from './components/modules/ReservationsView';
@@ -91,10 +92,16 @@ const MainRouter: React.FC = () => {
       <PrintSheetModal />
       <LiveChatModal />
       <EditModal
-        type={modalType}
+        type={modalType !== 'demande-envoi' ? modalType : null}
         data={modalData}
         onClose={() => setModalType(null)}
       />
+      {modalType === 'demande-envoi' && (
+        <DemandeEnvoiModal
+          data={modalData}
+          onClose={() => setModalType(null)}
+        />
+      )}
 
       {/* Global Toast */}
       {toast && (

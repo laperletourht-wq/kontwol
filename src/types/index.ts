@@ -54,6 +54,10 @@ export interface Reservation {
   status: 'En attente' | 'Confirmée' | 'En cours' | 'Terminée' | 'Annulée';
   telephone?: string;
   email?: string;
+  demandeDevis?: boolean;
+  demandeFacture?: boolean;
+  devisRef?: string;
+  factureRef?: string;
   archived?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -83,6 +87,8 @@ export interface Proforma {
   tva?: number;
   totalTTC?: number;
   status: 'En attente' | 'Acceptée' | 'Refusée' | 'Convertie en facture';
+  statut?: string;
+  reservationId?: string;
   notes?: string;
   archived?: boolean;
   createdAt?: string;
@@ -104,8 +110,15 @@ export interface Facture {
   currency?: 'USD' | 'HTG';
   paidAmount?: number;
   status: 'Payée' | 'En attente' | 'En retard' | 'Partiellement payée' | 'Annulée';
+  statut?: string;
+  montantTotal?: number;
+  totalTTC?: number;
   paymentMethod?: string;
+  modePaiement?: string;
   items?: ProformaItem[];
+  reservationId?: string;
+  preuveImage?: string;
+  referenceTransaction?: string;
   notes?: string;
   archived?: boolean;
   createdAt?: string;
@@ -236,12 +249,14 @@ export interface Paiement {
   clientEmail?: string;
   montant: number;
   devise: 'USD' | 'HTG';
-  modePaiement: 'MonCash' | 'Natcash' | 'Virement Bancaire' | 'Espèces' | 'Carte de Crédit' | 'Chèque';
+  modePaiement: 'MonCash' | 'Natcash' | 'Virement Bancaire' | 'Espèces' | 'Carte de Crédit' | 'Chèque' | string;
   motif: string;
   factureAssociee?: string;
   proformaAssociee?: string;
   statut: 'Validé' | 'En attente' | 'Rejeté';
   recuPar?: string;
+  preuveImage?: string;
+  referenceTransaction?: string;
   archived?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -265,6 +280,9 @@ export interface NotificationItem {
   read: boolean;
   link?: string;
   targetId?: string;
+  targetAudience?: 'admin' | 'client' | 'chauffeur' | 'all';
+  targetUid?: string;
+  authorUid?: string;
 }
 
 export interface ChatMessage {
