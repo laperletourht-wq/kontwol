@@ -173,9 +173,8 @@ export const AuthModal: React.FC = () => {
 
           <div style={{ position: 'relative', zIndex: 2 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-              <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: 'linear-gradient(135deg, #082b70 0%, #05183d 100%)', border: '2px solid #f59e0b', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(8,43,112,0.3)', flexShrink: 0 }}>
-                <span style={{ fontSize: '18px', fontWeight: 900, color: '#f59e0b', fontFamily: 'serif', lineHeight: 1 }}>LT</span>
-                <span style={{ fontSize: '7px', fontWeight: 800, letterSpacing: '0.8px', color: '#93c5fd', textTransform: 'uppercase', marginTop: '2px' }}>HAÏTI</span>
+              <div style={{ width: '54px', height: '54px', borderRadius: '50%', background: '#fff', padding: '2px', boxShadow: '0 4px 12px rgba(0,0,0,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <img src="/logo-laperle.jpg" alt="LAPERLE TOUR HT" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'contain' }} />
               </div>
               <div>
                 <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#fff' }}>LAPERLE TOUR HT</h3>

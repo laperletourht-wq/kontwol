@@ -90,9 +90,12 @@ export const PrintSheetModal: React.FC = () => {
           {/* Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-6 border-b-2 border-[#082b70]">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#082b70] to-[#05183d] text-white flex flex-col items-center justify-center font-black shadow-sm border-2 border-amber-500 shrink-0 select-none print:border-[#082b70]">
-                <span className="text-xl tracking-wider text-amber-400 font-serif leading-none font-bold">LT</span>
-                <span className="text-[7.5px] tracking-widest text-slate-200 uppercase font-sans font-bold leading-none mt-1">HAÏTI</span>
+              <div className="w-16 h-16 rounded-full bg-white border border-slate-200 shadow-sm p-1 flex items-center justify-center shrink-0">
+                <img 
+                  src="/logo-laperle.jpg" 
+                  alt="LAPERLE TOUR HT" 
+                  className="w-full h-full rounded-full object-contain"
+                />
               </div>
               <div>
                 <h1 className="text-2xl font-black tracking-tight text-[#082b70] m-0">LAPERLE TOUR HT</h1>

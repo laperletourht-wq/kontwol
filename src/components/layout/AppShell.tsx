@@ -599,8 +599,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
         {/* Mobile-only Drawer Header */}
         <div className="sidebar-mobile-bar">
           <div className="sidebar-mobile-brand" onClick={() => { setIsPublicLanding(true); setMobileSidebarOpen(false); }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, #082b70 0%, #05183d 100%)', border: '1.5px solid #f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b', fontWeight: 900, fontFamily: 'serif', fontSize: '14px', flexShrink: 0 }}>
-              LT
+            <div className="brand-logo-circle" style={{ width: '34px', height: '34px', borderRadius: '50%', background: '#ffffff', padding: '1px', boxShadow: '0 2px 6px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <img src="/logo-laperle.jpg" alt="LAPERLE TOUR HT" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'contain' }} />
             </div>
             <div className="sidebar-mobile-title">
               <strong>LAPERLE TOUR HT</strong>
@@ -624,8 +624,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           title="Consulter la vitrine publique LAPERLE TOUR HT"
           onClick={() => setIsPublicLanding(true)}
         >
-          <div className="brand-logo-circle" style={{ background: 'linear-gradient(135deg, #082b70 0%, #05183d 100%)', border: '1.5px solid #f59e0b', color: '#f59e0b', fontFamily: 'serif', fontWeight: 900, fontSize: '17px' }}>
-            LT
+          <div className="brand-logo-circle" style={{ width: '42px', height: '42px', borderRadius: '50%', background: '#ffffff', padding: '2px', boxShadow: '0 3px 10px rgba(0,0,0,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <img src="/logo-laperle.jpg" alt="LAPERLE TOUR HT" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'contain' }} />
           </div>
           <div className="brand-titles">
             <div className="brand-name-row">
@@ -707,8 +707,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
               onClick={() => setIsPublicLanding(true)}
               title="Consulter la vitrine publique LAPERLE TOUR HT"
             >
-              <div className="header-logo-badge" style={{ background: 'linear-gradient(135deg, #082b70 0%, #05183d 100%)', border: '1px solid #f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b', fontWeight: 900, fontFamily: 'serif', fontSize: '13px' }}>
-                LT
+              <div className="header-logo-badge" style={{ width: '38px', height: '38px', borderRadius: '50%', background: '#ffffff', padding: '2px', boxShadow: '0 2px 6px rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <img src="/logo-laperle.jpg" alt="LAPERLE TOUR HT" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'contain' }} />
               </div>
               <div className="header-brand-names">
                 <div className="brand-title-top">

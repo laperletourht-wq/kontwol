@@ -9430,43 +9430,24 @@ div#app > div.main > main#page > div:nth-of-type(2) > div:nth-of-type(4) {
   .pl-brand-slogan {
     font-size: 10px !important;
   }
-  .pl-nav-desktop-btn {
-    display: none !important;
-  }
-  .pl-mobile-toggle {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    min-width: 42px !important;
-    min-height: 42px !important;
-    width: 42px !important;
-    height: 42px !important;
-    font-size: 20px !important;
-    color: #ffffff !important;
-    background: rgba(255, 255, 255, 0.1) !important;
-    border: 1px solid rgba(255, 255, 255, 0.22) !important;
-    border-radius: 8px !important;
-  }
-  .pl-mobile-drawer {
-    background: #041639 !important;
-    padding: 18px 20px 24px !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.15) !important;
-    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5) !important;
-  }
-  .pl-mobile-drawer .pl-nav-link {
-    font-size: 15px !important;
-    padding: 12px 0 !important;
-    min-height: 44px !important;
+  .pl-nav-actions {
     display: flex !important;
     align-items: center !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-    color: #f1f5f9 !important;
+    gap: 6px !important;
   }
-  .pl-mobile-drawer .pl-nav-actions {
-    flex-direction: column !important;
-    gap: 10px !important;
-    margin-top: 14px !important;
-    width: 100% !important;
+  .pl-nav-actions .pl-btn-secondary,
+  .pl-nav-actions .pl-btn-primary {
+    display: inline-flex !important;
+    padding: 7px 12px !important;
+    font-size: 12.5px !important;
+    border-radius: 8px !important;
+    min-height: 36px !important;
+  }
+  .pl-mobile-toggle {
+    display: none !important;
+  }
+  .pl-mobile-drawer {
+    display: none !important;
   }
   .pl-mobile-drawer .pl-nav-actions button {
     width: 100% !important;

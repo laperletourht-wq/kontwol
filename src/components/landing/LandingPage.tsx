@@ -5,7 +5,6 @@ import { useAuth } from '../../context/AuthContext';
 export const LandingPage: React.FC = () => {
   const { setAuthModalOpen, setAuthView, saveReservation, showToast, setIsPublicLanding, settings } = useApp();
   const { user, profile } = useAuth();
-  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   // Quote Simulator state
   const [selectedService, setSelectedService] = useState('tourisme');
@@ -110,7 +109,6 @@ export const LandingPage: React.FC = () => {
   };
 
   const scrollToSection = (id: string) => {
-    setMobileDrawerOpen(false);
     const elem = document.getElementById(id);
     if (elem) {
       elem.scrollIntoView({ behavior: 'smooth' });
@@ -123,8 +121,8 @@ export const LandingPage: React.FC = () => {
       <header className="pl-navbar">
         <div className="pl-nav-inner">
           <a href="#plHero" className="pl-nav-brand" title="LAPERLE TOUR HT - Accueil" onClick={(e) => { e.preventDefault(); scrollToSection('plHero'); }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, #082b70 0%, #05183d 100%)', border: '1.5px solid #f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b', fontWeight: 900, fontFamily: 'serif', fontSize: '15px', flexShrink: 0 }}>
-              LT
+            <div className="brand-logo-circle" style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#ffffff', padding: '2px', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <img src="/logo-laperle.jpg" alt="LAPERLE TOUR HT" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'contain' }} />
             </div>
             <div className="pl-brand-text">
               <span className="pl-brand-name">LAPERLE <em>TOUR HT</em></span>
@@ -132,20 +130,13 @@ export const LandingPage: React.FC = () => {
             </div>
           </a>
 
-          <nav className="pl-nav-menu">
-            <a href="#plHero" className="pl-nav-link" onClick={(e) => { e.preventDefault(); scrollToSection('plHero'); }}>Accueil</a>
-            <a href="#plServices" className="pl-nav-link" onClick={(e) => { e.preventDefault(); scrollToSection('plServices'); }}>Nos Services</a>
-            <a href="#plFlotte" className="pl-nav-link" onClick={(e) => { e.preventDefault(); scrollToSection('plFlotte'); }}>Notre Flotte</a>
-            <a href="#plDevis" className="pl-nav-link" onClick={(e) => { e.preventDefault(); scrollToSection('plDevis'); }}>Simulateur de Devis</a>
-            <a href="#plEngagements" className="pl-nav-link" onClick={(e) => { e.preventDefault(); scrollToSection('plEngagements'); }}>Pourquoi Laperle</a>
-            <a href="#plContact" className="pl-nav-link" onClick={(e) => { e.preventDefault(); scrollToSection('plContact'); }}>Contact</a>
-          </nav>
+          {/* Menu links masked per user instruction */}
 
-          <div className="pl-nav-actions">
+          <div className="pl-nav-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {user ? (
               <button 
                 type="button" 
-                className="pl-btn-primary pl-nav-desktop-btn" 
+                className="pl-btn-primary" 
                 onClick={() => setIsPublicLanding(false)}
                 title="Accéder au Centre de Contrôle"
               >
@@ -155,7 +146,7 @@ export const LandingPage: React.FC = () => {
               <>
                 <button 
                   type="button" 
-                  className="pl-btn-secondary pl-nav-desktop-btn" 
+                  className="pl-btn-secondary" 
                   onClick={() => { setAuthView('login'); setAuthModalOpen(true); }}
                   title="Accéder à votre espace sécurisé"
                 >
@@ -163,42 +154,12 @@ export const LandingPage: React.FC = () => {
                 </button>
                 <button 
                   type="button" 
-                  className="pl-btn-primary pl-nav-desktop-btn" 
+                  className="pl-btn-primary" 
                   onClick={() => { setAuthView('register'); setAuthModalOpen(true); }}
                   title="Créer un compte en 1 minute"
                 >
                   S'inscrire
                 </button>
-              </>
-            )}
-            <button 
-              type="button" 
-              className="pl-mobile-toggle" 
-              onClick={() => setMobileDrawerOpen(!mobileDrawerOpen)} 
-              aria-label={mobileDrawerOpen ? "Fermer le menu mobile" : "Ouvrir le menu mobile"}
-            >
-              {mobileDrawerOpen ? '✕' : '☰'}
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile Drawer */}
-        <div className={`pl-mobile-drawer ${mobileDrawerOpen ? 'open' : ''}`} style={{ display: mobileDrawerOpen ? 'block' : 'none' }}>
-          <a href="#plHero" className="pl-nav-link" onClick={() => scrollToSection('plHero')}>Accueil</a>
-          <a href="#plServices" className="pl-nav-link" onClick={() => scrollToSection('plServices')}>Nos Services</a>
-          <a href="#plFlotte" className="pl-nav-link" onClick={() => scrollToSection('plFlotte')}>Notre Flotte</a>
-          <a href="#plDevis" className="pl-nav-link" onClick={() => scrollToSection('plDevis')}>Simulateur de Devis</a>
-          <a href="#plEngagements" className="pl-nav-link" onClick={() => scrollToSection('plEngagements')}>Pourquoi Laperle</a>
-          <a href="#plContact" className="pl-nav-link" onClick={() => scrollToSection('plContact')}>Contact</a>
-          <div className="pl-nav-actions" style={{ marginTop: '14px', display: 'flex', gap: '8px' }}>
-            {user ? (
-              <button type="button" className="pl-btn-primary" onClick={() => { setIsPublicLanding(false); setMobileDrawerOpen(false); }}>
-                Centre de Contrôle ➔
-              </button>
-            ) : (
-              <>
-                <button type="button" className="pl-btn-secondary" onClick={() => { setAuthView('login'); setAuthModalOpen(true); setMobileDrawerOpen(false); }}>Connexion</button>
-                <button type="button" className="pl-btn-primary" onClick={() => { setAuthView('register'); setAuthModalOpen(true); setMobileDrawerOpen(false); }}>S'inscrire</button>
               </>
             )}
           </div>
