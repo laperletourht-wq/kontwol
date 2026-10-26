@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
+import { UniversalFooter } from '../common/UniversalFooter';
 
 export const LandingPage: React.FC = () => {
   const { setAuthModalOpen, setAuthView, saveReservation, showToast, setIsPublicLanding, settings } = useApp();
@@ -520,73 +521,8 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* 6. Engagements & Pourquoi Laperle */}
-      <section className="pl-section" id="plEngagements">
-        <div className="pl-section-head">
-          <div className="pl-section-kicker">POURQUOI CHOISIR LAPERLE TOUR HT</div>
-          <h2 className="pl-section-title">Les 4 Piliers de Notre Engagement</h2>
-          <p className="pl-section-sub">Une rigueur opérationnelle sans faille pour votre sérénité totale en Haïti.</p>
-        </div>
-
-        <div className="pl-engagements-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px', maxWidth: '1280px', margin: '0 auto', padding: '0 20px' }}>
-          <div style={{ padding: '24px', background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-            <div style={{ fontSize: '28px', marginBottom: '8px' }}>🛡️</div>
-            <h4 style={{ color: '#082b70', margin: '0 0 8px', fontSize: '17px' }}>Sécurité & Chauffeurs Assermentés</h4>
-            <p style={{ color: '#64748b', fontSize: '13px', lineHeight: 1.6, margin: 0 }}>
-              Tous nos conducteurs font l'objet d'enquêtes de sécurité approfondies et d'un entraînement continu à la conduite préventive.
-            </p>
-          </div>
-
-          <div style={{ padding: '24px', background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-            <div style={{ fontSize: '28px', marginBottom: '8px' }}>⏱️</div>
-            <h4 style={{ color: '#082b70', margin: '0 0 8px', fontSize: '17px' }}>Ponctualité Rigoureuse 24/7</h4>
-            <p style={{ color: '#64748b', fontSize: '13px', lineHeight: 1.6, margin: 0 }}>
-              Anticipation constante des axes routiers et régulation en direct par notre centre de contrôle opérationnel à Delmas.
-            </p>
-          </div>
-
-          <div style={{ padding: '24px', background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-            <div style={{ fontSize: '28px', marginBottom: '8px' }}>📄</div>
-            <h4 style={{ color: '#082b70', margin: '0 0 8px', fontSize: '17px' }}>Facturation Conforme DGI</h4>
-            <p style={{ color: '#64748b', fontSize: '13px', lineHeight: 1.6, margin: 0 }}>
-              Proformas transparentes, factures officielles avec mentions fiscales haïtiennes, devises USD et HTG adaptées à vos exigences.
-            </p>
-          </div>
-
-          <div style={{ padding: '24px', background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-            <div style={{ fontSize: '28px', marginBottom: '8px' }}>💬</div>
-            <h4 style={{ color: '#082b70', margin: '0 0 8px', fontSize: '17px' }}>Support Dédié WhatsApp</h4>
-            <p style={{ color: '#64748b', fontSize: '13px', lineHeight: 1.6, margin: 0 }}>
-              Un interlocuteur direct disponible 24h/24 pour ajuster vos horaires, ajouter un passager ou planifier une mission urgente.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* 7. Contact Section */}
-      <section className="pl-section" id="plContact" style={{ background: 'linear-gradient(180deg, #07255e 0%, #0d3b87 100%)', color: '#fff', padding: '60px 20px' }}>
-        <div style={{ maxWidth: '1000px', margin: '0 auto', textAlign: 'center' }}>
-          <span style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', color: '#f7941d' }}>CONTACT DIRECT & DISPATCH</span>
-          <h2 style={{ fontSize: '32px', fontWeight: 800, margin: '12px 0 16px', color: '#fff' }}>Planifiez Votre Prochain Déplacement</h2>
-          <p style={{ fontSize: '15px', color: '#cbd5e1', maxWidth: '640px', margin: '0 auto 30px' }}>
-            Nos conseillers sont à votre écoute pour organiser votre transport à Port-au-Prince et dans tout le pays.
-          </p>
-
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginBottom: '40px' }}>
-            <a href={`https://wa.me/${settings.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', background: '#25d366', color: '#fff', padding: '14px 24px', borderRadius: '10px', textDecoration: 'none', fontWeight: 700, fontSize: '15px' }}>
-              <span>💬</span> <span>WhatsApp Direct ({settings.whatsapp})</span>
-            </a>
-            <a href={`mailto:${settings.email}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)', padding: '14px 24px', borderRadius: '10px', textDecoration: 'none', fontWeight: 700, fontSize: '15px' }}>
-              <span>✉️</span> <span>{settings.email}</span>
-            </a>
-          </div>
-
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: '24px', fontSize: '13px', color: '#94a3b8' }}>
-            <p style={{ margin: '0 0 6px' }}><strong>LAPERLE TOUR HT</strong> • Delmas 75, Port-au-Prince, Haïti</p>
-            <p style={{ margin: 0 }}>© {new Date().getFullYear()} LAPERLE TOUR HT. Tous droits réservés. « Un coup d'œil sur Haïti ».</p>
-          </div>
-        </div>
-      </section>
+      {/* Pied de page universel Laperle Tour HT */}
+      <UniversalFooter variant="public" />
     </div>
   );
 };

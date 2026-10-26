@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
+import { RowActionMenu, ActionMenuItem } from '../common/RowActionMenu';
 
 interface PlanningsViewProps {
   onOpenModal: (type: string, data?: any) => void;
@@ -12,11 +13,12 @@ export const PlanningsView: React.FC<PlanningsViewProps> = ({ onOpenModal }) => 
   const isChauffeur = role === 'chauffeur';
   const isClient = role === 'client' || role === 'prospect';
   const canDispatch = !isChauffeur && !isClient;
-  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
-  const effectiveSearch = (searchTerm || globalSearchQuery).toLowerCase();
+  const effectiveSearch = globalSearchQuery.toLowerCase();
 
   const filtered = plannings.filter((p) => {
+    if (statusFilter !== 'ALL' && p.statut !== statusFilter) return false;
     if (effectiveSearch) {
       return (
         p.client.toLowerCase().includes(effectiveSearch) ||
@@ -49,116 +51,134 @@ export const PlanningsView: React.FC<PlanningsViewProps> = ({ onOpenModal }) => 
       </div>
 
       <div className="data-panel">
-        <div className="filters">
-          <input
-            type="text"
-            placeholder="Rechercher par trajet, chauffeur, véhicule ou client..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="filters" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#475569' }}>Statut :</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={{
+                padding: '7px 12px',
+                borderRadius: '8px',
+                border: '1px solid #cbd5e1',
+                fontSize: '13px',
+                background: '#ffffff',
+                color: '#1e293b'
+              }}
+            >
+              <option value="ALL">Tous les statuts</option>
+              <option value="Programmé">Programmé</option>
+              <option value="En cours">En cours</option>
+              <option value="Achevé">Achevé</option>
+              <option value="Annulé">Annulé</option>
+            </select>
+          </div>
+          <div style={{ fontSize: '12.5px', color: '#64748b' }}>
+            <strong>{filtered.length}</strong> trajet{filtered.length > 1 ? 's' : ''} programmé{filtered.length > 1 ? 's' : ''}
+          </div>
         </div>
 
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Date & Heure</th>
-                <th>Client / Mission</th>
-                <th>Prestation</th>
-                <th>Itinéraire</th>
-                <th>Passagers</th>
-                <th>Conducteur</th>
-                <th>Véhicule</th>
-                <th>Statut</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
+        <div className="modern-table-card">
+          <div className="modern-table-wrap">
+            <table className="modern-table">
+              <thead>
                 <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>
-                    Aucun planning programmé.
-                  </td>
+                  <th>Date & Heure</th>
+                  <th>Client / Mission</th>
+                  <th>Prestation</th>
+                  <th>Itinéraire</th>
+                  <th>Passagers</th>
+                  <th>Conducteur</th>
+                  <th>Véhicule</th>
+                  <th>Statut</th>
+                  <th style={{ textAlign: 'right', paddingRight: '20px' }}>Actions</th>
                 </tr>
-              ) : (
-                filtered.map((p) => (
-                  <tr key={p.id}>
-                    <td>
-                      <strong>{p.heure}</strong>
-                      <div style={{ fontSize: '11px', color: '#64748b' }}>{p.date}</div>
-                    </td>
-                    <td><strong>{p.client}</strong></td>
-                    <td>{p.service}</td>
-                    <td>
-                      <div style={{ fontSize: '12px' }}>
-                        <span>📍 {p.depart}</span>
-                        <span style={{ color: '#f7941d', margin: '0 4px' }}>➔</span>
-                        <span>🎯 {p.destination}</span>
-                      </div>
-                    </td>
-                    <td>{p.passagers} pers.</td>
-                    <td><strong>{p.chauffeur}</strong></td>
-                    <td>{p.vehicule}</td>
-                    <td>
-                      <span className={`badge ${p.statut === 'En cours' ? 'orange' : p.statut === 'Achevé' ? 'green' : ''}`}>
-                        {p.statut}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="action-cell">
-                        {p.statut === 'Programmé' && (
-                          <button
-                            type="button"
-                            className="tiny"
-                            style={{ background: '#fef3c7', color: '#b45309', fontWeight: 700 }}
-                            onClick={() => savePlanning({ ...p, statut: 'En cours' })}
-                            title="Démarrer la mission (Met le véhicule et le chauffeur en mission)"
-                          >
-                            ▶️ Démarrer
-                          </button>
-                        )}
-                        {p.statut === 'En cours' && (
-                          <button
-                            type="button"
-                            className="tiny"
-                            style={{ background: '#f0fdf4', color: '#15803d', fontWeight: 700 }}
-                            onClick={() => savePlanning({ ...p, statut: 'Achevé' })}
-                            title="Achever la mission (Libère le véhicule et le chauffeur)"
-                          >
-                            ✅ Achever
-                          </button>
-                        )}
-                        {canDispatch && (
-                          <>
-                            <button
-                              type="button"
-                              className="tiny edit"
-                              onClick={() => onOpenModal('planning', p)}
-                              title="Modifier"
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              type="button"
-                              className="tiny delete"
-                              onClick={() => {
-                                if (window.confirm('Supprimer ce planning de trajet ?')) {
-                                  deletePlanning(p.id);
-                                }
-                              }}
-                              title="Supprimer"
-                            >
-                              🗑️
-                            </button>
-                          </>
-                        )}
-                      </div>
+              </thead>
+              <tbody>
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
+                      Aucun planning programmé.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  filtered.map((p) => {
+                    const actionItems: ActionMenuItem[] = [];
+
+                    if (p.statut === 'Programmé') {
+                      actionItems.push({
+                        label: 'Démarrer la mission',
+                        icon: '▶️',
+                        onClick: () => savePlanning({ ...p, statut: 'En cours' }),
+                        variant: 'primary'
+                      });
+                    }
+
+                    if (p.statut === 'En cours') {
+                      actionItems.push({
+                        label: 'Achever la mission',
+                        icon: '✅',
+                        onClick: () => savePlanning({ ...p, statut: 'Achevé' }),
+                        variant: 'success'
+                      });
+                    }
+
+                    if (canDispatch) {
+                      actionItems.push({
+                        label: 'Modifier le trajet',
+                        icon: '✏️',
+                        onClick: () => onOpenModal('planning', p)
+                      });
+                      actionItems.push({
+                        label: 'Supprimer',
+                        icon: '🗑️',
+                        onClick: () => {
+                          if (window.confirm('Supprimer ce planning de trajet ?')) {
+                            deletePlanning(p.id);
+                          }
+                        },
+                        variant: 'danger'
+                      });
+                    }
+
+                    return (
+                      <tr key={p.id}>
+                        <td>
+                          <strong style={{ color: '#082b70', fontSize: '13.5px' }}>{p.heure}</strong>
+                          <div style={{ fontSize: '11px', color: '#64748b' }}>{p.date}</div>
+                        </td>
+                        <td><strong style={{ color: '#0f172a' }}>{p.client}</strong></td>
+                        <td><span className="badge">{p.service}</span></td>
+                        <td>
+                          <div style={{ fontSize: '12px' }}>
+                            <span>📍 {p.depart}</span>
+                            <span style={{ color: '#f7941d', margin: '0 4px', fontWeight: 700 }}>➔</span>
+                            <span>🎯 {p.destination}</span>
+                          </div>
+                        </td>
+                        <td style={{ fontWeight: 600 }}>{p.passagers} pers.</td>
+                        <td><strong>{p.chauffeur}</strong></td>
+                        <td>{p.vehicule}</td>
+                        <td>
+                          <span className={`badge ${p.statut === 'En cours' ? 'orange' : p.statut === 'Achevé' ? 'green' : ''}`}>
+                            {p.statut}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'right', paddingRight: '20px' }}>
+                          <RowActionMenu items={actionItems} title={`Actions pour le trajet de ${p.client}`} />
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+          {filtered.length > 0 && (
+            <div style={{ padding: '12px 18px', borderTop: '1px solid #f1f5f9', background: '#f8fafc', fontSize: '12px', color: '#64748b', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Affichage de <strong>{filtered.length}</strong> mission(s)</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

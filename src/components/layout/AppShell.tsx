@@ -4,6 +4,7 @@ import { useApp } from '../../context/AppContext';
 
 import { ProfileReminderBanner } from '../common/ProfileReminderBanner';
 import { ClientProfileModal } from '../modals/ClientProfileModal';
+import { UniversalFooter } from '../common/UniversalFooter';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -970,6 +971,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
         <main id="page" className="page">
           <ProfileReminderBanner />
           {children}
+          <UniversalFooter variant="app" />
         </main>
 
         {/* Global Client Profile Modal */}

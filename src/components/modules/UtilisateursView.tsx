@@ -3,15 +3,16 @@ import { useApp } from '../../context/AppContext';
 import { useAuth, ROLE_PERMISSIONS } from '../../context/AuthContext';
 import { UserProfile, ALL_SYSTEM_ZONES } from '../../types';
 import { UserRoleModal } from '../modals/UserRoleModal';
+import { RowActionMenu, ActionMenuItem } from '../common/RowActionMenu';
 
 interface UtilisateursViewProps {
   onOpenModal: (type: string, data?: any) => void;
 }
 
 export const UtilisateursView: React.FC<UtilisateursViewProps> = ({ onOpenModal }) => {
-  const { utilisateurs, showToast } = useApp();
+  const { utilisateurs, showToast, globalSearchQuery } = useApp();
   const { role: currentUserRole, isSuperAdmin } = useAuth();
-  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('ALL');
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
 
   const isAdmin = currentUserRole === 'admin' || isSuperAdmin;
@@ -56,11 +57,14 @@ export const UtilisateursView: React.FC<UtilisateursViewProps> = ({ onOpenModal 
     }
   ];
 
+  const effectiveSearch = globalSearchQuery.toLowerCase();
+
   const filtered = displayUsers.filter((u) => {
-    if (searchTerm) {
-      const matchEmail = (u.email || '').toLowerCase().includes(searchTerm.toLowerCase());
-      const matchNom = (u.nom || u.name || '').toLowerCase().includes(searchTerm.toLowerCase());
-      const matchRole = (u.role || '').toLowerCase().includes(searchTerm.toLowerCase());
+    if (roleFilter !== 'ALL' && (u.role || 'client') !== roleFilter) return false;
+    if (effectiveSearch) {
+      const matchEmail = (u.email || '').toLowerCase().includes(effectiveSearch);
+      const matchNom = (u.nom || u.name || '').toLowerCase().includes(effectiveSearch);
+      const matchRole = (u.role || '').toLowerCase().includes(effectiveSearch);
       return matchEmail || matchNom || matchRole;
     }
     return true;
@@ -123,146 +127,167 @@ export const UtilisateursView: React.FC<UtilisateursViewProps> = ({ onOpenModal 
 
       <div className="data-panel">
         <div className="filters" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '18px' }}>
-          <input
-            type="text"
-            placeholder="Rechercher par nom, adresse e-mail ou rôle..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ minWidth: '300px', flex: 1 }}
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#475569' }}>Filtrer par rôle :</span>
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              style={{
+                padding: '7px 12px',
+                borderRadius: '8px',
+                border: '1px solid #cbd5e1',
+                fontSize: '13px',
+                background: '#ffffff',
+                color: '#1e293b'
+              }}
+            >
+              <option value="ALL">Tous les rôles</option>
+              <option value="admin">Administrateur</option>
+              <option value="comptabilite">Comptabilité & Finances</option>
+              <option value="secretaire">Secrétariat & Accueil</option>
+              <option value="dispatch">Dispatch & Logistique</option>
+              <option value="chauffeur">Chauffeur Privé</option>
+              <option value="client">Client & Passager</option>
+            </select>
+          </div>
           <div style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>
             {filtered.length} utilisateur{filtered.length > 1 ? 's' : ''} répertorié{filtered.length > 1 ? 's' : ''}
           </div>
         </div>
 
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th style={{ width: '220px' }}>Utilisateur</th>
-                <th>Adresse E-mail</th>
-                <th style={{ width: '130px' }}>Rôle</th>
-                <th>Zones d'Accès Autorisées</th>
-                <th style={{ width: '100px' }}>Statut</th>
-                <th style={{ width: '160px', textAlign: 'center' }}>Action Admin</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((u) => {
-                const zones = getAuthorizedZones(u);
-                const isUserAdminRole = u.role === 'admin';
+        <div className="modern-table-card">
+          <div className="modern-table-wrap">
+            <table className="modern-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '220px' }}>Utilisateur</th>
+                  <th>Adresse E-mail</th>
+                  <th style={{ width: '130px' }}>Rôle</th>
+                  <th>Zones d'Accès Autorisées</th>
+                  <th style={{ width: '100px' }}>Statut</th>
+                  <th style={{ textAlign: 'right', paddingRight: '20px' }}>Action Admin</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((u) => {
+                  const zones = getAuthorizedZones(u);
+                  const isUserAdminRole = u.role === 'admin';
+                  const cleanPhone = (u.telephone || '').replace(/\D/g, '');
 
-                return (
-                  <tr key={u.id}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{
-                          width: '36px',
-                          height: '36px',
-                          borderRadius: '50%',
-                          background: isUserAdminRole ? '#082b70' : '#eff6ff',
-                          color: isUserAdminRole ? '#fbbf24' : '#1d4ed8',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 800,
-                          fontSize: '14px',
-                          flexShrink: 0,
-                          border: isUserAdminRole ? '2px solid #f59e0b' : '1px solid #bfdbfe'
-                        }}>
-                          {(u.nom || u.name || u.email || 'U').charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <strong style={{ color: '#0f172a', fontSize: '13.5px', display: 'block' }}>
-                            {u.nom || u.name || 'Utilisateur'}
-                          </strong>
-                          {u.telephone && <span style={{ fontSize: '11px', color: '#64748b' }}>{u.telephone}</span>}
-                        </div>
-                      </div>
-                    </td>
-                    <td style={{ fontSize: '13px', color: '#334155', fontWeight: 500 }}>
-                      {u.email}
-                    </td>
-                    <td>
-                      <span className={`user-role-badge ${(u.role || 'client').toUpperCase()}`}>
-                        {(u.role || 'client').toUpperCase()}
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '420px' }}>
-                        {isUserAdminRole ? (
-                          <span style={{ fontSize: '11px', fontWeight: 700, background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: '6px', border: '1px solid #fde68a' }}>
-                            ⭐ Toutes les zones (Accès Super Administrateur)
-                          </span>
-                        ) : zones.length === 0 ? (
-                          <span style={{ fontSize: '11px', color: '#94a3b8', fontStyle: 'italic' }}>Aucune zone</span>
-                        ) : (
-                          zones.map((zKey) => {
-                            const zoneDef = ALL_SYSTEM_ZONES.find((item) => item.key === zKey);
-                            return (
-                              <span
-                                key={zKey}
-                                style={{
-                                  fontSize: '11px',
-                                  fontWeight: 600,
-                                  background: '#f1f5f9',
-                                  color: '#1e293b',
-                                  padding: '2px 7px',
-                                  borderRadius: '6px',
-                                  border: '1px solid #e2e8f0',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '3px'
-                                }}
-                                title={zoneDef?.description}
-                              >
-                                <span>{zoneDef?.icon || '•'}</span>
-                                <span>{zoneDef?.label || zKey}</span>
-                              </span>
-                            );
-                          })
-                        )}
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`user-status-badge ${u.status || 'actif'}`}>
-                        {u.status === 'inactif' ? 'Désactivé' : 'Actif'}
-                      </span>
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      {isAdmin ? (
-                        <button
-                          type="button"
-                          className="btn-card-action primary-subtle"
-                          onClick={() => setEditingUser(u)}
-                          style={{
-                            padding: '6px 12px',
-                            fontSize: '12px',
-                            fontWeight: 700,
-                            borderRadius: '8px',
-                            display: 'inline-flex',
+                  const actionItems: ActionMenuItem[] = [
+                    ...(isAdmin ? [
+                      {
+                        label: 'Gérer Rôle & Zones',
+                        icon: '🔑',
+                        onClick: () => setEditingUser(u),
+                        variant: 'primary' as const
+                      }
+                    ] : []),
+                    ...(cleanPhone ? [
+                      {
+                        label: 'WhatsApp',
+                        icon: '💬',
+                        href: `https://wa.me/${cleanPhone}`,
+                        variant: 'success' as const
+                      }
+                    ] : [])
+                  ];
+
+                  return (
+                    <tr key={u.id}>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '50%',
+                            background: isUserAdminRole ? '#082b70' : '#eff6ff',
+                            color: isUserAdminRole ? '#fbbf24' : '#1d4ed8',
+                            display: 'flex',
                             alignItems: 'center',
-                            gap: '5px',
-                            cursor: 'pointer'
-                          }}
-                          title="Modifier le rôle et les accès aux zones"
-                        >
-                          <span>🔑 Gérer Rôle & Zones</span>
-                        </button>
-                      ) : (
-                        <span 
-                          style={{ fontSize: '11px', color: '#94a3b8', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                          title="Seul l'administrateur peut modifier les rôles et accès"
-                        >
-                          <span>🔒 Réservé Admin</span>
+                            justifyContent: 'center',
+                            fontWeight: 800,
+                            fontSize: '14px',
+                            flexShrink: 0,
+                            border: isUserAdminRole ? '2px solid #f59e0b' : '1px solid #bfdbfe'
+                          }}>
+                            {(u.nom || u.name || u.email || 'U').charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <strong style={{ color: '#0f172a', fontSize: '13.5px', display: 'block' }}>
+                              {u.nom || u.name || 'Utilisateur'}
+                            </strong>
+                            {u.telephone && <span style={{ fontSize: '11px', color: '#64748b' }}>{u.telephone}</span>}
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ fontSize: '13px', color: '#334155', fontWeight: 500 }}>
+                        {u.email}
+                      </td>
+                      <td>
+                        <span className={`user-role-badge ${(u.role || 'client').toUpperCase()}`}>
+                          {(u.role || 'client').toUpperCase()}
                         </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '420px' }}>
+                          {isUserAdminRole ? (
+                            <span style={{ fontSize: '11px', fontWeight: 700, background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: '6px', border: '1px solid #fde68a' }}>
+                              ⭐ Toutes les zones (Accès Super Administrateur)
+                            </span>
+                          ) : zones.length === 0 ? (
+                            <span style={{ fontSize: '11px', color: '#94a3b8', fontStyle: 'italic' }}>Aucune zone</span>
+                          ) : (
+                            zones.map((zKey) => {
+                              const zoneDef = ALL_SYSTEM_ZONES.find((item) => item.key === zKey);
+                              return (
+                                <span
+                                  key={zKey}
+                                  style={{
+                                    fontSize: '11px',
+                                    fontWeight: 600,
+                                    background: '#f1f5f9',
+                                    color: '#1e293b',
+                                    padding: '2px 7px',
+                                    borderRadius: '6px',
+                                    border: '1px solid #e2e8f0',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px'
+                                  }}
+                                  title={zoneDef?.description}
+                                >
+                                  <span>{zoneDef?.icon || '•'}</span>
+                                  <span>{zoneDef?.label || zKey}</span>
+                                </span>
+                              );
+                            })
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`user-status-badge ${u.status || 'actif'}`}>
+                          {u.status === 'inactif' ? 'Désactivé' : 'Actif'}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right', paddingRight: '20px' }}>
+                        {actionItems.length > 0 ? (
+                          <RowActionMenu items={actionItems} title={`Gérer ${u.nom || u.email}`} />
+                        ) : (
+                          <span style={{ fontSize: '11px', color: '#94a3b8' }}>🔒 Lecture</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {filtered.length > 0 && (
+            <div style={{ padding: '12px 18px', borderTop: '1px solid #f1f5f9', background: '#f8fafc', fontSize: '12px', color: '#64748b', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Affichage de <strong>{filtered.length}</strong> compte(s)</span>
+            </div>
+          )}
         </div>
       </div>
 

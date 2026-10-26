@@ -10006,6 +10006,70 @@ div#app > div.main > main#page > div:nth-of-type(2) > div:nth-of-type(4) {
   border-top: 1px solid #f1f5f9;
 }
 
+/* =========================================================================
+   MODERN AIRY TABLE STYLING (Inspired by Dashboard UI Reference)
+   ========================================================================= */
+.modern-table-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 20px -2px rgba(8, 43, 112, 0.05);
+  overflow: visible;
+  margin-top: 16px;
+  width: 100%;
+}
+.modern-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 16px;
+}
+.modern-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.modern-table thead th {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+.modern-table tbody tr {
+  background: #ffffff;
+  border-bottom: 1px solid #f1f5f9;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.modern-table tbody tr:last-child {
+  border-bottom: none;
+}
+.modern-table tbody tr:hover {
+  background: rgba(239, 246, 255, 0.5);
+}
+.modern-table tbody td {
+  padding: 14px 18px;
+  vertical-align: middle;
+  font-size: 13px;
+  color: #1e293b;
+}
+
+@keyframes fadeInMenu {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+
 
 
 

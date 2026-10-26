@@ -5,6 +5,7 @@ import { Facture } from '../../types';
 import { DualPrice } from '../common/DualPrice';
 import { DocRefBadge } from '../common/DocRefBadge';
 import { PaymentProofModal } from '../modals/PaymentProofModal';
+import { RowActionMenu, type ActionMenuItem } from '../common/RowActionMenu';
 
 interface FacturesViewProps {
   onOpenModal: (type: string, data?: any) => void;
@@ -86,18 +87,12 @@ export const FacturesView: React.FC<FacturesViewProps> = ({ onOpenModal }) => {
 
       <div className="data-panel">
         <div className="filters" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 320px', flexWrap: 'wrap' }}>
-            <input
-              type="text"
-              placeholder={isClient ? 'Rechercher une facture ou référence...' : 'Rechercher par facture, client ou proforma...'}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ flex: '1 1 200px' }}
-            />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>Filtrer par statut :</span>
             <select 
               value={statusFilter} 
               onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ flex: '0 1 160px' }}
+              style={{ minWidth: '160px', padding: '6px 12px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
             >
               <option value="ALL">Tous les statuts</option>
               <option value="Payée">Payée</option>
@@ -290,160 +285,139 @@ export const FacturesView: React.FC<FacturesViewProps> = ({ onOpenModal }) => {
           </div>
         )}
 
-        {/* 2. TABLE VIEW WITH ELONGATED SPACIOUS ROWS */}
+        {/* 2. TABLE VIEW (Modern Airy Table with 3-dot Action Menu) */}
         {viewMode === 'table' && (
-          <div className="table-wrap" style={{ marginTop: '16px', overflowX: 'auto' }}>
-            <table className="table" style={{ borderCollapse: 'separate', borderSpacing: '0 8px', width: '100%' }}>
-              <thead>
-                <tr style={{ background: '#f8fafc' }}>
-                  <th style={{ padding: '14px 16px', fontSize: '12px' }}>N° Facture</th>
-                  <th style={{ padding: '14px 16px', fontSize: '12px' }}>Réf. Devis</th>
-                  {!isClient && <th style={{ padding: '14px 16px', fontSize: '12px' }}>Client</th>}
-                  <th style={{ padding: '14px 16px', fontSize: '12px' }}>Date Émission</th>
-                  <th style={{ padding: '14px 16px', fontSize: '12px' }}>Date Échéance</th>
-                  <th style={{ padding: '14px 16px', fontSize: '12px' }}>Montant (USD / HTG)</th>
-                  <th style={{ padding: '14px 16px', fontSize: '12px' }}>Moyen / Réf.</th>
-                  <th style={{ padding: '14px 16px', fontSize: '12px' }}>Statut</th>
-                  <th style={{ padding: '14px 16px', fontSize: '12px' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
+          <div className="modern-table-card">
+            <div className="modern-table-wrap">
+              <table className="modern-table">
+                <thead>
                   <tr>
-                    <td colSpan={isClient ? 8 : 9} style={{ textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
-                      Aucune facture disponible.
-                    </td>
+                    <th>N° Facture</th>
+                    <th>Réf. Devis</th>
+                    {!isClient && <th>Client</th>}
+                    <th>Date Émission</th>
+                    <th>Date Échéance</th>
+                    <th>Montant (USD / HTG)</th>
+                    <th>Moyen / Réf.</th>
+                    <th>Statut</th>
+                    <th style={{ textAlign: 'right', paddingRight: '20px' }}>Actions</th>
                   </tr>
-                ) : (
-                  filtered.map((f) => (
-                    <tr 
-                      key={f.id}
-                      style={{ 
-                        background: '#ffffff', 
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)', 
-                        borderRadius: '10px'
-                      }}
-                    >
-                      <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>
-                        <DocRefBadge reference={f.number} type="facture" />
-                      </td>
-                      <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>
-                        {f.proformaNumber ? (
-                          <DocRefBadge reference={f.proformaNumber} type="proforma" label={f.proformaNumber} />
-                        ) : (
-                          <span style={{ color: '#94a3b8', fontSize: '11px' }}>Direct</span>
-                        )}
-                      </td>
-                      {!isClient && (
-                        <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>
-                          <strong style={{ color: '#0f172a' }}>{f.client}</strong>
-                        </td>
-                      )}
-                      <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>{f.date}</td>
-                      <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>{f.dueDate || '-'}</td>
-                      <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>
-                        <DualPrice amount={f.amount || 0} currency={f.currency || 'USD'} size="sm" />
-                      </td>
-                      <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>
-                        <div style={{ fontSize: '12px', fontWeight: 600 }}>
-                          {f.modePaiement || f.paymentMethod || 'MonCash / Virement'}
-                        </div>
-                        {f.referenceTransaction && (
-                          <div style={{ fontSize: '10.5px', color: '#7e22ce', fontFamily: 'monospace' }}>
-                            {f.referenceTransaction}
-                          </div>
-                        )}
-                        {f.preuveImage && (
-                          <button
-                            type="button"
-                            onClick={() => setZoomedProofImage(f.preuveImage || null)}
-                            className="inline-block mt-1 text-[10px] text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200"
-                          >
-                            📎 Voir photo
-                          </button>
-                        )}
-                      </td>
-                      <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>
-                        <span className={`badge ${getStatusBadge(f.status)}`}>
-                          {f.status || 'En attente'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>
-                        <div className="action-cell" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                          <button
-                            type="button"
-                            className="tiny"
-                            style={{ background: '#eff6ff', color: '#1d4ed8', fontWeight: 600 }}
-                            onClick={() => setPrintSheetData({ type: 'facture', data: f })}
-                            title="Aperçu officiel de la facture"
-                          >
-                            🖨️ PDF
-                          </button>
-
-                          {f.status !== 'Payée' && (
-                            <button
-                              type="button"
-                              className="tiny"
-                              style={{ background: '#f0fdf4', color: '#15803d', fontWeight: 600 }}
-                              onClick={() => setProofFacture(f)}
-                              title="Attacher la preuve de virement / MonCash"
-                            >
-                              💳 Payer
-                            </button>
-                          )}
-
-                          {isClient ? (
-                            <button
-                              type="button"
-                              className="tiny"
-                              style={{ background: '#fef3c7', color: '#92400e', fontWeight: 600 }}
-                              onClick={() => onOpenModal('demande-envoi', { type: 'facture', doc: f })}
-                              title="Demander l'envoi de la facture par Email ou WhatsApp"
-                            >
-                              📨 Envoi
-                            </button>
-                          ) : (
-                            <>
-                              {f.status !== 'Payée' && (
-                                <button
-                                  type="button"
-                                  className="tiny"
-                                  style={{ background: '#e0e7ff', color: '#3730a3', fontWeight: 600 }}
-                                  onClick={() => convertFactureToPaiement(f)}
-                                  title="Encaisser immédiatement"
-                                >
-                                  ⚡
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                className="tiny edit"
-                                onClick={() => onOpenModal('facture', f)}
-                                title="Modifier"
-                              >
-                                ✏️
-                              </button>
-                              <button
-                                type="button"
-                                className="tiny delete"
-                                onClick={() => {
-                                  if (window.confirm(`Supprimer la facture ${f.number} ?`)) {
-                                    deleteFacture(f.id);
-                                  }
-                                }}
-                                title="Supprimer"
-                              >
-                                🗑️
-                              </button>
-                            </>
-                          )}
-                        </div>
+                </thead>
+                <tbody>
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={isClient ? 8 : 9} style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
+                        Aucune facture disponible.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    filtered.map((f) => {
+                      const actionItems: ActionMenuItem[] = [
+                        {
+                          label: 'Aperçu imprimable (PDF)',
+                          icon: '🖨️',
+                          onClick: () => setPrintSheetData({ type: 'facture', data: f }),
+                          variant: 'primary'
+                        },
+                        ...(f.status !== 'Payée' ? [{
+                          label: 'Attacher preuve de paiement',
+                          icon: '💳',
+                          onClick: () => setProofFacture(f),
+                          variant: 'success' as const
+                        }] : []),
+                        ...(isClient ? [
+                          {
+                            label: 'Recevoir par Email / WhatsApp',
+                            icon: '📨',
+                            onClick: () => onOpenModal('demande-envoi', { type: 'facture', doc: f })
+                          }
+                        ] : [
+                          ...(f.status !== 'Payée' ? [{
+                            label: 'Encaisser immédiatement',
+                            icon: '⚡',
+                            onClick: () => convertFactureToPaiement(f),
+                            variant: 'success' as const
+                          }] : []),
+                          {
+                            label: 'Modifier la facture',
+                            icon: '✏️',
+                            onClick: () => onOpenModal('facture', f)
+                          },
+                          {
+                            label: 'Supprimer',
+                            icon: '🗑️',
+                            onClick: () => {
+                              if (window.confirm(`Supprimer la facture ${f.number} ?`)) {
+                                deleteFacture(f.id);
+                              }
+                            },
+                            variant: 'danger' as const
+                          }
+                        ])
+                      ];
+
+                      return (
+                        <tr key={f.id}>
+                          <td>
+                            <DocRefBadge reference={f.number} type="facture" />
+                          </td>
+                          <td>
+                            {f.proformaNumber ? (
+                              <DocRefBadge reference={f.proformaNumber} type="proforma" label={f.proformaNumber} />
+                            ) : (
+                              <span style={{ color: '#94a3b8', fontSize: '11px' }}>Direct</span>
+                            )}
+                          </td>
+                          {!isClient && (
+                            <td>
+                              <strong style={{ color: '#0f172a' }}>{f.client}</strong>
+                            </td>
+                          )}
+                          <td>{f.date}</td>
+                          <td>{f.dueDate || '-'}</td>
+                          <td>
+                            <DualPrice amount={f.amount || 0} currency={f.currency || 'USD'} size="sm" />
+                          </td>
+                          <td>
+                            <div style={{ fontSize: '12px', fontWeight: 600 }}>
+                              {f.modePaiement || f.paymentMethod || 'MonCash / Virement'}
+                            </div>
+                            {f.referenceTransaction && (
+                              <div style={{ fontSize: '10.5px', color: '#7e22ce', fontFamily: 'monospace' }}>
+                                {f.referenceTransaction}
+                              </div>
+                            )}
+                            {f.preuveImage && (
+                              <button
+                                type="button"
+                                onClick={() => setZoomedProofImage(f.preuveImage || null)}
+                                className="inline-block mt-1 text-[10px] text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200"
+                              >
+                                📎 Voir photo
+                              </button>
+                            )}
+                          </td>
+                          <td>
+                            <span className={`badge ${getStatusBadge(f.status)}`}>
+                              {f.status || 'En attente'}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'right', paddingRight: '20px' }}>
+                            <RowActionMenu items={actionItems} title={`Actions pour ${f.number}`} />
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {filtered.length > 0 && (
+              <div style={{ padding: '12px 18px', borderTop: '1px solid #f1f5f9', background: '#f8fafc', fontSize: '12px', color: '#64748b', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Affichage de <strong>{filtered.length}</strong> facture(s)</span>
+                <span style={{ fontSize: '11px' }}>Règlements & Trésorerie certifiés DGI</span>
+              </div>
+            )}
           </div>
         )}
       </div>

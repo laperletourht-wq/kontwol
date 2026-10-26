@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { DualPrice } from '../common/DualPrice';
 import { DocRefBadge } from '../common/DocRefBadge';
+import { RowActionMenu, type ActionMenuItem } from '../common/RowActionMenu';
 
 interface ReservationsViewProps {
   onOpenModal: (type: string, data?: any) => void;
@@ -86,18 +87,12 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
 
       <div className="data-panel">
         <div className="filters" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 320px', flexWrap: 'wrap' }}>
-            <input
-              type="text"
-              placeholder={isClient ? 'Rechercher un trajet, destination...' : 'Filtrer par client, trajet ou service...'}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ flex: '1 1 200px' }}
-            />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>Filtrer par statut :</span>
             <select 
               value={statusFilter} 
               onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ flex: '0 1 160px' }}
+              style={{ minWidth: '160px', padding: '6px 12px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
             >
               <option value="ALL">Tous les statuts</option>
               <option value="En attente">En attente</option>
@@ -337,182 +332,166 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
           </div>
         )}
 
-        {/* 2. TABLE VIEW WITH ELONGATED SPACIOUS ROWS */}
+        {/* 2. TABLE VIEW (Modern Airy Table with 3-dot Action Menu) */}
         {viewMode === 'table' && (
-          <div className="table-wrap" style={{ marginTop: '16px', overflowX: 'auto' }}>
-            <table className="table" style={{ borderCollapse: 'separate', borderSpacing: '0 8px', width: '100%' }}>
-              <thead>
-                <tr style={{ background: '#f8fafc' }}>
-                  <th style={{ padding: '14px 16px', fontSize: '12px' }}>Réf. Course</th>
-                  {!isClient && <th style={{ padding: '14px 16px', fontSize: '12px' }}>Client</th>}
-                  <th className="cell-service" style={{ padding: '14px 16px', fontSize: '12px' }}>Prestation</th>
-                  <th className="cell-route" style={{ padding: '14px 16px', fontSize: '12px' }}>Itinéraire Trajet</th>
-                  <th style={{ padding: '14px 16px', fontSize: '12px' }}>Date & Heure</th>
-                  <th style={{ padding: '14px 16px', fontSize: '12px' }}>Passagers</th>
-                  <th style={{ padding: '14px 16px', fontSize: '12px' }}>Tarif (USD / HTG)</th>
-                  <th style={{ padding: '14px 16px', fontSize: '12px' }}>Chauffeur</th>
-                  <th style={{ padding: '14px 16px', fontSize: '12px' }}>Statut</th>
-                  <th style={{ padding: '14px 16px', fontSize: '12px' }}>Actions & Demandes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
+          <div className="modern-table-card">
+            <div className="modern-table-wrap">
+              <table className="modern-table">
+                <thead>
                   <tr>
-                    <td colSpan={isClient ? 9 : 10} style={{ textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
-                      Aucune réservation trouvée.
-                    </td>
+                    <th>Réf. Course</th>
+                    {!isClient && <th>Client</th>}
+                    <th>Prestation</th>
+                    <th>Itinéraire</th>
+                    <th>Date & Heure</th>
+                    <th>Passagers</th>
+                    <th>Tarif (USD / HTG)</th>
+                    <th>Chauffeur</th>
+                    <th>Statut</th>
+                    <th style={{ textAlign: 'right', paddingRight: '20px' }}>Actions</th>
                   </tr>
-                ) : (
-                  filtered.map((r) => (
-                    <tr 
-                      key={r.id} 
-                      style={{ 
-                        background: '#ffffff', 
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)', 
-                        borderRadius: '10px'
-                      }}
-                    >
-                      <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>
-                        <DocRefBadge reference={r.id} type="reservation" />
-                        {r.devisRef && (
-                          <div style={{ marginTop: '4px' }}>
-                            <DocRefBadge reference={r.devisRef} type="proforma" label={`Devis ${r.devisRef}`} />
-                          </div>
-                        )}
-                        {r.factureRef && (
-                          <div style={{ marginTop: '4px' }}>
-                            <DocRefBadge reference={r.factureRef} type="facture" label={`Facture ${r.factureRef}`} />
-                          </div>
-                        )}
-                      </td>
-                      {!isClient && (
-                        <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>
-                          <strong style={{ color: '#0f172a' }}>{r.client}</strong>
-                          {r.telephone && <div style={{ fontSize: '11px', color: '#64748b' }}>{r.telephone}</div>}
-                        </td>
-                      )}
-                      <td className="cell-service" style={{ padding: '16px 14px', verticalAlign: 'middle', fontWeight: 600, color: '#1e293b' }}>
-                        {r.service || 'Course privée VIP'}
-                      </td>
-                      <td className="cell-route" style={{ padding: '16px 14px', verticalAlign: 'middle' }}>
-                        <div style={{ fontSize: '13px', lineHeight: 1.5 }}>
-                          <div>📍 <strong>{r.origin || 'Port-au-Prince'}</strong></div>
-                          <div style={{ color: '#d97706', fontWeight: 700, paddingLeft: '4px' }}>➔ 🎯 <strong>{r.destination || 'Côte des Arcadins'}</strong></div>
-                        </div>
-                      </td>
-                      <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>
-                        <div style={{ fontWeight: 600 }}>{r.date}</div>
-                        <div style={{ fontSize: '11px', color: '#64748b' }}>{r.time || '09:00'}</div>
-                      </td>
-                      <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>
-                        <span className="font-semibold">{r.passengers || 1} pers.</span>
-                      </td>
-                      <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>
-                        <DualPrice amount={r.amount || 0} currency={r.currency || 'USD'} size="sm" />
-                      </td>
-                      <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>
-                        <div style={{ fontSize: '12px' }}>
-                          <span style={{ fontWeight: 600 }}>{r.driver || 'En attente'}</span>
-                          {r.vehicle && <div style={{ color: '#082b70', fontSize: '11px' }}>{r.vehicle}</div>}
-                        </div>
-                      </td>
-                      <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>
-                        <span className={`badge ${getStatusBadgeClass(r.status)}`}>
-                          {r.status || 'En attente'}
-                        </span>
-                        {r.demandeDevis && (
-                          <div style={{ fontSize: '10px', color: '#b45309', fontWeight: 600, marginTop: '2px' }}>
-                            Devis demandé ⏳
-                          </div>
-                        )}
-                        {r.demandeFacture && (
-                          <div style={{ fontSize: '10px', color: '#1d4ed8', fontWeight: 600, marginTop: '2px' }}>
-                            Facture demandée ⏳
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>
-                        <div className="action-cell" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                          {isClient ? (
-                            <>
-                              <button
-                                type="button"
-                                className="tiny"
-                                style={{ background: '#fef3c7', color: '#92400e', fontWeight: 600 }}
-                                onClick={() => handleRequestDoc(r, 'devis')}
-                                title="Demander un devis sur ce trajet"
-                              >
-                                📋 Devis
-                              </button>
-                              <button
-                                type="button"
-                                className="tiny"
-                                style={{ background: '#eff6ff', color: '#1d4ed8', fontWeight: 600 }}
-                                onClick={() => handleRequestDoc(r, 'facture')}
-                                title="Demander une facture sur ce trajet"
-                              >
-                                🧾 Facture
-                              </button>
-                              <a
-                                href={`https://wa.me/${officialWhatsApp.replace(/\D/g, '')}?text=${encodeURIComponent(`Bonjour Laperle Tour, je vous contacte concernant ma réservation ${r.id}.`)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="tiny"
-                                style={{ textDecoration: 'none' }}
-                                title="Support WhatsApp"
-                              >
-                                💬
-                              </a>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                className="tiny"
-                                style={{ background: '#eef3ff', color: '#164b99', fontWeight: 600 }}
-                                onClick={() => convertReservationToProforma(r)}
-                                title="Générer un devis proforma"
-                              >
-                                📋 Devis
-                              </button>
-                              <button
-                                type="button"
-                                className="tiny"
-                                style={{ background: '#f0fdf4', color: '#15803d', fontWeight: 600 }}
-                                onClick={() => convertReservationToPlanning(r)}
-                                title="Envoyer au planning de dispatch"
-                              >
-                                ⏱️ Dispatch
-                              </button>
-                              <button
-                                type="button"
-                                className="tiny edit"
-                                onClick={() => onOpenModal('reservation', r)}
-                                title="Modifier"
-                              >
-                                ✏️
-                              </button>
-                              <button
-                                type="button"
-                                className="tiny delete"
-                                onClick={() => {
-                                  if (window.confirm('Voulez-vous supprimer cette réservation ?')) {
-                                    deleteReservation(r.id);
-                                  }
-                                }}
-                                title="Supprimer"
-                              >
-                                🗑️
-                              </button>
-                            </>
-                          )}
-                        </div>
+                </thead>
+                <tbody>
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={isClient ? 9 : 10} style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
+                        Aucune réservation trouvée.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    filtered.map((r) => {
+                      const actionItems: ActionMenuItem[] = isClient ? [
+                        {
+                          label: 'Demander un devis',
+                          icon: '📋',
+                          onClick: () => handleRequestDoc(r, 'devis'),
+                          variant: 'primary'
+                        },
+                        {
+                          label: 'Demander une facture',
+                          icon: '🧾',
+                          onClick: () => handleRequestDoc(r, 'facture'),
+                          variant: 'primary'
+                        },
+                        {
+                          label: 'Assistance WhatsApp',
+                          icon: '💬',
+                          href: `https://wa.me/${officialWhatsApp.replace(/\D/g, '')}?text=${encodeURIComponent(`Bonjour Laperle Tour, je vous contacte concernant ma réservation ${r.id}.`)}`,
+                          variant: 'success'
+                        }
+                      ] : [
+                        {
+                          label: 'Générer Devis Proforma',
+                          icon: '📋',
+                          onClick: () => convertReservationToProforma(r),
+                          variant: 'primary'
+                        },
+                        {
+                          label: 'Envoyer au Planning Dispatch',
+                          icon: '⏱️',
+                          onClick: () => convertReservationToPlanning(r),
+                          variant: 'success'
+                        },
+                        {
+                          label: 'Modifier la réservation',
+                          icon: '✏️',
+                          onClick: () => onOpenModal('reservation', r)
+                        },
+                        ...(r.telephone ? [{
+                          label: 'Contacter le client WhatsApp',
+                          icon: '💬',
+                          href: `https://wa.me/${r.telephone.replace(/\D/g, '')}?text=${encodeURIComponent(`Bonjour ${r.client}, votre réservation Laperle ${r.id} est bien notée.`)}`,
+                          variant: 'success' as const
+                        }] : []),
+                        {
+                          label: 'Supprimer',
+                          icon: '🗑️',
+                          onClick: () => {
+                            if (window.confirm('Voulez-vous supprimer cette réservation ?')) {
+                              deleteReservation(r.id);
+                            }
+                          },
+                          variant: 'danger'
+                        }
+                      ];
+
+                      return (
+                        <tr key={r.id}>
+                          <td>
+                            <DocRefBadge reference={r.id} type="reservation" />
+                            {r.devisRef && (
+                              <div style={{ marginTop: '4px' }}>
+                                <DocRefBadge reference={r.devisRef} type="proforma" label={`Devis ${r.devisRef}`} />
+                              </div>
+                            )}
+                            {r.factureRef && (
+                              <div style={{ marginTop: '4px' }}>
+                                <DocRefBadge reference={r.factureRef} type="facture" label={`Facture ${r.factureRef}`} />
+                              </div>
+                            )}
+                          </td>
+                          {!isClient && (
+                            <td>
+                              <strong style={{ color: '#0f172a' }}>{r.client}</strong>
+                              {r.telephone && <div style={{ fontSize: '11px', color: '#64748b' }}>{r.telephone}</div>}
+                            </td>
+                          )}
+                          <td style={{ fontWeight: 600, color: '#1e293b' }}>
+                            {r.service || 'Course privée VIP'}
+                          </td>
+                          <td>
+                            <div style={{ fontSize: '12.5px', lineHeight: 1.45 }}>
+                              <div>📍 <strong>{r.origin || 'Port-au-Prince'}</strong></div>
+                              <div style={{ color: '#d97706', fontWeight: 700, paddingLeft: '4px' }}>➔ 🎯 <strong>{r.destination || 'Côte des Arcadins'}</strong></div>
+                            </div>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 600 }}>{r.date}</div>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>{r.time || '09:00'}</div>
+                          </td>
+                          <td>
+                            <span className="font-semibold">{r.passengers || 1} pers.</span>
+                          </td>
+                          <td>
+                            <DualPrice amount={r.amount || 0} currency={r.currency || 'USD'} size="sm" />
+                          </td>
+                          <td>
+                            <div style={{ fontSize: '12px' }}>
+                              <span style={{ fontWeight: 600 }}>{r.driver || 'En attente'}</span>
+                              {r.vehicle && <div style={{ color: '#082b70', fontSize: '11px' }}>{r.vehicle}</div>}
+                            </div>
+                          </td>
+                          <td>
+                            <span className={`badge ${getStatusBadgeClass(r.status)}`}>
+                              {r.status || 'En attente'}
+                            </span>
+                            {r.demandeDevis && (
+                              <div style={{ fontSize: '10px', color: '#b45309', fontWeight: 600, marginTop: '2px' }}>
+                                Devis demandé ⏳
+                              </div>
+                            )}
+                            {r.demandeFacture && (
+                              <div style={{ fontSize: '10px', color: '#1d4ed8', fontWeight: 600, marginTop: '2px' }}>
+                                Facture demandée ⏳
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'right', paddingRight: '20px' }}>
+                            <RowActionMenu items={actionItems} title={`Actions pour ${r.id}`} />
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {filtered.length > 0 && (
+              <div style={{ padding: '12px 18px', borderTop: '1px solid #f1f5f9', background: '#f8fafc', fontSize: '12px', color: '#64748b', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Affichage de <strong>{filtered.length}</strong> réservation(s)</span>
+                <span style={{ fontSize: '11px' }}>Tableau opérationnel actualisé</span>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { DualPrice } from '../common/DualPrice';
 import { DocRefBadge } from '../common/DocRefBadge';
 import { PaymentProofModal } from '../modals/PaymentProofModal';
+import { RowActionMenu, ActionMenuItem } from '../common/RowActionMenu';
 
 interface PaiementsViewProps {
   onOpenModal: (type: string, data?: any) => void;
@@ -16,14 +17,15 @@ export const PaiementsView: React.FC<PaiementsViewProps> = ({ onOpenModal }) => 
   const isChauffeur = role === 'chauffeur';
   const canManagePayments = !isClient && !isChauffeur;
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
   const [proofModalOpen, setProofModalOpen] = useState(false);
   const [zoomedProofImage, setZoomedProofImage] = useState<string | null>(null);
 
-  const effectiveSearch = (searchTerm || globalSearchQuery).toLowerCase();
+  const effectiveSearch = globalSearchQuery.toLowerCase();
 
   const filtered = paiements.filter((p) => {
+    if (statusFilter !== 'ALL' && (p.statut || 'En attente') !== statusFilter) return false;
     if (effectiveSearch) {
       return (
         p.reference?.toLowerCase().includes(effectiveSearch) ||
@@ -62,14 +64,25 @@ export const PaiementsView: React.FC<PaiementsViewProps> = ({ onOpenModal }) => 
 
       <div className="data-panel">
         <div className="filters" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 320px', flexWrap: 'wrap' }}>
-            <input
-              type="text"
-              placeholder="Rechercher par référence, client, mode ou bordereau..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ flex: '1 1 240px' }}
-            />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#475569' }}>Statut :</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={{
+                padding: '7px 12px',
+                borderRadius: '8px',
+                border: '1px solid #cbd5e1',
+                fontSize: '13px',
+                background: '#ffffff',
+                color: '#1e293b'
+              }}
+            >
+              <option value="ALL">Tous les statuts</option>
+              <option value="Validé">Validé</option>
+              <option value="En attente">En attente</option>
+              <option value="Rejeté">Rejeté</option>
+            </select>
           </div>
 
           <div className="view-mode-toggle-group">
@@ -86,10 +99,10 @@ export const PaiementsView: React.FC<PaiementsViewProps> = ({ onOpenModal }) => 
               type="button"
               className={`btn-view-mode ${viewMode === 'table' ? 'active' : ''}`}
               onClick={() => setViewMode('table')}
-              title="Affichage en tableau aux lignes allongées"
+              title="Affichage en tableau moderne et aéré"
             >
               <span>📊</span>
-              <span>Tableau Allongé</span>
+              <span>Tableau Épuré</span>
             </button>
           </div>
         </div>
@@ -229,130 +242,128 @@ export const PaiementsView: React.FC<PaiementsViewProps> = ({ onOpenModal }) => 
           </div>
         )}
 
-        {/* 2. TABLE VIEW WITH ELONGATED SPACIOUS ROWS */}
+        {/* 2. TABLE VIEW WITH MODERN AIRY ROWS */}
         {viewMode === 'table' && (
-          <div className="table-wrap" style={{ marginTop: '16px', overflowX: 'auto' }}>
-            <table className="table" style={{ borderCollapse: 'separate', borderSpacing: '0 8px', width: '100%' }}>
-              <thead>
-                <tr style={{ background: '#f8fafc' }}>
-                  <th style={{ padding: '14px 16px', fontSize: '12px' }}>Réf. Paiement</th>
-                  <th style={{ padding: '14px 16px', fontSize: '12px' }}>Date</th>
-                  <th style={{ padding: '14px 16px', fontSize: '12px' }}>Client</th>
-                  <th style={{ padding: '14px 16px', fontSize: '12px' }}>Montant (USD / HTG)</th>
-                  <th style={{ padding: '14px 16px', fontSize: '12px' }}>Moyen & Bordereau</th>
-                  <th style={{ padding: '14px 16px', fontSize: '12px' }}>Facture Liée</th>
-                  <th style={{ padding: '14px 16px', fontSize: '12px' }}>Statut</th>
-                  <th style={{ padding: '14px 16px', fontSize: '12px' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
+          <div className="modern-table-card" style={{ marginTop: '16px' }}>
+            <div className="modern-table-wrap">
+              <table className="modern-table">
+                <thead>
                   <tr>
-                    <td colSpan={8} style={{ textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
-                      Aucun encaissement enregistré.
-                    </td>
+                    <th>Réf. Paiement</th>
+                    <th>Date</th>
+                    <th>Client</th>
+                    <th>Montant (USD / HTG)</th>
+                    <th>Moyen & Bordereau</th>
+                    <th>Facture Liée</th>
+                    <th>Statut</th>
+                    <th style={{ textAlign: 'right', paddingRight: '20px' }}>Actions</th>
                   </tr>
-                ) : (
-                  filtered.map((p) => (
-                    <tr 
-                      key={p.id}
-                      style={{ 
-                        background: '#ffffff', 
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)', 
-                        borderRadius: '10px'
-                      }}
-                    >
-                      <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>
-                        <DocRefBadge reference={p.reference || p.id} type="paiement" />
-                      </td>
-                      <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>{p.date}</td>
-                      <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>
-                        <strong style={{ color: '#0f172a' }}>{p.client}</strong>
-                      </td>
-                      <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>
-                        <DualPrice amount={p.montant} currency={p.devise || 'USD'} size="sm" />
-                      </td>
-                      <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>
-                        <span className="badge">{p.modePaiement}</span>
-                        {p.referenceTransaction && (
-                          <div style={{ fontSize: '10.5px', color: '#7e22ce', fontFamily: 'monospace', marginTop: '3px' }}>
-                            {p.referenceTransaction}
-                          </div>
-                        )}
-                        {p.preuveImage && (
-                          <button
-                            type="button"
-                            onClick={() => setZoomedProofImage(p.preuveImage || null)}
-                            className="inline-block mt-1 text-[10px] text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200"
-                          >
-                            📎 Photo
-                          </button>
-                        )}
-                      </td>
-                      <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>
-                        {p.factureAssociee ? (
-                          <DocRefBadge reference={p.factureAssociee} type="facture" />
-                        ) : (
-                          <span style={{ color: '#94a3b8', fontSize: '11px' }}>-</span>
-                        )}
-                      </td>
-                      <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>
-                        <span className={`badge ${p.statut === 'Validé' ? 'green' : 'orange'}`}>
-                          {p.statut}
-                        </span>
-                      </td>
-                      <td style={{ padding: '16px 14px', verticalAlign: 'middle' }}>
-                        <div className="action-cell" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                          <button
-                            type="button"
-                            className="tiny"
-                            style={{ background: '#eff6ff', color: '#1d4ed8', fontWeight: 600 }}
-                            onClick={() => setPrintSheetData({
-                              type: 'paiement',
-                              data: {
-                                ...p,
-                                number: p.reference,
-                                amount: p.montant,
-                                currency: p.devise,
-                                service: p.motif || `Règlement par ${p.modePaiement}`
-                              }
-                            })}
-                            title="Aperçu officiel imprimable"
-                          >
-                            🖨️ Reçu
-                          </button>
-
-                          {canManagePayments && (
-                            <>
-                              <button
-                                type="button"
-                                className="tiny edit"
-                                onClick={() => onOpenModal('paiement', p)}
-                                title="Modifier"
-                              >
-                                ✏️
-                              </button>
-                              <button
-                                type="button"
-                                className="tiny delete"
-                                onClick={() => {
-                                  if (window.confirm(`Supprimer le paiement ${p.reference} ?`)) {
-                                    deletePaiement(p.id);
-                                  }
-                                }}
-                                title="Supprimer"
-                              >
-                                🗑️
-                              </button>
-                            </>
-                          )}
-                        </div>
+                </thead>
+                <tbody>
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
+                        Aucun encaissement enregistré.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    filtered.map((p) => {
+                      const actionItems: ActionMenuItem[] = [
+                        {
+                          label: 'Reçu Officiel PDF',
+                          icon: '🖨️',
+                          onClick: () => setPrintSheetData({
+                            type: 'paiement',
+                            data: {
+                              ...p,
+                              number: p.reference,
+                              amount: p.montant,
+                              currency: p.devise,
+                              service: p.motif || `Règlement par ${p.modePaiement}`
+                            }
+                          }),
+                          variant: 'primary'
+                        },
+                        ...(p.preuveImage ? [{
+                          label: 'Agrandir Preuve Photo',
+                          icon: '🖼️',
+                          onClick: () => setZoomedProofImage(p.preuveImage || null)
+                        }] : []),
+                        ...(canManagePayments ? [
+                          {
+                            label: 'Modifier le paiement',
+                            icon: '✏️',
+                            onClick: () => onOpenModal('paiement', p)
+                          },
+                          {
+                            label: 'Supprimer',
+                            icon: '🗑️',
+                            onClick: () => {
+                              if (window.confirm(`Supprimer le paiement ${p.reference} ?`)) {
+                                deletePaiement(p.id);
+                              }
+                            },
+                            variant: 'danger' as const
+                          }
+                        ] : [])
+                      ];
+
+                      return (
+                        <tr key={p.id}>
+                          <td>
+                            <DocRefBadge reference={p.reference || p.id} type="paiement" />
+                          </td>
+                          <td>{p.date}</td>
+                          <td>
+                            <strong style={{ color: '#082b70' }}>{p.client}</strong>
+                          </td>
+                          <td>
+                            <DualPrice amount={p.montant} currency={p.devise || 'USD'} size="sm" />
+                          </td>
+                          <td>
+                            <span className="badge">{p.modePaiement}</span>
+                            {p.referenceTransaction && (
+                              <div style={{ fontSize: '10.5px', color: '#7e22ce', fontFamily: 'monospace', marginTop: '3px' }}>
+                                {p.referenceTransaction}
+                              </div>
+                            )}
+                            {p.preuveImage && (
+                              <button
+                                type="button"
+                                onClick={() => setZoomedProofImage(p.preuveImage || null)}
+                                className="inline-block mt-1 text-[10px] text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200"
+                              >
+                                📎 Photo
+                              </button>
+                            )}
+                          </td>
+                          <td>
+                            {p.factureAssociee ? (
+                              <DocRefBadge reference={p.factureAssociee} type="facture" />
+                            ) : (
+                              <span style={{ color: '#94a3b8', fontSize: '11px' }}>-</span>
+                            )}
+                          </td>
+                          <td>
+                            <span className={`badge ${p.statut === 'Validé' ? 'green' : 'orange'}`}>
+                              {p.statut}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'right', paddingRight: '20px' }}>
+                            <RowActionMenu items={actionItems} title={`Actions pour le paiement ${p.reference}`} />
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {filtered.length > 0 && (
+              <div style={{ padding: '12px 18px', borderTop: '1px solid #f1f5f9', background: '#f8fafc', fontSize: '12px', color: '#64748b', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Affichage de <strong>{filtered.length}</strong> encaissement(s)</span>
+              </div>
+            )}
           </div>
         )}
       </div>
