@@ -39,9 +39,9 @@ export const AbonnementsView: React.FC<AbonnementsViewProps> = ({ onOpenModal })
       </div>
 
       <div className="data-panel">
-        <div className="filters" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#475569' }}>Type :</span>
+        <div className="filters" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'nowrap', overflowX: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>Type :</span>
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}

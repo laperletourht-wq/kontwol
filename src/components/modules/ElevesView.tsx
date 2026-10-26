@@ -38,9 +38,9 @@ export const ElevesView: React.FC<ElevesViewProps> = ({ onOpenModal }) => {
       </div>
 
       <div className="data-panel">
-        <div className="filters" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#475569' }}>Statut :</span>
+        <div className="filters" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'nowrap', overflowX: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>Statut :</span>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}

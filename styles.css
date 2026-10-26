@@ -1657,13 +1657,19 @@ button, input, select, textarea {
     border-radius: 10px !important;
   }
   .filters {
-    flex-direction: column !important;
-    gap: 8px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    gap: 10px !important;
     width: 100% !important;
   }
-  .filters input, .filters select {
-    width: 100% !important;
-    min-height: 46px !important;
+  .filters select {
+    width: auto !important;
+    min-width: 150px !important;
+    min-height: 38px !important;
     font-size: 13px !important;
   }
   .action-cell {
@@ -1829,29 +1835,33 @@ div#root:nth-of-type(1) > div#app:nth-of-type(1) > div:nth-of-type(2) > main#pag
 }
 .filters {
   display: flex;
-  gap: 10px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
+  flex-direction: row;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
 }
 .filters input,
 .filters select {
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 10px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 12px;
   font-size: 13px;
-  background: #f8fafc;
+  background: #ffffff;
   color: #0f172a;
   outline: none;
-  min-height: 42px;
+  min-height: 38px;
   transition: all 0.15s ease;
   font-family: inherit;
 }
-.filters input {
-  flex: 1 1 240px;
-}
 .filters select {
-  flex: 0 1 180px;
+  flex: none;
+  width: auto;
+  min-width: 160px;
 }
 .filters input:focus,
 .filters select:focus {
@@ -5809,15 +5819,19 @@ button, input, select, textarea, .nav-item, .tiny, .firebase-chip, .user-btn {
   }
   .filters {
     display: flex !important;
-    flex-direction: column !important;
-    gap: 8px !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    gap: 10px !important;
     width: 100% !important;
   }
-  .filters input, .filters select {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-height: 44px !important;
-    font-size: 16px !important; /* Empêche le zoom auto iOS Safari */
+  .filters select {
+    width: auto !important;
+    max-width: 200px !important;
+    min-height: 38px !important;
+    font-size: 13px !important;
     box-sizing: border-box !important;
   }
   .form-grid {
@@ -9632,12 +9646,19 @@ div#app > div.main > main#page > div:nth-of-type(2) > div:nth-of-type(4) {
     min-height: 44px !important;
   }
   .filters {
-    flex-direction: column !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    gap: 10px !important;
     width: 100% !important;
   }
-  .filters input, .filters select {
-    width: 100% !important;
-    min-height: 42px !important;
+  .filters select {
+    width: auto !important;
+    min-height: 38px !important;
+    font-size: 13px !important;
   }
   .table-wrap {
     width: 100% !important;
@@ -10068,6 +10089,53 @@ div#app > div.main > main#page > div:nth-of-type(2) > div:nth-of-type(4) {
     transform: translateY(0) scale(1);
   }
 }
+
+/* =========================================================================
+   STRICT HORIZONTAL TOOLBAR BEFORE TABLE
+   ========================================================================= */
+.filters,
+.data-panel > .filters,
+div#root div#app main#page div.data-panel > div.filters {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: nowrap !important;
+  gap: 12px !important;
+  width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  margin-bottom: 14px !important;
+  padding: 4px 0 6px 0 !important;
+  box-sizing: border-box !important;
+}
+
+.filters > div,
+.data-panel > .filters > div {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: 10px !important;
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+}
+
+.filters select,
+.data-panel > .filters select {
+  width: auto !important;
+  min-width: 150px !important;
+  max-width: 260px !important;
+  padding: 7px 12px !important;
+  border-radius: 8px !important;
+  border: 1px solid #cbd5e1 !important;
+  background: #ffffff !important;
+  font-size: 13px !important;
+  color: #1e293b !important;
+  flex-shrink: 0 !important;
+  flex: none !important;
+}
+
 
 
 

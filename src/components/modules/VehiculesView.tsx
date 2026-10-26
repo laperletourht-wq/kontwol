@@ -48,19 +48,22 @@ export const VehiculesView: React.FC<VehiculesViewProps> = ({ onOpenModal }) => 
       </div>
 
       <div className="data-panel">
-        <div className="filters" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>Statut véhicule :</span>
+        <div className="filters" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'nowrap', gap: '12px', overflowX: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'nowrap', flexShrink: 0 }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>Statut véhicule :</span>
             <select 
               value={statusFilter} 
               onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ minWidth: '180px', padding: '6px 12px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+              style={{ minWidth: '180px', padding: '6px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#1e293b' }}
             >
               <option value="ALL">Tous les statuts</option>
               <option value="Disponible">Disponible</option>
               <option value="En mission">En mission</option>
               <option value="En maintenance">En maintenance</option>
             </select>
+          </div>
+          <div style={{ fontSize: '12.5px', color: '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <strong>{filtered.length}</strong> véhicule{filtered.length > 1 ? 's' : ''}
           </div>
         </div>
 

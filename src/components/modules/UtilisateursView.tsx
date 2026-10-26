@@ -126,9 +126,9 @@ export const UtilisateursView: React.FC<UtilisateursViewProps> = ({ onOpenModal 
       </div>
 
       <div className="data-panel">
-        <div className="filters" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '18px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#475569' }}>Filtrer par rôle :</span>
+        <div className="filters" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'nowrap', gap: '12px', marginBottom: '18px', overflowX: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>Filtrer par rôle :</span>
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}

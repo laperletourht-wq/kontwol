@@ -40,13 +40,13 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenModal }) => {
       </div>
 
       <div className="data-panel">
-        <div className="filters" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>Type de client :</span>
+        <div className="filters" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'nowrap', gap: '12px', overflowX: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'nowrap', flexShrink: 0 }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>Type de client :</span>
             <select 
               value={typeFilter} 
               onChange={(e) => setTypeFilter(e.target.value)}
-              style={{ minWidth: '180px', padding: '6px 12px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+              style={{ minWidth: '180px', padding: '6px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#1e293b' }}
             >
               <option value="ALL">Tous les types de clients</option>
               <option value="Particulier">Particulier</option>
@@ -55,6 +55,9 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenModal }) => {
               <option value="École">École / Collège</option>
               <option value="Touriste">Touriste / Diaspora</option>
             </select>
+          </div>
+          <div style={{ fontSize: '12.5px', color: '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <strong>{filtered.length}</strong> client{filtered.length > 1 ? 's' : ''}
           </div>
         </div>
 
