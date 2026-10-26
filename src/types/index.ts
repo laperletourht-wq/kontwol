@@ -21,6 +21,8 @@ export interface UserProfile {
   phone?: string;
   role: UserRole;
   roles?: UserRole[];
+  allowedModules?: string[]; // Modules/zones d'accès spécifiquement accordés par l'Admin
+  permissions?: Record<string, boolean>;
   status?: 'actif' | 'inactif';
   statutCompte?: string;
   statutClient?: string;
@@ -30,11 +32,37 @@ export interface UserProfile {
   societe?: string;
   numeroFiscal?: string;
   profileComplete?: boolean;
-  permissions?: Record<string, boolean>;
   createdAt?: string;
   updatedAt?: string;
   lastLogin?: string;
 }
+
+export interface SystemZoneDefinition {
+  key: string;
+  label: string;
+  icon: string;
+  category: 'Vue Globale' | 'Transport & Flotte' | 'Scolaire' | 'Facturation & Trésorerie' | 'Administration';
+  description: string;
+  adminOnly?: boolean;
+}
+
+export const ALL_SYSTEM_ZONES: SystemZoneDefinition[] = [
+  { key: 'dashboard', label: 'Tableau de Bord', icon: '📊', category: 'Vue Globale', description: 'Vue générale, indicateurs clés et activités en direct' },
+  { key: 'plannings', label: 'Planning & Dispatch', icon: '📅', category: 'Vue Globale', description: 'Calendrier des trajets, courses assignées et dispatch chauffeurs' },
+  { key: 'reservations', label: 'Réservations & Courses', icon: '🚗', category: 'Transport & Flotte', description: 'Prise en charge de passagers, courses privées et transferts VIP' },
+  { key: 'vehicules', label: 'Flotte Véhicules', icon: '🚘', category: 'Transport & Flotte', description: 'Suivi du parc automobile, statut de disponibilité et assignations' },
+  { key: 'chauffeurs', label: 'Chauffeurs & Personnel', icon: '👔', category: 'Transport & Flotte', description: 'Gestion des chauffeurs assermentés, permis et contacts directs' },
+  { key: 'eleves', label: 'Élèves & Ramassage', icon: '🎒', category: 'Scolaire', description: 'Inscriptions scolaires, écoles partenaires et arrêts de navette' },
+  { key: 'abonnements', label: 'Abonnements Scolaires', icon: '🎫', category: 'Scolaire', description: 'Contrats de transport mensuels et forfaits récurrents' },
+  { key: 'proformas', label: 'Devis Proforma', icon: '📄', category: 'Facturation & Trésorerie', description: 'Émissions d\'estimations et propositions commerciales' },
+  { key: 'factures', label: 'Factures & Règlements', icon: '💳', category: 'Facturation & Trésorerie', description: 'Facturation officielle DGI, suivi des soldes et preuves de paiement' },
+  { key: 'paiements', label: 'Trésorerie & Encaissements', icon: '💰', category: 'Facturation & Trésorerie', description: 'MonCash, virements bancaires, chèques et dépenses de service' },
+  { key: 'finances', label: 'Comptabilité & Rentabilité', icon: '📈', category: 'Facturation & Trésorerie', description: 'Rapports de recettes, marges et bilans financiers' },
+  { key: 'clients', label: 'Répertoire Clients', icon: '👥', category: 'Administration', description: 'Comptes clients, entreprises, délégations et historique' },
+  { key: 'utilisateurs', label: 'Gestion Utilisateurs (RBAC)', icon: '🔐', category: 'Administration', description: 'Attribution des rôles et contrôle strict des accès aux zones', adminOnly: true },
+  { key: 'vitrine', label: 'Vitrine Publique CMS', icon: '🌐', category: 'Administration', description: 'Personnalisation des offres et textes du site public' },
+  { key: 'parametres', label: 'Paramètres Société', icon: '⚙️', category: 'Administration', description: 'Taux de change USD/HTG, TVA et coordonnées de l\'entreprise', adminOnly: true },
+];
 
 export interface Reservation {
   id: string;

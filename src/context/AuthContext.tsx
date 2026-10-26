@@ -38,11 +38,12 @@ interface AuthContextType {
   updateUserProfile: (data: Partial<UserProfile>) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  updateUserRoleAndZones: (targetUserId: string, newRole: UserRole, allowedModules: string[], status?: 'actif' | 'inactif') => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
+export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   admin: [
     'dashboard', 'reservations', 'proformas', 'factures', 'clients', 
     'eleves', 'abonnements', 'vehicules', 'chauffeurs', 'plannings', 
@@ -97,6 +98,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const assignedRoles: UserRole[] = isSuper 
           ? ['admin'] 
           : (Array.isArray(data.roles) && data.roles.length ? data.roles : [assignedRole]);
+        const assignedAllowedModules = Array.isArray(data.allowedModules) && data.allowedModules.length > 0
+          ? data.allowedModules
+          : (ROLE_PERMISSIONS[assignedRole] || []);
 
         const fullProfile: UserProfile = {
           ...data,
@@ -106,6 +110,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           name: data.nom || data.name || firebaseUser.displayName || 'Utilisateur',
           role: assignedRole,
           roles: assignedRoles,
+          allowedModules: assignedAllowedModules,
           status: data.status || 'actif'
         };
         setProfile(fullProfile);
@@ -179,6 +184,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const canAccess = (moduleKey: string): boolean => {
     if (isSuperAdmin || role === 'admin') return true;
+    // 1. Zones personnalisées attribuées spécifiquement par l'Administrateur
+    if (profile?.allowedModules && Array.isArray(profile.allowedModules) && profile.allowedModules.length > 0) {
+      return profile.allowedModules.includes(moduleKey);
+    }
+    // 2. Dictionnaire fin de permissions
+    if (profile?.permissions && profile.permissions[moduleKey] !== undefined) {
+      return Boolean(profile.permissions[moduleKey]);
+    }
+    // 3. Fallback basé sur les rôles par défaut
     for (const r of roles) {
       const allowed = ROLE_PERMISSIONS[r] || [];
       if (allowed.includes(moduleKey)) return true;
@@ -321,6 +335,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const updateUserRoleAndZones = async (
+    targetUserId: string,
+    newRole: UserRole,
+    allowedModules: string[],
+    status: 'actif' | 'inactif' = 'actif'
+  ) => {
+    if (role !== 'admin' && !isSuperAdmin) {
+      throw new Error("Seul l'administrateur peut modifier le rôle d'une personne et lui attribuer l'accès aux zones.");
+    }
+    const userRef = doc(db, 'utilisateurs', targetUserId);
+    const updatePayload = {
+      role: newRole,
+      roles: [newRole],
+      allowedModules,
+      status,
+      updatedAt: new Date().toISOString(),
+      updatedBy: user?.email || 'admin'
+    };
+    await setDoc(userRef, updatePayload, { merge: true });
+    if (user?.uid === targetUserId) {
+      setProfile((prev) => (prev ? { ...prev, ...updatePayload } : null));
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -337,7 +375,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         registerWithEmail,
         updateUserProfile,
         logout,
-        refreshProfile
+        refreshProfile,
+        updateUserRoleAndZones
       }}
     >
       {children}

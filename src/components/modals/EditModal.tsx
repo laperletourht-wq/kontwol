@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth, ROLE_PERMISSIONS } from '../../context/AuthContext';
 import { UserRole } from '../../types';
 
 interface EditModalProps {
@@ -10,7 +10,7 @@ interface EditModalProps {
 }
 
 export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => {
-  const { user, profile, role } = useAuth();
+  const { user, profile, role, isSuperAdmin, updateUserRoleAndZones } = useAuth();
   const isClientUser = role === 'client' || role === 'prospect';
 
   const { 
@@ -182,9 +182,18 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
             statut: formData.statut || 'Validé'
           });
           break;
-        case 'utilisateur':
-          showToast(`Droits de ${formData.nom || formData.email} mis à jour`, 'success');
+        case 'utilisateur': {
+          if (role !== 'admin' && !isSuperAdmin) {
+            showToast("Seul l'administrateur peut créer ou modifier des comptes utilisateurs.", 'error');
+            return;
+          }
+          const targetId = formData.id || formData.uid || `usr-${Date.now().toString().slice(-6)}`;
+          const userRole = (formData.role as UserRole) || 'client';
+          const allowedModules = formData.allowedModules || (ROLE_PERMISSIONS[userRole] || ['dashboard']);
+          await updateUserRoleAndZones(targetId, userRole, allowedModules, formData.status || 'actif');
+          showToast(`Compte de ${formData.nom || formData.email} enregistré avec succès`, 'success');
           break;
+        }
         default:
           break;
       }
@@ -1303,6 +1312,72 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
                   placeholder="Règlement course / abonnement"
                   required
                 />
+              </div>
+            </div>
+          )}
+
+          {/* UTILISATEUR FORM */}
+          {type === 'utilisateur' && (
+            <div className="form-grid">
+              <div className="field">
+                <label>Nom Complet :</label>
+                <input
+                  type="text"
+                  value={formData.nom || formData.name || ''}
+                  onChange={(e) => handleChange('nom', e.target.value)}
+                  placeholder="Ex: Jean-Marc Delacroix"
+                  required
+                />
+              </div>
+
+              <div className="field">
+                <label>Adresse E-mail :</label>
+                <input
+                  type="email"
+                  value={formData.email || ''}
+                  onChange={(e) => handleChange('email', e.target.value)}
+                  placeholder="collaborateur@laperletour.ht"
+                  required
+                />
+              </div>
+
+              <div className="field">
+                <label>Numéro de Téléphone :</label>
+                <input
+                  type="tel"
+                  value={formData.telephone || formData.phone || ''}
+                  onChange={(e) => handleChange('telephone', e.target.value)}
+                  placeholder="+509 3723 3816"
+                />
+              </div>
+
+              <div className="field">
+                <label>Rôle Attribué (Géré par l'Administrateur) :</label>
+                <select
+                  value={formData.role || 'client'}
+                  onChange={(e) => handleChange('role', e.target.value)}
+                >
+                  <option value="admin">Administrateur (Accès Total)</option>
+                  <option value="direction">Direction Générale</option>
+                  <option value="comptabilite">Comptabilité & Finances</option>
+                  <option value="secretaire">Secrétariat & Accueil</option>
+                  <option value="operations">Opérations & Régulation</option>
+                  <option value="chauffeur">Chauffeur VIP</option>
+                  <option value="client">Client VIP Portefeuille</option>
+                  <option value="prospect">Prospect</option>
+                  <option value="lecture_seule">Consultation / Lecture Seule</option>
+                </select>
+              </div>
+
+              <div className="field">
+                <label>Statut du Compte :</label>
+                <select
+                  value={formData.status || 'actif'}
+                  onChange={(e) => handleChange('status', e.target.value)}
+                >
+                  <option value="actif">Actif (Autorisé)</option>
+                  <option value="inactif">Désactivé (Bloqué)</option>
+                </select>
               </div>
             </div>
           )}

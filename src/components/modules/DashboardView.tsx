@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { DualPrice } from '../common/DualPrice';
 import { DocRefBadge } from '../common/DocRefBadge';
+import { DashboardUniversalSearchBar } from '../common/DashboardUniversalSearchBar';
 
 interface DashboardViewProps {
   onOpenModal: (type: string, data?: any) => void;
@@ -118,6 +119,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenModal }) => 
               </button>
             </div>
           </div>
+
+          {/* Universal Search Bar */}
+          <DashboardUniversalSearchBar />
         </div>
 
         {/* Quick Document Request Banner from Support */}
@@ -626,6 +630,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenModal }) => 
             </button>
           </div>
         </div>
+
+        {/* Universal Search Bar */}
+        <DashboardUniversalSearchBar />
       </div>
 
       {/* 2. 8 KPI Cards in a 4-column x 2-row grid */}

@@ -378,7 +378,8 @@ service cloud.firestore {
             "secretaire", "operations", "chauffeur", 
             "client", "lecture_seule", "prospect"
           ])
-        ));
+        )) &&
+        (!('allowedModules' in data) || (data.allowedModules is list && data.allowedModules.size() <= 25));
     }
 
     function isValidNotification(data) {
@@ -628,6 +629,7 @@ service cloud.firestore {
           (!('role' in existing()) || incoming().role == existing().role) &&
           (!('roles' in existing()) || incoming().roles == existing().roles) &&
           (!('permissions' in existing()) || incoming().permissions == existing().permissions) &&
+          (!('allowedModules' in existing()) || incoming().allowedModules == existing().allowedModules) &&
           (!('statutClient' in existing()) || incoming().statutClient == existing().statutClient) &&
           (!('status' in existing()) || incoming().status == existing().status) &&
           (!('statutCompte' in existing()) || incoming().statutCompte == existing().statutCompte) &&
