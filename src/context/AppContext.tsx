@@ -547,6 +547,16 @@ interface AppContextType {
   convertReservationToPlanning: (res: Reservation) => Promise<void>;
   convertFactureToPaiement: (facture: Facture, modePaiement?: string, reference?: string) => Promise<void>;
   generateEleveAbonnementEtFacture: (eleve: Eleve) => Promise<void>;
+  assignDriverAndDispatch: (
+    reservationId: string, 
+    chauffeurId: string, 
+    chauffeurNom: string, 
+    vehiculeId: string, 
+    vehiculeNom: string, 
+    chauffeurTel?: string, 
+    notes?: string
+  ) => Promise<string>;
+  completeReservationByDriver: (reservationId: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -1366,6 +1376,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await saveFacture(newFacture);
     await saveProforma({ ...proforma, status: 'Convertie en facture' });
 
+    // Link back to original reservation if found
+    const linkedRes = rawReservations.find(r => r.devisRef === proforma.number || r.id === proforma.id);
+    if (linkedRes) {
+      await saveReservation({
+        ...linkedRes,
+        factureRef: factureNumber,
+        status: 'Facturé',
+        updatedAt: new Date().toISOString()
+      });
+    }
+
     // Notify the client that their invoice is ready!
     if (proforma.clientId || proforma.clientEmail) {
       await addNotification({
@@ -1417,10 +1438,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     await saveProforma(newProforma);
 
-    // Update reservation with devisRef
+    // Update reservation with devisRef and status Devis émis
     await saveReservation({
       ...res,
-      devisRef: number
+      devisRef: number,
+      status: 'Devis émis',
+      updatedAt: new Date().toISOString()
     });
 
     // Notify the client that their proforma has been prepared!
@@ -1523,7 +1546,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentModule('factures');
   };
 
-  // Passerelle 4 : Facture ➔ Enregistrement Instantané de Paiement Caisse
+  // Passerelle 4 : Facture ➔ Enregistrement Instantané de Paiement Caisse & Validation
   const convertFactureToPaiement = async (
     facture: Facture,
     modePaiement: string = 'Espèces Caisse',
@@ -1560,8 +1583,167 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updatedAt: new Date().toISOString()
     });
 
-    showToast(`Paiement de $${montantPaye} ${facture.currency || 'USD'} encaissé avec succès pour la facture ${facture.number} !`, 'success');
+    // Mettre à jour la réservation associée si existante
+    const linkedRes = rawReservations.find(
+      r => r.factureRef === facture.number || r.devisRef === facture.proformaNumber || (facture.reservationId && r.id === facture.reservationId)
+    );
+    if (linkedRes) {
+      await saveReservation({
+        ...linkedRes,
+        status: 'Confirmée',
+        paiementRef: refPaiement,
+        updatedAt: new Date().toISOString()
+      });
+
+      // Notification à l'équipe régulation pour assigner le chauffeur
+      await addNotification({
+        title: '✅ Course Payée · Prête pour assignation',
+        message: `La facture ${facture.number} pour ${facture.client} a été payée ($${montantPaye} ${facture.currency || 'USD'}). Vous pouvez assigner le chauffeur et le véhicule.`,
+        type: 'success',
+        link: 'reservations',
+        targetId: linkedRes.id,
+        targetAudience: 'all'
+      });
+    }
+
+    showToast(`Paiement de $${montantPaye} ${facture.currency || 'USD'} validé avec succès pour la facture ${facture.number} !`, 'success');
     setCurrentModule('paiements');
+  };
+
+  // Passerelle 5 : Assignation Manuelle Chauffeur & Véhicule avec Ordre de Mission
+  const assignDriverAndDispatch = async (
+    reservationId: string,
+    chauffeurId: string,
+    chauffeurNom: string,
+    vehiculeId: string,
+    vehiculeNom: string,
+    chauffeurTel?: string,
+    notes?: string
+  ): Promise<string> => {
+    const targetRes = rawReservations.find(r => r.id === reservationId);
+    if (!targetRes) throw new Error('Réservation introuvable');
+
+    const updatedRes: Reservation = {
+      ...targetRes,
+      driver: chauffeurNom,
+      chauffeur: chauffeurNom,
+      driverId: chauffeurId,
+      vehicle: vehiculeNom,
+      vehicule: vehiculeNom,
+      vehicleId: vehiculeId,
+      chauffeurTelephone: chauffeurTel,
+      status: 'En cours',
+      notes: notes ? `${targetRes.notes ? targetRes.notes + ' | ' : ''}Dispatch : ${notes}` : targetRes.notes,
+      updatedAt: new Date().toISOString()
+    };
+    await saveReservation(updatedRes);
+
+    // Mettre à jour le véhicule sélectionné
+    const targetVeh = rawVehicules.find(v => v.id === vehiculeId || v.plaque === vehiculeId);
+    if (targetVeh) {
+      await saveVehicule({
+        ...targetVeh,
+        statut: 'En mission',
+        chauffeurAttitre: chauffeurNom,
+        updatedAt: new Date().toISOString()
+      });
+    }
+
+    // Créer ou actualiser le planning dispatch
+    const planningId = `PLN-${Date.now().toString().slice(-6)}`;
+    const newPlanning: Planning = {
+      id: planningId,
+      date: targetRes.date || new Date().toISOString().slice(0, 10),
+      heure: targetRes.time || '08:30',
+      client: targetRes.client,
+      clientId: targetRes.clientId,
+      service: targetRes.service || 'Course VIP',
+      depart: targetRes.origin || 'Port-au-Prince',
+      destination: targetRes.destination || 'Destination VIP',
+      passagers: targetRes.passengers || 1,
+      chauffeur: chauffeurNom,
+      vehicule: vehiculeNom,
+      statut: 'En mission',
+      notes: `Ordre de mission pour ${targetRes.id} ${notes ? `- ${notes}` : ''}`
+    };
+    await savePlanning(newPlanning);
+
+    // Notification interne dans l'application au chauffeur
+    await addNotification({
+      title: '🚗 Nouvelle mission assignée !',
+      message: `Course assignée pour ${targetRes.client} le ${targetRes.date} à ${targetRes.time || '08:00'}. Trajet : ${targetRes.origin || 'Départ'} ➔ ${targetRes.destination || 'Destination'}.`,
+      type: 'info',
+      link: 'plannings',
+      targetId: planningId,
+      targetAudience: 'all'
+    });
+
+    // Génération du message WhatsApp pré-formaté pour le chauffeur
+    const telClean = (chauffeurTel || '').replace(/\D/g, '');
+    const msgText = encodeURIComponent(
+      `*ORDRE DE MISSION · LAPERLE TOUR HT*\n` +
+      `Bonjour ${chauffeurNom},\n\n` +
+      `Une course officielle vous a été assignée :\n` +
+      `• *Réf Course* : ${targetRes.id}\n` +
+      `• *Client* : ${targetRes.client} (${targetRes.telephone || 'Non renseigné'})\n` +
+      `• *Date & Heure* : ${targetRes.date} à ${targetRes.time || '08:00'}\n` +
+      `• *Prise en charge* : ${targetRes.origin || 'Port-au-Prince'}\n` +
+      `• *Destination* : ${targetRes.destination || 'Destination'}\n` +
+      `• *Passagers* : ${targetRes.passengers || 1}\n` +
+      `• *Véhicule* : ${vehiculeNom}\n` +
+      `${notes ? `• *Consignes* : ${notes}\n` : ''}\n` +
+      `Merci de confirmer la prise en charge.`
+    );
+    const waUrl = telClean ? `https://wa.me/${telClean}?text=${msgText}` : `https://wa.me/50944408687?text=${msgText}`;
+
+    showToast(`Chauffeur ${chauffeurNom} et ${vehiculeNom} assignés avec succès !`, 'success');
+    return waUrl;
+  };
+
+  // Passerelle 6 : Clôture en 1 clic de la course par le Chauffeur
+  const completeReservationByDriver = async (reservationId: string) => {
+    const targetRes = rawReservations.find(r => r.id === reservationId);
+    if (!targetRes) throw new Error('Réservation introuvable');
+
+    const updatedRes: Reservation = {
+      ...targetRes,
+      status: 'Terminée',
+      updatedAt: new Date().toISOString()
+    };
+    await saveReservation(updatedRes);
+
+    // Libérer le véhicule
+    if (targetRes.vehicleId || targetRes.vehicle) {
+      const veh = rawVehicules.find(v => v.id === targetRes.vehicleId || v.modele === targetRes.vehicle || v.plaque === targetRes.vehicle);
+      if (veh) {
+        await saveVehicule({
+          ...veh,
+          statut: 'Disponible',
+          updatedAt: new Date().toISOString()
+        });
+      }
+    }
+
+    // Clôturer le planning si existant
+    const pln = rawPlannings.find(p => p.client === targetRes.client && (p.statut === 'Programmé' || p.statut === 'En mission' || p.statut === 'En cours'));
+    if (pln) {
+      await savePlanning({
+        ...pln,
+        statut: 'Terminé'
+      });
+    }
+
+    // Notification générale pour secrétaire, admin & direction
+    await addNotification({
+      title: '🏁 Course terminée avec succès',
+      message: `Le chauffeur ${targetRes.driver || targetRes.chauffeur || 'partenaire'} a signalé la fin de la course N° ${targetRes.id} pour ${targetRes.client}. Dossier complet et archivé !`,
+      type: 'success',
+      link: 'reservations',
+      targetId: targetRes.id,
+      targetAudience: 'all'
+    });
+
+    showToast(`Course ${targetRes.id} terminée avec succès ! La régulation et la direction ont été notifiées.`, 'success');
   };
 
   return (
@@ -1637,7 +1819,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         convertReservationToProforma,
         convertReservationToPlanning,
         convertFactureToPaiement,
-        generateEleveAbonnementEtFacture
+        generateEleveAbonnementEtFacture,
+        assignDriverAndDispatch,
+        completeReservationByDriver
       }}
     >
       {children}

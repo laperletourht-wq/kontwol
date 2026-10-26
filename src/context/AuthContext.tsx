@@ -17,6 +17,7 @@ export const SUPER_ADMIN_EMAILS = [
   'castimamoise@gmail.com', 
   'laperletourht@gmail.com'
 ];
+export const INITIAL_ADMIN_PASSWORD = 'Admin2026';
 
 export function isSuperAdminEmail(email?: string | null): boolean {
   if (!email) return false;
@@ -139,8 +140,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn('Could not write initial profile to Firestore (using memory profile):', writeErr);
       }
       setProfile(newProfile);
-    } catch (err) {
-      console.error('Error fetching user profile:', err);
+    } catch (err: any) {
+      console.warn('Notice fetching user profile (using memory fallback):', err?.message || err);
       // Fallback
       const isSuper = isSuperAdminEmail(firebaseUser.email);
       setProfile({
@@ -208,10 +209,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginWithEmail = async (email: string, pass: string) => {
-    const { signInWithEmailAndPassword } = await import('firebase/auth');
-    const cred = await signInWithEmailAndPassword(auth, email, pass);
-    if (cred.user) {
-      await fetchProfile(cred.user);
+    const cleanEmail = email.trim().toLowerCase();
+    const { signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import('firebase/auth');
+    try {
+      const cred = await signInWithEmailAndPassword(auth, cleanEmail, pass);
+      if (cred.user) {
+        await fetchProfile(cred.user);
+      }
+    } catch (err: any) {
+      const errCode = String(err?.code || '');
+      // If super admin attempts initial login with the configured default initial password and account doesn't exist yet, auto-provision
+      if (
+        (errCode === 'auth/invalid-credential' || errCode === 'auth/user-not-found') &&
+        isSuperAdminEmail(cleanEmail) &&
+        pass === INITIAL_ADMIN_PASSWORD
+      ) {
+        try {
+          const newCred = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
+          if (newCred.user) {
+            await fetchProfile(newCred.user);
+            return;
+          }
+        } catch (createErr) {
+          // If creation fails, proceed to throw original err
+        }
+      }
+      throw err;
     }
   };
 

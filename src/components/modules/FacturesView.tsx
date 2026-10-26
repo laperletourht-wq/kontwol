@@ -65,23 +65,127 @@ export const FacturesView: React.FC<FacturesViewProps> = ({ onOpenModal }) => {
     window.open(`https://wa.me/${officialWhatsApp.replace(/\D/g, '')}?text=${text}`, '_blank');
   };
 
+  const totalInvoices = factures.length;
+  const paidInvoices = factures.filter((f) => f.status === 'Payée').length;
+  const pendingInvoices = factures.filter((f) => f.status === 'En attente' || f.status === 'Partiellement payée' || !f.status).length;
+  const lateInvoices = factures.filter((f) => f.status === 'En retard').length;
+  const pendingAmountUSD = factures
+    .filter((f) => f.status !== 'Payée')
+    .reduce((sum, f) => sum + (f.totalTTC || f.amount || 0), 0);
+  const exchangeRate = settings?.tauxChangeUSD_HTG || 132;
+  const pendingAmountHTG = Math.round(pendingAmountUSD * exchangeRate);
+  const recoveryRate = totalInvoices > 0 ? Math.round((paidInvoices / totalInvoices) * 100) : 100;
+
   return (
-    <div>
-      <div className="section-head">
-        <div>
-          <h2>{isClient ? 'Mes Factures & Règlements' : 'Factures Officielles & Recouvrement'}</h2>
-          <p>
-            {isClient
-              ? 'Consultez vos factures en règle, réglez par MonCash, virement ou chèque avec preuve photographique.'
-              : 'Gestion comptable, encaissements et suivi des bordereaux de règlement conformes DGI.'}
-          </p>
+    <div className="dashboard-container-exact">
+      {/* 1. Hero Card matching exact design */}
+      <div className="dashboard-hero-card">
+        <div className="hero-kicker-row">
+          <span className="kicker-sparkle">✨</span>
+          <span className="kicker-text">COMPTABILITÉ & FACTURATION CONFORME · LAPERLE TOUR HT</span>
         </div>
-        <div className="actions">
-          {!isClient && !isChauffeur && (
-            <button type="button" className="primary" onClick={() => onOpenModal('facture')}>
-              + Nouvelle Facture
-            </button>
-          )}
+
+        <div className="hero-content-row">
+          <div className="hero-text-block">
+            <h1 className="hero-title">
+              {isClient ? 'Mes Factures & Règlements' : 'Factures Officielles & Recouvrement'}
+            </h1>
+            <p className="hero-subtitle">
+              {isClient
+                ? 'Consultez vos factures en règle, réglez en toute sécurité par MonCash, virement ou chèque avec transmission de bordereau.'
+                : 'Gestion comptable, encaissements certifiés DGI, suivi des bordereaux et téléversement des preuves de règlement.'}
+            </p>
+          </div>
+
+          <div className="hero-actions-block">
+            {!isClient && !isChauffeur && (
+              <button 
+                type="button" 
+                className="btn-hero-primary" 
+                onClick={() => onOpenModal('facture')}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <span>Nouvelle Facture</span>
+              </button>
+            )}
+
+            <a
+              href={`https://wa.me/${officialWhatsApp.replace(/\D/g, '')}?text=${encodeURIComponent('Bonjour Service Comptabilité Laperle Tour, je vous contacte concernant mes factures et règlements.')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-hero-secondary"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+              </svg>
+              <span>Comptabilité WhatsApp</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. 4-Card KPI Grid */}
+      <div className="dashboard-kpi-grid">
+        {/* KPI 1: Total Factures */}
+        <div className="kpi-card-exact" onClick={() => setStatusFilter('ALL')} title="Afficher toutes les factures">
+          <div className="kpi-icon-box blue">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+              <polyline points="10 9 9 9 8 9"/>
+            </svg>
+          </div>
+          <div className="kpi-header-label">FACTURES ÉMISES</div>
+          <div className="kpi-main-number">{totalInvoices}</div>
+          <div className="kpi-sub-text green">↗ {filtered.length} affichée(s)</div>
+        </div>
+
+        {/* KPI 2: Factures Payées */}
+        <div className="kpi-card-exact" onClick={() => setStatusFilter('Payée')} title="Filtrer les factures payées">
+          <div className="kpi-icon-box green">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              <polyline points="9 12 11 14 15 10"/>
+            </svg>
+          </div>
+          <div className="kpi-header-label">FACTURES RÉGLÉES</div>
+          <div className="kpi-main-number" style={{ color: '#16a34a' }}>{paidInvoices}</div>
+          <div className="kpi-sub-text green">{recoveryRate}% taux de recouvrement</div>
+        </div>
+
+        {/* KPI 3: Factures en attente */}
+        <div className="kpi-card-exact" onClick={() => setStatusFilter('En attente')} title="Filtrer les factures en attente">
+          <div className="kpi-icon-box amber">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+          <div className="kpi-header-label">EN ATTENTE DE RÈGLEMENT</div>
+          <div className="kpi-main-number" style={{ color: lateInvoices > 0 ? '#dc2626' : '#d97706' }}>
+            {pendingInvoices}
+          </div>
+          <div className="kpi-sub-text" style={{ color: lateInvoices > 0 ? '#dc2626' : undefined }}>
+            {lateInvoices > 0 ? `${lateInvoices} en retard de paiement` : 'Échéance à jour'}
+          </div>
+        </div>
+
+        {/* KPI 4: Solde à recouvrer */}
+        <div className="kpi-card-exact" title="Montant total à recouvrer">
+          <div className="kpi-icon-box red">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="4" width="20" height="16" rx="2"/>
+              <line x1="2" y1="10" x2="22" y2="10"/>
+            </svg>
+          </div>
+          <div className="kpi-header-label">SOLDE RESTANT DÛ</div>
+          <div className="kpi-main-number red" style={{ fontSize: '22px' }}>${pendingAmountUSD.toLocaleString()} USD</div>
+          <div className="kpi-sub-text">≈ {pendingAmountHTG.toLocaleString()} HTG</div>
         </div>
       </div>
 
@@ -239,10 +343,11 @@ export const FacturesView: React.FC<FacturesViewProps> = ({ onOpenModal }) => {
                             <button
                               type="button"
                               className="btn-card-action success-subtle"
+                              style={{ background: '#dcfce7', borderColor: '#86efac', color: '#166534', fontWeight: 700 }}
                               onClick={() => convertFactureToPaiement(f)}
-                              title="Valider l'encaissement"
+                              title="Valider l'encaissement et débloquer l'assignation chauffeur"
                             >
-                              ⚡ Encaisser Direct
+                              ✅ Valider Paiement & Facture
                             </button>
                             <button
                               type="button"
@@ -253,9 +358,19 @@ export const FacturesView: React.FC<FacturesViewProps> = ({ onOpenModal }) => {
                             </button>
                           </>
                         ) : (
-                          <span style={{ fontSize: '12px', color: '#16a34a', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                            ✓ Facture Soldée
-                          </span>
+                          <>
+                            <span style={{ fontSize: '12px', color: '#16a34a', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              ✓ Facture Validée & Payée
+                            </span>
+                            <button
+                              type="button"
+                              className="btn-card-action primary-subtle"
+                              onClick={() => setCurrentModule('reservations')}
+                              title="Consulter les réservations et assigner le chauffeur"
+                            >
+                              🚗 Assigner Chauffeur
+                            </button>
+                          </>
                         )}
                         <button
                           type="button"

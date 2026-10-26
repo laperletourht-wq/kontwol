@@ -164,19 +164,22 @@ function timestampMillis(value) {
 // =========================================================================
 
 // 1. HTTP Security Headers with Helmet (Tailored for AI Studio Iframe & Firebase)
-app.use(helmet({
-  frameguard: false, // DO NOT emit X-Frame-Options so AI Studio iframe connects smoothly
-  crossOriginOpenerPolicy: false, // Allow Google Auth popups and external links
-  crossOriginEmbedderPolicy: false,
-  crossOriginResourcePolicy: { policy: "cross-origin" },
-  contentSecurityPolicy: false // Allow scripts, styles, images and iframe embedding without restriction
-}));
+app.use((req, res, next) => {
+  if (req.url && req.url.includes('__aistudio')) return next();
+  return helmet({
+    frameguard: false, // DO NOT emit X-Frame-Options so AI Studio iframe connects smoothly
+    crossOriginOpenerPolicy: false, // Allow Google Auth popups and external links
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    contentSecurityPolicy: false // Allow scripts, styles, images and iframe embedding without restriction
+  })(req, res, next);
+});
 
 // 2. High-performance Compression (Gzip / Brotli)
 app.use(compression({
   threshold: 1024,
   filter: (req, res) => {
-    if (req.headers['x-no-compression']) return false;
+    if (req.headers['x-no-compression'] || (req.url && req.url.includes('__aistudio'))) return false;
     return compression.filter(req, res);
   }
 }));
@@ -193,6 +196,7 @@ const generalLimiter = rateLimit({
   max: 10000,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => Boolean(req.url && req.url.includes('__aistudio')),
   validate: { xForwardedForHeader: false },
   message: { error: 'Trop de requêtes depuis cette adresse IP. Veuillez patienter un instant.' }
 });
@@ -202,6 +206,7 @@ const authLimiter = rateLimit({
   max: 500,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => Boolean(req.url && req.url.includes('__aistudio')),
   validate: { xForwardedForHeader: false },
   message: { error: 'Trop de tentatives de connexion/inscription. Veuillez réessayer dans quelques minutes.' }
 });

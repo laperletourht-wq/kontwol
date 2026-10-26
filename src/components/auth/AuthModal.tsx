@@ -31,11 +31,11 @@ export const AuthModal: React.FC = () => {
     if (code.includes('popup-blocked') || message.includes('popup-blocked')) {
       return 'La fenêtre pop-up a été bloquée par votre navigateur. Veuillez autoriser les fenêtres pop-up pour cette page.';
     }
-    if (code.includes('wrong-password') || code.includes('user-not-found') || code.includes('invalid-credential')) {
-      return 'Adresse e-mail ou mot de passe incorrect.';
+    if (code.includes('wrong-password') || code.includes('user-not-found') || code.includes('invalid-credential') || message.includes('auth/invalid-credential')) {
+      return 'Adresse e-mail ou mot de passe incorrect. Si vous n\'avez pas encore créé de compte, cliquez sur « S\'inscrire » ci-dessous.';
     }
     if (code.includes('email-already-in-use')) {
-      return 'Cette adresse e-mail est déjà associée à un compte.';
+      return 'Cette adresse e-mail est déjà associée à un compte. Veuillez vous connecter ou utiliser « Mot de passe oublié ».';
     }
     if (code.includes('weak-password')) {
       return 'Le mot de passe doit comporter au moins 6 caractères.';
@@ -52,7 +52,7 @@ export const AuthModal: React.FC = () => {
       setAuthModalOpen(false);
       setIsPublicLanding(false);
     } catch (err: any) {
-      console.error('[Google Auth Error]:', err);
+      console.warn('[Google Auth Notice]:', err?.code || err?.message || err);
       setErrorMessage(getAuthErrorMessage(err));
     } finally {
       setLoading(false);
@@ -73,7 +73,7 @@ export const AuthModal: React.FC = () => {
       setAuthModalOpen(false);
       setIsPublicLanding(false);
     } catch (err: any) {
-      console.error(err);
+      console.warn('[Auth Login Notice]:', err?.code || err?.message || err);
       setErrorMessage(getAuthErrorMessage(err));
     } finally {
       setLoading(false);
@@ -125,14 +125,32 @@ export const AuthModal: React.FC = () => {
     }
   };
 
-  const handleForgotPassword = (e: React.FormEvent) => {
+  const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
       setErrorMessage('Veuillez saisir votre adresse e-mail.');
       return;
     }
-    showToast(`Un lien de réinitialisation sécurisé a été transmis à ${email}`, 'success');
-    setAuthView('login');
+    setLoading(true);
+    setErrorMessage('');
+    try {
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase() })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Impossible d\'envoyer l\'e-mail de réinitialisation.');
+      }
+      showToast(data.message || `Un lien de réinitialisation sécurisé a été transmis à ${email}`, 'success');
+      setAuthView('login');
+    } catch (err: any) {
+      console.warn('[Password Reset Notice]:', err?.message);
+      setErrorMessage(err?.message || 'Erreur lors de la demande de réinitialisation.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

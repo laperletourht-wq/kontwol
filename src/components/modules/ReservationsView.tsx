@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { DualPrice } from '../common/DualPrice';
 import { DocRefBadge } from '../common/DocRefBadge';
 import { RowActionMenu, type ActionMenuItem } from '../common/RowActionMenu';
+import { AssignDriverModal } from '../modals/AssignDriverModal';
 
 interface ReservationsViewProps {
   onOpenModal: (type: string, data?: any) => void;
@@ -17,6 +18,7 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
     globalSearchQuery,
     convertReservationToProforma,
     convertReservationToPlanning,
+    completeReservationByDriver,
     settings
   } = useApp();
   const { role } = useAuth();
@@ -26,6 +28,7 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [pendingReqId, setPendingReqId] = useState<string | null>(null);
+  const [assignModalRes, setAssignModalRes] = useState<any | null>(null);
 
   const effectiveSearch = (searchTerm || globalSearchQuery).toLowerCase();
 
@@ -276,22 +279,49 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
                       </>
                     ) : (
                       <>
-                        <button
-                          type="button"
-                          className="btn-card-action primary-subtle"
-                          onClick={() => convertReservationToProforma(r)}
-                          title="Générer automatiquement un devis proforma"
-                        >
-                          📋 Générer Devis
-                        </button>
+                        {!r.devisRef && (
+                          <button
+                            type="button"
+                            className="btn-card-action primary-subtle"
+                            onClick={() => convertReservationToProforma(r)}
+                            title="Chiffrer et transformer en devis proforma officiel"
+                          >
+                            📋 Transformer en Devis
+                          </button>
+                        )}
+                        {r.devisRef && !r.factureRef && (
+                          <button
+                            type="button"
+                            className="btn-card-action primary-subtle"
+                            onClick={() => setCurrentModule('proformas')}
+                            title="Consulter le devis et émettre la facture"
+                          >
+                            🧾 Émettre Facture
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="btn-card-action success-subtle"
-                          onClick={() => convertReservationToPlanning(r)}
-                          title="Envoyer au planning de dispatch"
+                          onClick={() => setAssignModalRes(r)}
+                          title="Assigner manuellement un chauffeur assermenté et un véhicule"
                         >
-                          ⏱️ Envoyer Dispatch
+                          🚗 Assigner Chauffeur & Véhicule
                         </button>
+                        {(r.status === 'En cours' || r.driver) && r.status !== 'Terminée' && (
+                          <button
+                            type="button"
+                            className="btn-card-action"
+                            style={{ background: '#f0fdf4', borderColor: '#86efac', color: '#166534', fontWeight: 700 }}
+                            onClick={() => {
+                              if (window.confirm(`Confirmer la fin de la course ${r.id} pour ${r.client} ?`)) {
+                                completeReservationByDriver(r.id);
+                              }
+                            }}
+                            title="Clôturer immédiatement la course (1 clic)"
+                          >
+                            🏁 Terminer la Course
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="btn-card-action"
@@ -300,6 +330,17 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
                         >
                           ✏️ Modifier
                         </button>
+                        {r.chauffeurTelephone && (
+                          <a
+                            href={`https://wa.me/${r.chauffeurTelephone.replace(/\D/g, '')}?text=${encodeURIComponent(`Bonjour ${r.driver}, concernant la course ${r.id} (${r.service || 'Course VIP'}).`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn-card-action"
+                            style={{ textDecoration: 'none' }}
+                          >
+                            📲 WhatsApp Chauffeur
+                          </a>
+                        )}
                         {r.telephone && (
                           <a
                             href={`https://wa.me/${r.telephone.replace(/\D/g, '')}?text=${encodeURIComponent(`Bonjour ${r.client}, votre réservation Laperle ${r.id} est bien notée.`)}`}
@@ -380,23 +421,45 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
                           variant: 'success'
                         }
                       ] : [
-                        {
-                          label: 'Générer Devis Proforma',
+                        ...(!r.devisRef ? [{
+                          label: 'Transformer en Devis',
                           icon: '📋',
                           onClick: () => convertReservationToProforma(r),
-                          variant: 'primary'
-                        },
+                          variant: 'primary' as const
+                        }] : []),
+                        ...(r.devisRef && !r.factureRef ? [{
+                          label: 'Émettre Facture',
+                          icon: '🧾',
+                          onClick: () => setCurrentModule('proformas'),
+                          variant: 'primary' as const
+                        }] : []),
                         {
-                          label: 'Envoyer au Planning Dispatch',
-                          icon: '⏱️',
-                          onClick: () => convertReservationToPlanning(r),
-                          variant: 'success'
+                          label: 'Assigner Chauffeur & Véhicule',
+                          icon: '🚗',
+                          onClick: () => setAssignModalRes(r),
+                          variant: 'success' as const
                         },
+                        ...((r.status === 'En cours' || r.driver) && r.status !== 'Terminée' ? [{
+                          label: 'Terminer la Course (1 clic)',
+                          icon: '🏁',
+                          onClick: () => {
+                            if (window.confirm(`Confirmer la fin de la course ${r.id} pour ${r.client} ?`)) {
+                              completeReservationByDriver(r.id);
+                            }
+                          },
+                          variant: 'success' as const
+                        }] : []),
                         {
                           label: 'Modifier la réservation',
                           icon: '✏️',
                           onClick: () => onOpenModal('reservation', r)
                         },
+                        ...(r.chauffeurTelephone ? [{
+                          label: 'WhatsApp Chauffeur',
+                          icon: '📲',
+                          href: `https://wa.me/${r.chauffeurTelephone.replace(/\D/g, '')}?text=${encodeURIComponent(`Bonjour ${r.driver}, concernant la course ${r.id}.`)}`,
+                          variant: 'success' as const
+                        }] : []),
                         ...(r.telephone ? [{
                           label: 'Contacter le client WhatsApp',
                           icon: '💬',
@@ -411,7 +474,7 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
                               deleteReservation(r.id);
                             }
                           },
-                          variant: 'danger'
+                          variant: 'danger' as const
                         }
                       ];
 
@@ -495,6 +558,15 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
           </div>
         )}
       </div>
+
+      {/* Modal d'assignation Chauffeur & Véhicule */}
+      {assignModalRes && (
+        <AssignDriverModal
+          reservation={assignModalRes}
+          onClose={() => setAssignModalRes(null)}
+          onSuccess={() => setAssignModalRes(null)}
+        />
+      )}
     </div>
   );
 };

@@ -17,7 +17,9 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenModal }) => 
     convertProformaToFacture, 
     setPrintSheetData, 
     globalSearchQuery, 
-    settings 
+    settings,
+    requestDocumentSend,
+    showToast
   } = useApp();
   const { role } = useAuth();
   const isClient = role === 'client' || role === 'prospect';
@@ -26,6 +28,21 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenModal }) => 
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+
+  const handleClientRequestInvoice = async (p: Proforma) => {
+    try {
+      await requestDocumentSend(
+        'facture',
+        p.number,
+        p.totalTTC || p.amount || 0,
+        'both',
+        `Le client ${p.client} a accepté le devis ${p.number} et demande la facture officielle avec les coordonnées de paiement.`
+      );
+      showToast(`Votre demande de facture officielle pour le devis ${p.number} a été transmise à la comptabilité !`, 'success');
+    } catch {
+      showToast('Demande enregistrée avec succès !', 'success');
+    }
+  };
 
   const effectiveSearch = (searchTerm || globalSearchQuery).toLowerCase();
 
@@ -49,29 +66,119 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenModal }) => 
     }
   };
 
+  const totalCount = proformas.length;
+  const pendingCount = proformas.filter((p) => p.status === 'En attente' || p.status === 'Brouillon' || !p.status).length;
+  const acceptedCount = proformas.filter((p) => p.status === 'Acceptée' || p.status === 'Convertie en facture').length;
+  const totalVolumeUSD = proformas.reduce((sum, p) => sum + (p.totalTTC || p.amount || 0), 0);
+  const exchangeRate = settings?.tauxChangeUSD_HTG || 132;
+  const totalVolumeHTG = Math.round(totalVolumeUSD * exchangeRate);
   const officialWhatsApp = settings?.whatsapp || '+509 4440 8687';
 
   return (
-    <div>
-      <div className="section-head">
-        <div>
-          <h2>{isClient ? 'Mes Devis & Propositions Commerciales' : 'Devis & Proformas Officielles'}</h2>
-          <p>
-            {isClient
-              ? 'Consultez les chiffrages sur mesure préparés par notre équipe commerciale et téléchargez vos devis officiels.'
-              : 'Éditez, chiffrez et convertissez vos propositions commerciales en $ USD et Gourdes HTG.'}
-          </p>
+    <div className="dashboard-container-exact">
+      {/* 1. Hero Card matching exact design */}
+      <div className="dashboard-hero-card">
+        <div className="hero-kicker-row">
+          <span className="kicker-sparkle">✨</span>
+          <span className="kicker-text">GESTION COMMERCIALE · DEVIS & PROFORMAS</span>
         </div>
-        <div className="actions">
-          {!isChauffeur && (
-            <button 
-              type="button" 
-              className="primary" 
-              onClick={() => onOpenModal(isClient ? 'demande-devis' : 'proforma')}
+
+        <div className="hero-content-row">
+          <div className="hero-text-block">
+            <h1 className="hero-title">
+              {isClient ? 'Mes Devis & Propositions Commerciales' : 'Devis & Proformas Officielles'}
+            </h1>
+            <p className="hero-subtitle">
+              {isClient
+                ? 'Consultez les chiffrages sur mesure préparés par notre équipe commerciale et téléchargez vos devis certifiés.'
+                : 'Éditez, chiffrez et convertissez vos propositions commerciales en $ USD et Gourdes HTG avec traçabilité complète.'}
+            </p>
+          </div>
+
+          <div className="hero-actions-block">
+            {!isChauffeur && (
+              <button 
+                type="button" 
+                className="btn-hero-primary" 
+                onClick={() => onOpenModal(isClient ? 'demande-devis' : 'proforma')}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <span>{isClient ? 'Demander un Devis' : 'Nouvelle Proforma'}</span>
+              </button>
+            )}
+
+            <a
+              href={`https://wa.me/${officialWhatsApp.replace(/\D/g, '')}?text=${encodeURIComponent('Bonjour Laperle Tour, je souhaite des informations concernant vos devis et tarifs.')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-hero-secondary"
             >
-              {isClient ? '+ Demander un Devis' : '+ Nouvelle Proforma'}
-            </button>
-          )}
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+              </svg>
+              <span>Support WhatsApp</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. 4-Card KPI Grid */}
+      <div className="dashboard-kpi-grid">
+        {/* KPI 1: Total Devis */}
+        <div className="kpi-card-exact" onClick={() => setStatusFilter('ALL')} title="Afficher tous les devis">
+          <div className="kpi-icon-box blue">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+          </div>
+          <div className="kpi-header-label">TOTAL PROPOSITIONS</div>
+          <div className="kpi-main-number">{totalCount}</div>
+          <div className="kpi-sub-text green">↗ {filtered.length} affichée(s)</div>
+        </div>
+
+        {/* KPI 2: En attente */}
+        <div className="kpi-card-exact" onClick={() => setStatusFilter('En attente')} title="Filtrer les devis en attente">
+          <div className="kpi-icon-box amber">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+          <div className="kpi-header-label">EN ATTENTE DE VALIDATION</div>
+          <div className="kpi-main-number" style={{ color: '#d97706' }}>{pendingCount}</div>
+          <div className="kpi-sub-text">Devis en cours d'évaluation</div>
+        </div>
+
+        {/* KPI 3: Acceptées / Converties */}
+        <div className="kpi-card-exact" onClick={() => setStatusFilter('Acceptée')} title="Filtrer les devis acceptés">
+          <div className="kpi-icon-box green">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+              <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+          </div>
+          <div className="kpi-header-label">DEVIS ACCEPTÉS</div>
+          <div className="kpi-main-number" style={{ color: '#16a34a' }}>{acceptedCount}</div>
+          <div className="kpi-sub-text green">Prêts pour conversion</div>
+        </div>
+
+        {/* KPI 4: Volume Financier */}
+        <div className="kpi-card-exact" title="Volume total des devis">
+          <div className="kpi-icon-box emerald">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="1" x2="12" y2="23"/>
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+          </div>
+          <div className="kpi-header-label">VOLUME CHIFFRÉ TOTAL</div>
+          <div className="kpi-main-number navy" style={{ fontSize: '22px' }}>${totalVolumeUSD.toLocaleString()} USD</div>
+          <div className="kpi-sub-text">≈ {totalVolumeHTG.toLocaleString()} HTG</div>
         </div>
       </div>
 
@@ -182,13 +289,22 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenModal }) => 
                         <button
                           type="button"
                           className="btn-card-action primary-subtle"
+                          style={{ background: '#fef3c7', borderColor: '#fde68a', color: '#92400e', fontWeight: 700 }}
+                          onClick={() => handleClientRequestInvoice(p)}
+                          title="Demander à la comptabilité d'émettre la facture avec coordonnées de paiement MonCash / Virement"
+                        >
+                          🧾 Demander une Facture & Payer
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-card-action"
                           onClick={() => onOpenModal('demande-envoi', { type: 'proforma', doc: p })}
                           title="Demander à l'équipe commerciale de vous réadresser ce devis"
                         >
                           📨 Recevoir par Email / WhatsApp
                         </button>
                         <a
-                          href={`https://wa.me/${officialWhatsApp.replace(/\D/g, '')}?text=${encodeURIComponent(`Bonjour Laperle Tour, je valide le devis proforma N° ${p.number} d'un montant de $${p.totalTTC || p.amount} USD.`)}`}
+                          href={`https://wa.me/${officialWhatsApp.replace(/\D/g, '')}?text=${encodeURIComponent(`Bonjour Laperle Tour, je valide le devis proforma N° ${p.number} ($${p.totalTTC || p.amount} USD) et je souhaite la facture pour effectuer mon règlement.`)}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="btn-card-action success-subtle"
@@ -271,6 +387,12 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenModal }) => 
                           variant: 'primary'
                         },
                         ...(isClient ? [
+                          {
+                            label: 'Demander Facture & Payer',
+                            icon: '🧾',
+                            onClick: () => handleClientRequestInvoice(p),
+                            variant: 'primary' as const
+                          },
                           {
                             label: 'Recevoir par Email / WhatsApp',
                             icon: '📨',

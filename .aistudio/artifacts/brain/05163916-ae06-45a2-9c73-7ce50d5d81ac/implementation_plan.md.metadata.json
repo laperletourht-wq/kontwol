@@ -1,0 +1,6 @@
+{
+  "summary":  "Plan directeur du cycle de vie unifié des courses : Réservation client ➔ Conversion en Devis/Proforma chiffré ➔ Demande de Facture & Choix du moyen de paiement ➔ Validation de facture & confirmation d'encaissement ➔ Assignation manuelle & transmission de l'ordre de mission au chauffeur (App + WhatsApp pré-rempli) ➔ Clôture en 1 clic par le chauffeur avec notification finale à la régulation.",
+  "updatedAt":  "2026-10-26T18:06:53.566180969Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

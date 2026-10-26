@@ -1,9 +1,14 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { DualPrice } from '../common/DualPrice';
+import { DocRefBadge } from '../common/DocRefBadge';
+import { RowActionMenu, type ActionMenuItem } from '../common/RowActionMenu';
 
 export const FinancesView: React.FC = () => {
-  const { paiements, factures, settings, showToast } = useApp();
-  const [selectedMonth, setSelectedMonth] = useState('ALL');
+  const { paiements, factures, settings, showToast, setPrintSheetData, globalSearchQuery } = useApp();
+  const [filterMode, setFilterMode] = useState<string>('ALL');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Compute total validated revenues
   const totalUSD = paiements
@@ -17,16 +22,35 @@ export const FinancesView: React.FC = () => {
   // Invoiced amounts pending collection
   const pendingInvoicedUSD = factures
     .filter((f) => f.status !== 'Payée')
-    .reduce((sum, f) => sum + f.amount, 0);
+    .reduce((sum, f) => sum + (f.totalTTC || f.amount || 0), 0);
+
+  const exchangeRate = settings?.tauxChangeUSD_HTG || 132;
+  const pendingInvoicedHTG = Math.round(pendingInvoicedUSD * exchangeRate);
 
   // Estimated operational expenses (fuel, maintenance, salaries ~35%)
   const estimatedExpensesUSD = Math.round(totalUSD * 0.35);
   const netProfitUSD = totalUSD - estimatedExpensesUSD;
+  const recoveryRate = factures.length > 0 
+    ? Math.round((factures.filter(f => f.status === 'Payée').length / factures.length) * 100) 
+    : 100;
+
+  const effectiveSearch = (searchTerm || globalSearchQuery).toLowerCase();
+
+  const filteredPaiements = paiements.filter((p) => {
+    if (filterMode !== 'ALL' && p.modePaiement !== filterMode && p.statut !== filterMode) return false;
+    if (effectiveSearch) {
+      const matchClient = p.client?.toLowerCase().includes(effectiveSearch);
+      const matchRef = p.reference?.toLowerCase().includes(effectiveSearch);
+      const matchMotif = p.motif?.toLowerCase().includes(effectiveSearch);
+      return matchClient || matchRef || matchMotif;
+    }
+    return true;
+  });
 
   const handleExportCSV = () => {
-    let csv = 'Reference,Date,Client,Montant,Devise,Mode,Statut\n';
+    let csv = 'Reference,Date,Client,Montant,Devise,Mode,Statut,Motif\n';
     paiements.forEach((p) => {
-      csv += `"${p.reference}","${p.date}","${p.client}",${p.montant},"${p.devise}","${p.modePaiement}","${p.statut}"\n`;
+      csv += `"${p.reference}","${p.date}","${p.client}",${p.montant},"${p.devise}","${p.modePaiement}","${p.statut}","${p.motif || ''}"\n`;
     });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -36,96 +60,337 @@ export const FinancesView: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast('Export CSV généré avec succès !', 'success');
+    showToast('Export CSV certifié généré avec succès !', 'success');
   };
 
+  const officialWhatsApp = settings?.whatsapp || '+509 4440 8687';
+
   return (
-    <div>
-      <div className="section-head">
-        <div>
-          <h2>Finances & Comptabilité Analytique</h2>
-          <p>Bilan consolidé des recettes, encaissements, factures à recouvrer et résultat net.</p>
-        </div>
-        <div className="actions">
-          <button type="button" className="secondary" onClick={handleExportCSV}>
-            📥 Exporter Rapport CSV
-          </button>
-        </div>
-      </div>
-
-      {/* KPI Financial Overview */}
-      <div className="kpis">
-        <div className="kpi">
-          <div className="kpi-icon" style={{ background: '#1675ea' }}>💵</div>
-          <div>
-            <small>Recettes Encaissées ($ USD)</small>
-            <strong>${totalUSD.toLocaleString()} USD</strong>
-            <a>Paiements validés</a>
-          </div>
+    <div className="dashboard-container-exact">
+      {/* 1. Hero Card matching exact design */}
+      <div className="dashboard-hero-card">
+        <div className="hero-kicker-row">
+          <span className="kicker-sparkle">✨</span>
+          <span className="kicker-text">ANALYSE FINANCIÈRE & TRÉSORERIE · LAPERLE TOUR HT</span>
         </div>
 
-        <div className="kpi">
-          <div className="kpi-icon" style={{ background: '#25a852' }}>🇭🇹</div>
-          <div>
-            <small>Recettes Encaissées (HTG)</small>
-            <strong>{totalHTG.toLocaleString()} HTG</strong>
-            <a>MonCash & Natcash</a>
-          </div>
-        </div>
-
-        <div className="kpi">
-          <div className="kpi-icon" style={{ background: '#f7941d' }}>⏳</div>
-          <div>
-            <small>Créances à Recouvrer</small>
-            <strong>${pendingInvoicedUSD.toLocaleString()} USD</strong>
-            <a>Factures en attente</a>
-          </div>
-        </div>
-
-        <div className="kpi">
-          <div className="kpi-icon" style={{ background: '#073b8f' }}>📈</div>
-          <div>
-            <small>Résultat d'Exploitation Estimé</small>
-            <strong>${netProfitUSD.toLocaleString()} USD</strong>
-            <a>Bénéfice opérationnel net</a>
-          </div>
-        </div>
-      </div>
-
-      {/* Details Panel */}
-      <div className="data-panel" style={{ marginTop: '20px' }}>
-        <h3 style={{ margin: '0 0 16px', color: '#082b70' }}>Synthèse des Flux Financiers</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-          <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Taux de change appliqué :</span>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: '#082b70', margin: '6px 0' }}>
-              1 USD = {settings.tauxChangeUSD_HTG} HTG
-            </div>
-            <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
-              Calculs automatiques pour les règlements en Gourdes haïtiennes.
+        <div className="hero-content-row">
+          <div className="hero-text-block">
+            <h1 className="hero-title">Trésorerie & Comptabilité Analytique</h1>
+            <p className="hero-subtitle">
+              Bilan consolidé des flux de trésorerie, encaissements certifiés USD et HTG (MonCash, virements), créances clients et résultat net d'exploitation.
             </p>
           </div>
 
-          <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Dépenses opérationnelles estimées :</span>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: '#b91c1c', margin: '6px 0' }}>
+          <div className="hero-actions-block">
+            <button type="button" className="btn-hero-primary" onClick={handleExportCSV}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              <span>Exporter Rapport CSV</span>
+            </button>
+
+            <a
+              href={`https://wa.me/${officialWhatsApp.replace(/\D/g, '')}?text=${encodeURIComponent('Bonjour Direction Financière Laperle Tour, je sollicite un point sur la trésorerie et les encaissements.')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-hero-secondary"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+              </svg>
+              <span>Support WhatsApp</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. 4-Card KPI Grid */}
+      <div className="dashboard-kpi-grid">
+        {/* KPI 1: Recettes USD */}
+        <div className="kpi-card-exact" title="Recettes encaissées en USD">
+          <div className="kpi-icon-box blue">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="1" x2="12" y2="23"/>
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+          </div>
+          <div className="kpi-header-label">RECETTES ENCAISSÉES ($ USD)</div>
+          <div className="kpi-main-number navy" style={{ fontSize: '24px' }}>${totalUSD.toLocaleString()} USD</div>
+          <div className="kpi-sub-text green">↗ Paiements validés certifiés</div>
+        </div>
+
+        {/* KPI 2: Recettes HTG */}
+        <div className="kpi-card-exact" title="Recettes encaissées en Gourdes HTG">
+          <div className="kpi-icon-box green">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="6" width="20" height="12" rx="2"/>
+              <circle cx="12" cy="12" r="2"/>
+              <path d="M6 12h.01M18 12h.01"/>
+            </svg>
+          </div>
+          <div className="kpi-header-label">RECETTES ENCAISSÉES (HTG)</div>
+          <div className="kpi-main-number" style={{ color: '#16a34a', fontSize: '24px' }}>{totalHTG.toLocaleString()} HTG</div>
+          <div className="kpi-sub-text green">MonCash, Natcash & Espèces</div>
+        </div>
+
+        {/* KPI 3: Créances à Recouvrer */}
+        <div className="kpi-card-exact" title="Créances clients à recouvrer">
+          <div className="kpi-icon-box amber">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+          <div className="kpi-header-label">CRÉANCES À RECOUVRER</div>
+          <div className="kpi-main-number" style={{ color: '#d97706', fontSize: '24px' }}>${pendingInvoicedUSD.toLocaleString()} USD</div>
+          <div className="kpi-sub-text">≈ {pendingInvoicedHTG.toLocaleString()} HTG en attente</div>
+        </div>
+
+        {/* KPI 4: Résultat d'Exploitation */}
+        <div className="kpi-card-exact" title="Bénéfice opérationnel net estimé">
+          <div className="kpi-icon-box emerald">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+              <polyline points="17 6 23 6 23 12"/>
+            </svg>
+          </div>
+          <div className="kpi-header-label">RÉSULTAT D'EXPLOITATION NET</div>
+          <div className="kpi-main-number navy" style={{ fontSize: '24px' }}>${netProfitUSD.toLocaleString()} USD</div>
+          <div className="kpi-sub-text green">Bénéfice opérationnel net estimé</div>
+        </div>
+      </div>
+
+      {/* 3. Synthèse des Flux Financiers */}
+      <div className="data-panel" style={{ marginBottom: '20px' }}>
+        <h3 style={{ margin: '0 0 16px', color: '#082b70', fontSize: '15px', fontWeight: 800 }}>
+          📊 Indicateurs Stratégiques & Taux de Change
+        </h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+          <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Taux de change appliqué :</span>
+            <div style={{ fontSize: '19px', fontWeight: 850, color: '#082b70', margin: '6px 0' }}>
+              1 USD = {exchangeRate} HTG
+            </div>
+            <p style={{ fontSize: '12px', color: '#64748b', margin: 0, lineHeight: 1.4 }}>
+              Calculs et conversions automatiques pour tous les règlements en Gourdes haïtiennes.
+            </p>
+          </div>
+
+          <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Dépenses opérationnelles estimées (~35%) :</span>
+            <div style={{ fontSize: '19px', fontWeight: 850, color: '#dc2626', margin: '6px 0' }}>
               ${estimatedExpensesUSD.toLocaleString()} USD
             </div>
-            <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
-              Carburant, entretien périodique des véhicules et indemnités chauffeurs.
+            <p style={{ fontSize: '12px', color: '#64748b', margin: 0, lineHeight: 1.4 }}>
+              Carburant, entretien périodique des véhicules et indemnités chauffeurs VIP.
             </p>
           </div>
 
-          <div style={{ padding: '16px', background: '#f0fdf4', borderRadius: '10px', border: '1px solid #bbf7d0' }}>
+          <div style={{ padding: '16px', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
             <span style={{ fontSize: '12px', color: '#166534', fontWeight: 600 }}>Taux de Recouvrement Global :</span>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: '#15803d', margin: '6px 0' }}>
-              {factures.length > 0 ? Math.round((factures.filter(f => f.status === 'Payée').length / factures.length) * 100) : 100}%
+            <div style={{ fontSize: '19px', fontWeight: 850, color: '#15803d', margin: '6px 0' }}>
+              {recoveryRate}%
             </div>
-            <p style={{ fontSize: '12px', color: '#166534', margin: 0 }}>
-              Factures honorées sans incident majeur.
+            <p style={{ fontSize: '12px', color: '#166534', margin: 0, lineHeight: 1.4 }}>
+              Factures honorées sans contentieux ni incident de paiement.
             </p>
           </div>
         </div>
+      </div>
+
+      {/* 4. Journal de Trésorerie & Encaissements */}
+      <div className="data-panel">
+        <div className="filters" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'nowrap', gap: '12px', overflowX: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'nowrap', flexShrink: 0 }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>Mode / Statut :</span>
+            <select 
+              value={filterMode} 
+              onChange={(e) => setFilterMode(e.target.value)}
+              style={{ minWidth: '160px', padding: '6px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#1e293b' }}
+            >
+              <option value="ALL">Tous les règlements</option>
+              <option value="MonCash">MonCash</option>
+              <option value="Natcash">Natcash</option>
+              <option value="Virement Bancaire">Virement Bancaire</option>
+              <option value="Espèces">Espèces</option>
+              <option value="Validé">Statut : Validé</option>
+              <option value="En attente">Statut : En attente</option>
+            </select>
+          </div>
+
+          <div className="view-mode-toggle-group">
+            <button
+              type="button"
+              className={`btn-view-mode ${viewMode === 'cards' ? 'active' : ''}`}
+              onClick={() => setViewMode('cards')}
+              title="Affichage en fiches dépliées"
+            >
+              <span>📋</span>
+              <span>Vue Cartes</span>
+            </button>
+            <button
+              type="button"
+              className={`btn-view-mode ${viewMode === 'table' ? 'active' : ''}`}
+              onClick={() => setViewMode('table')}
+              title="Affichage en tableau complet"
+            >
+              <span>📊</span>
+              <span>Tableau Allongé</span>
+            </button>
+          </div>
+        </div>
+
+        {/* CARDS VIEW */}
+        {viewMode === 'cards' && (
+          <div className="cards-grid-flow" style={{ marginTop: '16px' }}>
+            {filteredPaiements.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '36px', background: '#f8fafc', borderRadius: '12px', color: '#64748b' }}>
+                <div style={{ fontSize: '32px', marginBottom: '8px' }}>💳</div>
+                <div style={{ fontSize: '15px', fontWeight: 600, color: '#0f172a' }}>Aucun flux enregistré</div>
+                <div style={{ fontSize: '13px', marginTop: '4px' }}>Modifiez vos filtres de recherche.</div>
+              </div>
+            ) : (
+              filteredPaiements.map((p) => (
+                <div key={p.id} className="item-detail-card">
+                  <div className="item-detail-card-head">
+                    <div className="card-id-cluster" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <DocRefBadge reference={p.reference} type="paiement" />
+                      <span className={`badge ${p.statut === 'Validé' ? 'green' : 'orange'}`}>
+                        {p.statut}
+                      </span>
+                      <strong style={{ color: '#0f172a', fontSize: '14px' }}>{p.client}</strong>
+                    </div>
+                    <div className="card-price-badge">
+                      <DualPrice amount={p.montant} currency={p.devise} size="md" />
+                    </div>
+                  </div>
+
+                  <div className="item-detail-card-meta">
+                    <span className="meta-chip">📅 Date : <strong>{p.date}</strong></span>
+                    <span className="meta-chip">💳 Mode : <strong>{p.modePaiement}</strong></span>
+                    {p.motif && <span className="meta-chip">📝 Motif : <strong>{p.motif}</strong></span>}
+                    {p.factureAssociee && (
+                      <span className="meta-chip">
+                        🧾 Facture liée : <DocRefBadge reference={p.factureAssociee} type="facture" />
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* TABLE VIEW */}
+        {viewMode === 'table' && (
+          <div style={{ marginTop: '16px', overflow: 'hidden', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#ffffff' }}>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>RÉFÉRENCE</th>
+                    <th>CLIENT</th>
+                    <th>DATE</th>
+                    <th>MODE DE RÈGLEMENT</th>
+                    <th>MONTANT CERTIFIÉ</th>
+                    <th>STATUT</th>
+                    <th>FACTURE LIÉE</th>
+                    <th style={{ textAlign: 'right', paddingRight: '20px' }}>ACTIONS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredPaiements.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                        Aucun flux de trésorerie trouvé.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredPaiements.map((p) => {
+                      const actionItems: ActionMenuItem[] = [
+                        {
+                          label: 'Imprimer le Reçu',
+                          icon: '🖨️',
+                          onClick: () => {
+                            if (setPrintSheetData) {
+                              setPrintSheetData({
+                                type: 'paiement',
+                                data: p,
+                                title: `Bordereau de Règlement ${p.reference}`
+                              });
+                            }
+                          }
+                        },
+                        {
+                          label: 'WhatsApp Trésorerie',
+                          icon: '💬',
+                          onClick: () => {
+                            const text = encodeURIComponent(
+                              `Bonjour ${p.client}, nous confirmons la bonne réception de votre règlement de ${p.montant} ${p.devise} (Réf : ${p.reference}). Merci !`
+                            );
+                            window.open(`https://wa.me/${officialWhatsApp.replace(/\D/g, '')}?text=${text}`, '_blank');
+                          }
+                        }
+                      ];
+
+                      return (
+                        <tr key={p.id}>
+                          <td>
+                            <DocRefBadge reference={p.reference} type="paiement" />
+                          </td>
+                          <td>
+                            <strong style={{ color: '#0f172a' }}>{p.client}</strong>
+                          </td>
+                          <td>{p.date}</td>
+                          <td>
+                            <span style={{ 
+                              background: '#f1f5f9', 
+                              padding: '3px 8px', 
+                              borderRadius: '6px', 
+                              fontSize: '11.5px', 
+                              fontWeight: 650, 
+                              color: '#334155' 
+                            }}>
+                              {p.modePaiement}
+                            </span>
+                          </td>
+                          <td>
+                            <DualPrice amount={p.montant} currency={p.devise} size="sm" />
+                          </td>
+                          <td>
+                            <span className={`badge ${p.statut === 'Validé' ? 'green' : 'orange'}`}>
+                              {p.statut}
+                            </span>
+                          </td>
+                          <td>
+                            {p.factureAssociee ? (
+                              <DocRefBadge reference={p.factureAssociee} type="facture" />
+                            ) : (
+                              <span style={{ color: '#94a3b8', fontSize: '11px' }}>-</span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'right', paddingRight: '20px' }}>
+                            <RowActionMenu items={actionItems} title={`Actions pour ${p.reference}`} />
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {filteredPaiements.length > 0 && (
+              <div style={{ padding: '12px 18px', borderTop: '1px solid #f1f5f9', background: '#f8fafc', fontSize: '12px', color: '#64748b', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Affichage de <strong>{filteredPaiements.length}</strong> ligne(s) d'encaissement</span>
+                <span style={{ fontSize: '11px' }}>Double devise USD / HTG certifiée</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

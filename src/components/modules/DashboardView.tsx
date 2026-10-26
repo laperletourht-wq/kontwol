@@ -4,6 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import { DualPrice } from '../common/DualPrice';
 import { DocRefBadge } from '../common/DocRefBadge';
 import { DashboardUniversalSearchBar } from '../common/DashboardUniversalSearchBar';
+import { SecretaireDashboard } from '../dashboard/SecretaireDashboard';
+import { ClientDashboard } from '../dashboard/ClientDashboard';
 
 interface DashboardViewProps {
   onOpenModal: (type: string, data?: any) => void;
@@ -34,6 +36,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenModal }) => 
 
   // Display user name
   const displayName = profile?.nom || user?.displayName || 'Castima Moïse';
+
+  // =========================================================================
+  // 1. SECRÉTAIRE DASHBOARD (MAQUETTE 1 : VUE D'ENSEMBLE, FLUX & CARTE LIVE)
+  // =========================================================================
+  if (role === 'secretaire') {
+    return <SecretaireDashboard onOpenModal={onOpenModal} />;
+  }
+
+  // =========================================================================
+  // 2. CLIENTS, PROSPECTS, CHAUFFEURS & AUTRES NON-ADMINS (MAQUETTE 2 : PROFIL, TIMELINE & PAIEMENTS)
+  // =========================================================================
+  if (isClient || isChauffeur || role === 'lecture_seule') {
+    return <ClientDashboard onOpenModal={onOpenModal} />;
+  }
 
   // =========================================================================
   // 1. CLIENT PORTAL DASHBOARD (STRICTLY ISOLATED FROM COMPANY FINANCES)
