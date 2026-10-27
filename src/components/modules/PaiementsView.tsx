@@ -18,7 +18,6 @@ export const PaiementsView: React.FC<PaiementsViewProps> = ({ onOpenModal }) => 
   const canManagePayments = !isClient && !isChauffeur;
 
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
   const [proofModalOpen, setProofModalOpen] = useState(false);
   const [zoomedProofImage, setZoomedProofImage] = useState<string | null>(null);
 
@@ -37,6 +36,13 @@ export const PaiementsView: React.FC<PaiementsViewProps> = ({ onOpenModal }) => 
     }
     return true;
   });
+
+  const totalCount = paiements.length;
+  const validatedCount = paiements.filter((p) => p.status === 'Validé').length;
+  const pendingCount = paiements.filter((p) => p.status === 'En attente').length;
+  const totalAmountUSD = paiements
+    .filter((p) => p.status === 'Validé')
+    .reduce((sum, p) => sum + (p.amountUSD || (p.currency === 'HTG' ? (p.amount / 132) : p.amount) || 0), 0);
 
   return (
     <div>
@@ -63,6 +69,107 @@ export const PaiementsView: React.FC<PaiementsViewProps> = ({ onOpenModal }) => 
       </div>
 
       <div className="data-panel">
+        {/* Bandeau de synthèse compact 1-ligne (Option A - Style Ruban Excel) */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '10px',
+          padding: '8px 14px',
+          background: '#f8fafc',
+          borderRadius: '8px',
+          border: '1px solid #e2e8f0',
+          marginBottom: '14px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '11.5px', fontWeight: 800, color: '#082b70', display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <span>📊</span> Synthèse :
+            </span>
+
+            <button
+              type="button"
+              onClick={() => setStatusFilter('ALL')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                border: statusFilter === 'ALL' ? '1px solid #2563eb' : '1px solid #cbd5e1',
+                background: statusFilter === 'ALL' ? '#eff6ff' : '#ffffff',
+                color: statusFilter === 'ALL' ? '#1d4ed8' : '#334155',
+                cursor: 'pointer'
+              }}
+              title="Afficher tous les règlements"
+            >
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#2563eb' }} />
+              <span>Tous les règlements : <strong>{totalCount}</strong></span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStatusFilter('Validé')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                border: statusFilter === 'Validé' ? '1px solid #16a34a' : '1px solid #cbd5e1',
+                background: statusFilter === 'Validé' ? '#f0fdf4' : '#ffffff',
+                color: statusFilter === 'Validé' ? '#15803d' : '#334155',
+                cursor: 'pointer'
+              }}
+              title="Filtrer les paiements validés"
+            >
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#16a34a' }} />
+              <span>Validés : <strong>{validatedCount}</strong></span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStatusFilter('En attente')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                border: statusFilter === 'En attente' ? '1px solid #d97706' : '1px solid #cbd5e1',
+                background: statusFilter === 'En attente' ? '#fffbeb' : '#ffffff',
+                color: statusFilter === 'En attente' ? '#b45309' : '#334155',
+                cursor: 'pointer'
+              }}
+              title="Filtrer les paiements en attente"
+            >
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#d97706' }} />
+              <span>En attente : <strong>{pendingCount}</strong></span>
+            </button>
+          </div>
+
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '4px 12px',
+            borderRadius: '6px',
+            background: '#ecfdf5',
+            border: '1px solid #a7f3d0',
+            color: '#065f46',
+            fontSize: '12px',
+            fontWeight: 700
+          }}>
+            <span>💵 Encaissé certifié :</span>
+            <span style={{ fontSize: '13px', fontWeight: 800 }}>${Math.round(totalAmountUSD).toLocaleString()} USD</span>
+          </div>
+        </div>
         <div className="filters" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'nowrap', gap: '12px', overflowX: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, whiteSpace: 'nowrap' }}>
             <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>Statut :</span>
@@ -85,30 +192,12 @@ export const PaiementsView: React.FC<PaiementsViewProps> = ({ onOpenModal }) => 
             </select>
           </div>
 
-          <div className="view-mode-toggle-group">
-            <button
-              type="button"
-              className={`btn-view-mode ${viewMode === 'cards' ? 'active' : ''}`}
-              onClick={() => setViewMode('cards')}
-              title="Affichage en fiches complètes sans troncature"
-            >
-              <span>📋</span>
-              <span>Vue Détaillée (Cartes)</span>
-            </button>
-            <button
-              type="button"
-              className={`btn-view-mode ${viewMode === 'table' ? 'active' : ''}`}
-              onClick={() => setViewMode('table')}
-              title="Affichage en tableau moderne et aéré"
-            >
-              <span>📊</span>
-              <span>Tableau Épuré</span>
-            </button>
+          <div style={{ fontSize: '12.5px', color: '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <strong>{filtered.length}</strong> règlement{filtered.length > 1 ? 's' : ''}
           </div>
         </div>
 
-        {/* 1. DETAILED CARDS VIEW */}
-        {viewMode === 'cards' && (
+        {false && (
           <div className="cards-grid-flow" style={{ marginTop: '16px' }}>
             {filtered.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '36px', background: '#f8fafc', borderRadius: '12px', color: '#64748b' }}>
@@ -242,9 +331,8 @@ export const PaiementsView: React.FC<PaiementsViewProps> = ({ onOpenModal }) => 
           </div>
         )}
 
-        {/* 2. TABLE VIEW WITH MODERN AIRY ROWS */}
-        {viewMode === 'table' && (
-          <div className="modern-table-card" style={{ marginTop: '16px' }}>
+        {/* MODERN AIRY TABLE (Excel Style) */}
+        <div className="modern-table-card" style={{ marginTop: '16px' }}>
             <div className="modern-table-wrap">
               <table className="modern-table">
                 <thead>
@@ -365,7 +453,6 @@ export const PaiementsView: React.FC<PaiementsViewProps> = ({ onOpenModal }) => 
               </div>
             )}
           </div>
-        )}
       </div>
 
       {/* Payment Proof Submission Modal */}

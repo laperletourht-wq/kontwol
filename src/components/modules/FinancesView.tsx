@@ -107,64 +107,100 @@ export const FinancesView: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. 4-Card KPI Grid */}
-      <div className="dashboard-kpi-grid">
-        {/* KPI 1: Recettes USD */}
-        <div className="kpi-card-exact" title="Recettes encaissées en USD">
-          <div className="kpi-icon-box blue">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="1" x2="12" y2="23"/>
-              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-            </svg>
-          </div>
-          <div className="kpi-header-label">RECETTES ENCAISSÉES ($ USD)</div>
-          <div className="kpi-main-number navy" style={{ fontSize: '24px' }}>${totalUSD.toLocaleString()} USD</div>
-          <div className="kpi-sub-text green">↗ Paiements validés certifiés</div>
-        </div>
-
-        {/* KPI 2: Recettes HTG */}
-        <div className="kpi-card-exact" title="Recettes encaissées en Gourdes HTG">
-          <div className="kpi-icon-box green">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="6" width="20" height="12" rx="2"/>
-              <circle cx="12" cy="12" r="2"/>
-              <path d="M6 12h.01M18 12h.01"/>
-            </svg>
-          </div>
-          <div className="kpi-header-label">RECETTES ENCAISSÉES (HTG)</div>
-          <div className="kpi-main-number" style={{ color: '#16a34a', fontSize: '24px' }}>{totalHTG.toLocaleString()} HTG</div>
-          <div className="kpi-sub-text green">MonCash, Natcash & Espèces</div>
-        </div>
-
-        {/* KPI 3: Créances à Recouvrer */}
-        <div className="kpi-card-exact" title="Créances clients à recouvrer">
-          <div className="kpi-icon-box amber">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"/>
-              <polyline points="12 6 12 12 16 14"/>
-            </svg>
-          </div>
-          <div className="kpi-header-label">CRÉANCES À RECOUVRER</div>
-          <div className="kpi-main-number" style={{ color: '#d97706', fontSize: '24px' }}>${pendingInvoicedUSD.toLocaleString()} USD</div>
-          <div className="kpi-sub-text">≈ {pendingInvoicedHTG.toLocaleString()} HTG en attente</div>
-        </div>
-
-        {/* KPI 4: Résultat d'Exploitation */}
-        <div className="kpi-card-exact" title="Bénéfice opérationnel net estimé">
-          <div className="kpi-icon-box emerald">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
-              <polyline points="17 6 23 6 23 12"/>
-            </svg>
-          </div>
-          <div className="kpi-header-label">RÉSULTAT D'EXPLOITATION NET</div>
-          <div className="kpi-main-number navy" style={{ fontSize: '24px' }}>${netProfitUSD.toLocaleString()} USD</div>
-          <div className="kpi-sub-text green">Bénéfice opérationnel net estimé</div>
-        </div>
-      </div>
-
       {/* 3. Synthèse des Flux Financiers */}
       <div className="data-panel" style={{ marginBottom: '20px' }}>
+        {/* Bandeau de synthèse compact 1-ligne (Option A - Style Ruban Excel) */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '10px',
+          padding: '8px 14px',
+          background: '#f8fafc',
+          borderRadius: '8px',
+          border: '1px solid #e2e8f0',
+          marginBottom: '16px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '11.5px', fontWeight: 800, color: '#082b70', display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <span>📊</span> Synthèse Trésorerie :
+            </span>
+
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                border: '1px solid #cbd5e1',
+                background: '#ffffff',
+                color: '#1e3a8a'
+              }}
+              title="Recettes encaissées en USD"
+            >
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#2563eb' }} />
+              <span>Recettes USD : <strong>${totalUSD.toLocaleString()}</strong></span>
+            </div>
+
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                border: '1px solid #cbd5e1',
+                background: '#ffffff',
+                color: '#15803d'
+              }}
+              title="Recettes encaissées en HTG"
+            >
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#16a34a' }} />
+              <span>Recettes HTG : <strong>{totalHTG.toLocaleString()} HTG</strong></span>
+            </div>
+
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                border: '1px solid #fed7aa',
+                background: '#fffaf5',
+                color: '#c2410c'
+              }}
+              title="Créances clients à recouvrer"
+            >
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#f97316' }} />
+              <span>Créances à recouvrer : <strong>${pendingInvoicedUSD.toLocaleString()} USD</strong></span>
+            </div>
+          </div>
+
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '4px 12px',
+            borderRadius: '6px',
+            background: '#ecfdf5',
+            border: '1px solid #a7f3d0',
+            color: '#065f46',
+            fontSize: '12px',
+            fontWeight: 700
+          }}>
+            <span>📈 Résultat Net Estimé :</span>
+            <span style={{ fontSize: '13px', fontWeight: 800 }}>${netProfitUSD.toLocaleString()} USD</span>
+          </div>
+        </div>
         <h3 style={{ margin: '0 0 16px', color: '#082b70', fontSize: '15px', fontWeight: 800 }}>
           📊 Indicateurs Stratégiques & Taux de Change
         </h3>

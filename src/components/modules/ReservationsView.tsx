@@ -26,7 +26,6 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
 
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [pendingReqId, setPendingReqId] = useState<string | null>(null);
   const [assignModalRes, setAssignModalRes] = useState<any | null>(null);
 
@@ -56,6 +55,11 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
   };
 
   const officialWhatsApp = settings?.whatsapp || '+509 4440 8687';
+
+  const totalCount = reservations.length;
+  const pendingCount = reservations.filter((r) => r.status === 'En attente').length;
+  const activeCount = reservations.filter((r) => r.status === 'Confirmée' || r.status === 'En cours').length;
+  const completedCount = reservations.filter((r) => r.status === 'Terminée').length;
 
   const handleRequestDoc = async (r: any, type: 'devis' | 'facture') => {
     setPendingReqId(`${r.id}-${type}`);
@@ -89,6 +93,129 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
       </div>
 
       <div className="data-panel">
+        {/* Bandeau de synthèse compact 1-ligne (Option A - Style Ruban Excel) */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '10px',
+          padding: '8px 14px',
+          background: '#f8fafc',
+          borderRadius: '8px',
+          border: '1px solid #e2e8f0',
+          marginBottom: '14px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '11.5px', fontWeight: 800, color: '#082b70', display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <span>📊</span> Synthèse :
+            </span>
+
+            <button
+              type="button"
+              onClick={() => setStatusFilter('ALL')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                border: statusFilter === 'ALL' ? '1px solid #2563eb' : '1px solid #cbd5e1',
+                background: statusFilter === 'ALL' ? '#eff6ff' : '#ffffff',
+                color: statusFilter === 'ALL' ? '#1d4ed8' : '#334155',
+                cursor: 'pointer'
+              }}
+              title="Afficher toutes les courses"
+            >
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#2563eb' }} />
+              <span>Toutes les courses : <strong>{totalCount}</strong></span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStatusFilter('En attente')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                border: statusFilter === 'En attente' ? '1px solid #d97706' : '1px solid #cbd5e1',
+                background: statusFilter === 'En attente' ? '#fffbeb' : '#ffffff',
+                color: statusFilter === 'En attente' ? '#b45309' : '#334155',
+                cursor: 'pointer'
+              }}
+              title="Filtrer les courses en attente"
+            >
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#d97706' }} />
+              <span>En attente : <strong>{pendingCount}</strong></span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStatusFilter('Confirmée')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                border: (statusFilter === 'Confirmée' || statusFilter === 'En cours') ? '1px solid #16a34a' : '1px solid #cbd5e1',
+                background: (statusFilter === 'Confirmée' || statusFilter === 'En cours') ? '#f0fdf4' : '#ffffff',
+                color: (statusFilter === 'Confirmée' || statusFilter === 'En cours') ? '#15803d' : '#334155',
+                cursor: 'pointer'
+              }}
+              title="Filtrer les courses confirmées"
+            >
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#16a34a' }} />
+              <span>Confirmées / En cours : <strong>{activeCount}</strong></span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStatusFilter('Terminée')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                border: statusFilter === 'Terminée' ? '1px solid #059669' : '1px solid #cbd5e1',
+                background: statusFilter === 'Terminée' ? '#ecfdf5' : '#ffffff',
+                color: statusFilter === 'Terminée' ? '#047857' : '#334155',
+                cursor: 'pointer'
+              }}
+              title="Filtrer les courses terminées"
+            >
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#059669' }} />
+              <span>Terminées : <strong>{completedCount}</strong></span>
+            </button>
+          </div>
+
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '4px 10px',
+            borderRadius: '6px',
+            background: '#f1f5f9',
+            border: '1px solid #cbd5e1',
+            color: '#475569',
+            fontSize: '12px',
+            fontWeight: 700
+          }}>
+            <span>🚘 Courses enregistrées :</span>
+            <strong style={{ color: '#082b70' }}>{totalCount}</strong>
+          </div>
+        </div>
         <div className="filters" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'nowrap', gap: '12px', overflowX: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'nowrap', flexShrink: 0 }}>
             <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>Filtrer par statut :</span>
@@ -106,31 +233,12 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
             </select>
           </div>
 
-          {/* View mode toggle: Detailed Cards vs Grid Table */}
-          <div className="view-mode-toggle-group">
-            <button
-              type="button"
-              className={`btn-view-mode ${viewMode === 'cards' ? 'active' : ''}`}
-              onClick={() => setViewMode('cards')}
-              title="Affichage en fiches dépliées complètes (aucune troncature)"
-            >
-              <span>📋</span>
-              <span>Vue Détaillée (Cartes)</span>
-            </button>
-            <button
-              type="button"
-              className={`btn-view-mode ${viewMode === 'table' ? 'active' : ''}`}
-              onClick={() => setViewMode('table')}
-              title="Affichage en tableau aux lignes allongées"
-            >
-              <span>📊</span>
-              <span>Tableau Allongé</span>
-            </button>
+          <div style={{ fontSize: '12.5px', color: '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <strong>{filtered.length}</strong> réservation{filtered.length > 1 ? 's' : ''}
           </div>
         </div>
 
-        {/* 1. DETAILED CARDS VIEW (Spacious, full width, no truncation) */}
-        {viewMode === 'cards' && (
+        {false && (
           <div className="cards-grid-flow" style={{ marginTop: '16px' }}>
             {filtered.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '36px', background: '#f8fafc', borderRadius: '12px', color: '#64748b' }}>
@@ -373,9 +481,8 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
           </div>
         )}
 
-        {/* 2. TABLE VIEW (Modern Airy Table with 3-dot Action Menu) */}
-        {viewMode === 'table' && (
-          <div className="modern-table-card">
+        {/* MODERN AIRY TABLE (Excel Style) */}
+        <div className="modern-table-card">
             <div className="modern-table-wrap">
               <table className="modern-table">
                 <thead>
@@ -556,7 +663,6 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
               </div>
             )}
           </div>
-        )}
       </div>
 
       {/* Modal d'assignation Chauffeur & Véhicule */}

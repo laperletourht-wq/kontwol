@@ -27,7 +27,6 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenModal }) => 
 
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
 
   const handleClientRequestInvoice = async (p: Proforma) => {
     try {
@@ -125,64 +124,109 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenModal }) => 
         </div>
       </div>
 
-      {/* 2. 4-Card KPI Grid */}
-      <div className="dashboard-kpi-grid">
-        {/* KPI 1: Total Devis */}
-        <div className="kpi-card-exact" onClick={() => setStatusFilter('ALL')} title="Afficher tous les devis">
-          <div className="kpi-icon-box blue">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="16" y1="13" x2="8" y2="13"/>
-              <line x1="16" y1="17" x2="8" y2="17"/>
-            </svg>
-          </div>
-          <div className="kpi-header-label">TOTAL PROPOSITIONS</div>
-          <div className="kpi-main-number">{totalCount}</div>
-          <div className="kpi-sub-text green">↗ {filtered.length} affichée(s)</div>
-        </div>
-
-        {/* KPI 2: En attente */}
-        <div className="kpi-card-exact" onClick={() => setStatusFilter('En attente')} title="Filtrer les devis en attente">
-          <div className="kpi-icon-box amber">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"/>
-              <polyline points="12 6 12 12 16 14"/>
-            </svg>
-          </div>
-          <div className="kpi-header-label">EN ATTENTE DE VALIDATION</div>
-          <div className="kpi-main-number" style={{ color: '#d97706' }}>{pendingCount}</div>
-          <div className="kpi-sub-text">Devis en cours d'évaluation</div>
-        </div>
-
-        {/* KPI 3: Acceptées / Converties */}
-        <div className="kpi-card-exact" onClick={() => setStatusFilter('Acceptée')} title="Filtrer les devis acceptés">
-          <div className="kpi-icon-box green">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-              <polyline points="22 4 12 14.01 9 11.01"/>
-            </svg>
-          </div>
-          <div className="kpi-header-label">DEVIS ACCEPTÉS</div>
-          <div className="kpi-main-number" style={{ color: '#16a34a' }}>{acceptedCount}</div>
-          <div className="kpi-sub-text green">Prêts pour conversion</div>
-        </div>
-
-        {/* KPI 4: Volume Financier */}
-        <div className="kpi-card-exact" title="Volume total des devis">
-          <div className="kpi-icon-box emerald">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="1" x2="12" y2="23"/>
-              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-            </svg>
-          </div>
-          <div className="kpi-header-label">VOLUME CHIFFRÉ TOTAL</div>
-          <div className="kpi-main-number navy" style={{ fontSize: '22px' }}>${totalVolumeUSD.toLocaleString()} USD</div>
-          <div className="kpi-sub-text">≈ {totalVolumeHTG.toLocaleString()} HTG</div>
-        </div>
-      </div>
-
       <div className="data-panel">
+        {/* Bandeau de synthèse compact 1-ligne (Option A - Style Ruban Excel) */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '10px',
+          padding: '8px 14px',
+          background: '#f8fafc',
+          borderRadius: '8px',
+          border: '1px solid #e2e8f0',
+          marginBottom: '14px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '11.5px', fontWeight: 800, color: '#082b70', display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <span>📊</span> Synthèse :
+            </span>
+
+            <button
+              type="button"
+              onClick={() => setStatusFilter('ALL')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                border: statusFilter === 'ALL' ? '1px solid #2563eb' : '1px solid #cbd5e1',
+                background: statusFilter === 'ALL' ? '#eff6ff' : '#ffffff',
+                color: statusFilter === 'ALL' ? '#1d4ed8' : '#334155',
+                cursor: 'pointer'
+              }}
+              title="Afficher toutes les propositions de devis"
+            >
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#2563eb' }} />
+              <span>Total devis : <strong>{totalCount}</strong></span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStatusFilter('En attente')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                border: statusFilter === 'En attente' ? '1px solid #d97706' : '1px solid #cbd5e1',
+                background: statusFilter === 'En attente' ? '#fffbeb' : '#ffffff',
+                color: statusFilter === 'En attente' ? '#b45309' : '#334155',
+                cursor: 'pointer'
+              }}
+              title="Filtrer les devis en attente"
+            >
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#d97706' }} />
+              <span>En attente : <strong>{pendingCount}</strong></span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStatusFilter('Acceptée')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                border: statusFilter === 'Acceptée' ? '1px solid #16a34a' : '1px solid #cbd5e1',
+                background: statusFilter === 'Acceptée' ? '#f0fdf4' : '#ffffff',
+                color: statusFilter === 'Acceptée' ? '#15803d' : '#334155',
+                cursor: 'pointer'
+              }}
+              title="Filtrer les devis acceptés"
+            >
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#16a34a' }} />
+              <span>Acceptés : <strong>{acceptedCount}</strong></span>
+            </button>
+          </div>
+
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '4px 12px',
+            borderRadius: '6px',
+            background: '#ecfdf5',
+            border: '1px solid #a7f3d0',
+            color: '#065f46',
+            fontSize: '12px',
+            fontWeight: 700
+          }}>
+            <span>💼 Volume chiffré :</span>
+            <span style={{ fontSize: '13px', fontWeight: 800 }}>${totalVolumeUSD.toLocaleString()} USD</span>
+            <span style={{ color: '#047857', fontSize: '11px', fontWeight: 500 }}>(≈ {totalVolumeHTG.toLocaleString()} HTG)</span>
+          </div>
+        </div>
         <div className="filters" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'nowrap', gap: '12px', overflowX: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'nowrap', flexShrink: 0 }}>
             <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>Filtrer par statut :</span>
@@ -199,30 +243,12 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenModal }) => 
             </select>
           </div>
 
-          <div className="view-mode-toggle-group">
-            <button
-              type="button"
-              className={`btn-view-mode ${viewMode === 'cards' ? 'active' : ''}`}
-              onClick={() => setViewMode('cards')}
-              title="Affichage en fiches complètes sans troncature"
-            >
-              <span>📋</span>
-              <span>Vue Détaillée (Cartes)</span>
-            </button>
-            <button
-              type="button"
-              className={`btn-view-mode ${viewMode === 'table' ? 'active' : ''}`}
-              onClick={() => setViewMode('table')}
-              title="Affichage en tableau aux lignes allongées"
-            >
-              <span>📊</span>
-              <span>Tableau Allongé</span>
-            </button>
+          <div style={{ fontSize: '12.5px', color: '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <strong>{filtered.length}</strong> devis
           </div>
         </div>
 
-        {/* 1. DETAILED CARDS VIEW */}
-        {viewMode === 'cards' && (
+        {false && (
           <div className="cards-grid-flow" style={{ marginTop: '16px' }}>
             {filtered.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '36px', background: '#f8fafc', borderRadius: '12px', color: '#64748b' }}>
@@ -353,9 +379,8 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenModal }) => 
           </div>
         )}
 
-        {/* 2. TABLE VIEW (Modern Airy Table with 3-dot Action Menu) */}
-        {viewMode === 'table' && (
-          <div className="modern-table-card">
+        {/* MODERN AIRY TABLE (Excel Style) */}
+        <div className="modern-table-card">
             <div className="modern-table-wrap">
               <table className="modern-table">
                 <thead>
@@ -463,7 +488,6 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenModal }) => 
               </div>
             )}
           </div>
-        )}
       </div>
     </div>
   );

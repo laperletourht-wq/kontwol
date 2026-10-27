@@ -576,6 +576,75 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const roleDisplay = role === 'admin' ? 'ADMIN' : role === 'client' ? 'CLIENT' : role === 'prospect' ? 'CLIENT' : role.toUpperCase();
   const initialLetter = userDisplayName.charAt(0).toUpperCase() || 'C';
 
+  const getHeaderRoleBadge = () => {
+    switch (role) {
+      case 'admin':
+        return {
+          title: 'ADMIN',
+          fullLabel: 'Administrateur',
+          tagline: 'Supervision & Contrôle Total',
+          icon: '🛡️',
+          badgeBg: '#fef3c7',
+          badgeColor: '#92400e',
+          borderColor: '#fde68a'
+        };
+      case 'secretaire':
+        return {
+          title: 'SECRÉTAIRE',
+          fullLabel: 'Secrétariat & Accueil',
+          tagline: 'Régulation & Dispatch Central',
+          icon: '📋',
+          badgeBg: '#fae8ff',
+          badgeColor: '#86198f',
+          borderColor: '#f5d0fe'
+        };
+      case 'chauffeur':
+        return {
+          title: 'CHAUFFEUR',
+          fullLabel: 'Chauffeur Privé VIP',
+          tagline: 'Missions & Feuilles de Route',
+          icon: '🚘',
+          badgeBg: '#dcfce7',
+          badgeColor: '#166534',
+          borderColor: '#bbf7d0'
+        };
+      case 'comptabilite':
+        return {
+          title: 'COMPTABILITÉ',
+          fullLabel: 'Comptabilité & Finances',
+          tagline: 'Factures, Encaissements & DGI',
+          icon: '💼',
+          badgeBg: '#ccfbf1',
+          badgeColor: '#115e59',
+          borderColor: '#99f6e4'
+        };
+      case 'direction':
+        return {
+          title: 'DIRECTION',
+          fullLabel: 'Direction Générale',
+          tagline: 'Supervision & Stratégie',
+          icon: '🏛️',
+          badgeBg: '#ede9fe',
+          badgeColor: '#5b21b6',
+          borderColor: '#ddd6fe'
+        };
+      case 'client':
+      case 'prospect':
+      default:
+        return {
+          title: 'CLIENT',
+          fullLabel: 'Espace Client',
+          tagline: 'Réservations, Devis & Trajets',
+          icon: '👤',
+          badgeBg: '#e0f2fe',
+          badgeColor: '#0369a1',
+          borderColor: '#bae6fd'
+        };
+    }
+  };
+
+  const headerRole = getHeaderRoleBadge();
+
   return (
     <div id="app" style={{ display: 'block' }}>
       {/* Sidebar Backdrop for Mobile */}
@@ -705,21 +774,50 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
             <div 
               className="header-brand-block" 
-              onClick={() => setIsPublicLanding(true)}
-              title="Consulter la vitrine publique LAPERLE TOUR HT"
+              title={`Espace connecté : ${headerRole.fullLabel}`}
+              style={{ cursor: 'default' }}
             >
-              <div className="header-logo-badge" style={{ width: '38px', height: '38px', borderRadius: '50%', background: '#ffffff', padding: '2px', boxShadow: '0 2px 6px rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <img src="/logo-laperle.jpg" alt="LAPERLE TOUR HT" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'contain' }} />
+              <div 
+                className="header-role-icon-badge" 
+                style={{ 
+                  width: '38px', 
+                  height: '38px', 
+                  borderRadius: '50%', 
+                  background: headerRole.badgeBg, 
+                  color: headerRole.badgeColor,
+                  border: `1.5px solid ${headerRole.borderColor}`,
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  flexShrink: 0,
+                  fontSize: '18px',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.06)'
+                }}
+              >
+                <span>{headerRole.icon}</span>
               </div>
               <div className="header-brand-names">
-                <div className="brand-title-top">
-                  <span className="title-navy">LAPERLE</span>
-                  <div className="title-orange-col">
-                    <span>TOUR</span>
-                    <span>HT</span>
-                  </div>
+                <div className="brand-title-top" style={{ gap: '6px' }}>
+                  <span className="title-navy" style={{ fontSize: '15px', fontWeight: 850, letterSpacing: '0.3px' }}>
+                    {headerRole.title}
+                  </span>
+                  <span 
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: 800,
+                      padding: '1px 7px',
+                      borderRadius: '10px',
+                      background: headerRole.badgeBg,
+                      color: headerRole.badgeColor,
+                      border: `1px solid ${headerRole.borderColor}`,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.4px'
+                    }}
+                  >
+                    {headerRole.fullLabel}
+                  </span>
                 </div>
-                <span className="brand-tagline">« Un coup d'œil sur Haïti »</span>
+                <span className="brand-tagline">« {headerRole.tagline} »</span>
               </div>
             </div>
           </div>
