@@ -704,24 +704,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updatedAt: new Date().toISOString()
     } as unknown as T;
 
-    listSetter((prev) => {
-      const idx = prev.findIndex((p) => p.id === id);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = fullItem;
-        return next;
-      }
-      return [fullItem, ...prev];
-    });
+    if (!auth.currentUser) {
+      showToast('Authentification requise pour enregistrer dans Firestore.', 'error');
+      throw new Error('Authentification requise.');
+    }
 
     try {
-      if (auth.currentUser) {
-        await setDoc(doc(db, colName, id), fullItem as any);
-      }
-    } catch (e) {
-      console.warn(`Failed to write to remote ${colName}, preserved in memory`, e);
+      await setDoc(doc(db, colName, id), fullItem as any);
+      listSetter((prev) => {
+        const idx = prev.findIndex((p) => p.id === id);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = fullItem;
+          return next;
+        }
+        return [fullItem, ...prev];
+      });
+      showToast(successMsg, 'success');
+    } catch (e: any) {
+      console.error(`Erreur d'écriture Firestore (${colName}):`, e);
+      showToast(`Échec d'enregistrement distant (${colName}) : ${e?.message || 'Droits insuffisants'}`, 'error');
+      throw e;
     }
-    showToast(successMsg, 'success');
   };
 
   const deleteItemFromCollection = async <T extends { id: string }>(
@@ -730,15 +734,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     listSetter: React.Dispatch<React.SetStateAction<T[]>>,
     successMsg: string
   ) => {
-    listSetter((prev) => prev.filter((p) => p.id !== id));
-    try {
-      if (auth.currentUser) {
-        await deleteDoc(doc(db, colName, id));
-      }
-    } catch (e) {
-      console.warn(`Failed to delete from remote ${colName}`, e);
+    if (!auth.currentUser) {
+      showToast('Authentification requise pour supprimer de Firestore.', 'error');
+      throw new Error('Authentification requise.');
     }
-    showToast(successMsg, 'info');
+    try {
+      await deleteDoc(doc(db, colName, id));
+      listSetter((prev) => prev.filter((p) => p.id !== id));
+      showToast(successMsg, 'info');
+    } catch (e: any) {
+      console.error(`Erreur de suppression Firestore (${colName}):`, e);
+      showToast(`Échec de suppression distante (${colName}) : ${e?.message || 'Erreur'}`, 'error');
+      throw e;
+    }
   };
 
   // --------------------------------------------------------------------------
@@ -1211,36 +1219,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const saveSettings = async (item: Partial<CompanySettings>) => {
-    const updated = { ...settings, ...item };
-    setSettings(updated);
-    try {
-      if (auth.currentUser) {
-        await setDoc(doc(db, 'settings', 'company'), updated);
-      }
-    } catch (e) {
-      console.warn('Could not save settings to cloud:', e);
+    if (!auth.currentUser) {
+      showToast('Authentification requise pour enregistrer les paramètres.', 'error');
+      throw new Error('Authentification requise.');
     }
-    showToast('Paramètres de l\'entreprise mis à jour', 'success');
+    const updated = { ...settings, ...item };
+    try {
+      await setDoc(doc(db, 'settings', 'company'), updated);
+      setSettings(updated);
+      showToast('Paramètres de l\'entreprise mis à jour', 'success');
+    } catch (e: any) {
+      console.error('Erreur d\'enregistrement des paramètres Firestore:', e);
+      showToast(`Échec d'enregistrement distant : ${e?.message || 'Erreur'}`, 'error');
+      throw e;
+    }
   };
 
   const sendChatMessage = async (text: string, channelId = 'dispatch') => {
     if (!text.trim()) return;
+    if (!auth.currentUser) {
+      showToast('Authentification requise pour envoyer un message.', 'error');
+      return;
+    }
     const newMsg: ChatMessage = {
       id: `MSG-${Date.now()}`,
       channelId,
-      senderId: user?.uid || 'guest',
+      senderId: user?.uid || auth.currentUser.uid,
       senderName: profile?.name || profile?.nom || user?.displayName || 'Opérateur',
       senderRole: profile?.role || 'admin',
       text: text.trim(),
       createdAt: new Date().toISOString()
     };
 
-    setMessages((prev) => [...prev, newMsg]);
     try {
-      if (auth.currentUser) {
-        await setDoc(doc(db, 'messages', newMsg.id), newMsg);
-      }
-    } catch (e) {}
+      await setDoc(doc(db, 'messages', newMsg.id), newMsg);
+      setMessages((prev) => [...prev, newMsg]);
+    } catch (e: any) {
+      console.error('Erreur d\'envoi de message Firestore:', e);
+      showToast(`Échec de l'envoi du message : ${e?.message || 'Erreur'}`, 'error');
+    }
   };
 
   const markNotificationAsRead = (id: string) => {

@@ -47,13 +47,13 @@
             };
             return mock;
           }
-          return new OriginalWS(url, protocols);
+          return protocols !== undefined ? new OriginalWS(url, protocols) : new OriginalWS(url);
         };
         window.WebSocket.prototype = OriginalWS.prototype;
-        window.WebSocket.CONNECTING = 0;
-        window.WebSocket.OPEN = 1;
-        window.WebSocket.CLOSING = 2;
-        window.WebSocket.CLOSED = 3;
+        window.WebSocket.CONNECTING = OriginalWS.CONNECTING;
+        window.WebSocket.OPEN = OriginalWS.OPEN;
+        window.WebSocket.CLOSING = OriginalWS.CLOSING;
+        window.WebSocket.CLOSED = OriginalWS.CLOSED;
       }
 
       // 2. Intercept unhandledrejection & window error events

@@ -211,14 +211,25 @@ service cloud.firestore {
     // Validation Helpers
     // -------------------------------------------------------------
     function isValidClient(data) {
-      return data.name is string && data.name.size() > 0 && data.name.size() <= 150 &&
+      return (
+        (data.name is string && data.name.size() > 0 && data.name.size() <= 150) ||
+        (data.nom is string && data.nom.size() > 0 && data.nom.size() <= 150) ||
+        (data.client is string && data.client.size() > 0 && data.client.size() <= 150)
+      ) &&
+        (!('prenom' in data) || (data.prenom is string && data.prenom.size() <= 150)) &&
         (!('phone' in data) || (data.phone is string && data.phone.size() <= 50)) &&
+        (!('telephone' in data) || (data.telephone is string && data.telephone.size() <= 50)) &&
+        (!('type' in data) || (data.type is string && data.type.size() <= 50)) &&
+        (!('address' in data) || (data.address is string && data.address.size() <= 300)) &&
+        (!('city' in data) || (data.city is string && data.city.size() <= 100)) &&
         (!('email' in data) || (data.email is string && data.email.size() <= 150)) &&
         (!('zone' in data) || (data.zone is string && data.zone.size() <= 100)) &&
         (!('service' in data) || (data['service'] is string && data['service'].size() <= 100)) &&
         (!('route' in data) || (data.route is string && data.route.size() <= 200)) &&
         (!('status' in data) || (data.status is string && data.status.size() <= 50)) &&
         (!('amount' in data) || (data.amount is number && data.amount >= 0)) &&
+        (!('totalOrders' in data) || (data.totalOrders is number && data.totalOrders >= 0)) &&
+        (!('archived' in data) || data.archived is bool) &&
         (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000)) &&
         (!('clientId' in data) || (data.clientId is string && data.clientId.size() <= 128)) &&
         (!('uid' in data) || (data.uid is string && data.uid.size() <= 128));
@@ -404,7 +415,14 @@ service cloud.firestore {
         ((isClient() || isProspect()) && (clientId == request.auth.uid || isClientDoc(existing())));
       allow list: if canReadOperations() || 
         ((isClient() || isProspect()) && isClientDoc(existing()));
-      allow create, update: if canManageOperations() && isValidId(clientId) && isValidClient(incoming());
+      allow create: if isValidId(clientId) && (
+        canManageOperations() ||
+        (isSignedIn() && (clientId == request.auth.uid || isOwnClientIdentity(incoming())))
+      ) && isValidClient(incoming());
+      allow update: if isValidId(clientId) && (
+        canManageOperations() ||
+        (isSignedIn() && (clientId == request.auth.uid || isClientDoc(existing())))
+      ) && isValidClient(incoming());
       allow delete: if isAdmin() && isValidId(clientId);
     }
 

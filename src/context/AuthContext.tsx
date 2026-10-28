@@ -322,7 +322,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       const userRef = doc(db, 'utilisateurs', user.uid);
-      await setDoc(userRef, {
+      const updateData: Record<string, any> = {
         nom: nomVal,
         name: nomVal,
         telephone: phoneVal,
@@ -332,18 +332,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         societe: societeVal,
         numeroFiscal: nifVal,
         profileComplete: isComplete,
-        updatedAt: updatedProfile.updatedAt,
-        status: updatedProfile.status || 'actif',
-        statutCompte: updatedProfile.statutCompte || 'actif',
-        statutClient: updatedProfile.statutClient || 'client',
-        role: updatedProfile.role || 'client',
-        roles: updatedProfile.roles || [updatedProfile.role || 'client']
-      }, { merge: true });
-    } catch (err) {
-      console.warn("Mise à jour Firestore en attente / mémoire locale :", err);
-    }
+        updatedAt: updatedProfile.updatedAt
+      };
 
-    setProfile(updatedProfile);
+      // Only super admin or admin can modify administrative fields
+      if (isSuperAdmin || role === 'admin') {
+        if (updatedProfile.status) updateData.status = updatedProfile.status;
+        if (updatedProfile.statutCompte) updateData.statutCompte = updatedProfile.statutCompte;
+        if (updatedProfile.statutClient) updateData.statutClient = updatedProfile.statutClient;
+        if (updatedProfile.role) updateData.role = updatedProfile.role;
+        if (updatedProfile.roles) updateData.roles = updatedProfile.roles;
+      }
+
+      await setDoc(userRef, updateData, { merge: true });
+      setProfile(updatedProfile);
+    } catch (err) {
+      console.error("Erreur de mise à jour Firestore :", err);
+      throw err;
+    }
   };
 
   const logout = async () => {

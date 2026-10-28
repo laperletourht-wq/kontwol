@@ -67,26 +67,22 @@ export {
   serverTimestamp
 };
 
-export const firebaseConfig = {
-  projectId: "laperletourht-28ad8",
-  appId: "1:385210839996:web:e1873fe5675e5730cab1b9",
-  apiKey: "AIzaSyD4D5AajRVUFI6tkf42NlkrmwNMRcuCfbI",
-  authDomain: "laperletourht-28ad8.firebaseapp.com",
-  firestoreDatabaseId: "ai-studio-centredecontrole-27e8ff4b-e91d-4923-8cc6-6265fb193fe7",
-  storageBucket: "laperletourht-28ad8.firebasestorage.app",
-  messagingSenderId: "385210839996",
-  measurementId: "",
-  oAuthClientId: "385210839996-rj4uvt3iep5hefj4km198vjgemuk5g4g.apps.googleusercontent.com",
-  recaptchaSiteKey: ""
-};
+import firebaseConfig from '../../firebase-applet-config.json' with { type: 'json' };
 
+export { firebaseConfig };
 export const app = initializeApp(firebaseConfig);
-try {
-  initializeFirestore(app, { experimentalAutoDetectLongPolling: true }, firebaseConfig.firestoreDatabaseId);
-} catch (e) {
-  // If already initialized, getFirestore will return the existing instance
-}
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db = (() => {
+  if (typeof window !== 'undefined') {
+    try {
+      return initializeFirestore(app, {
+        experimentalForceLongPolling: true,
+      }, firebaseConfig.firestoreDatabaseId);
+    } catch (e) {
+      return getFirestore(app, firebaseConfig.firestoreDatabaseId);
+    }
+  }
+  return getFirestore(app, firebaseConfig.firestoreDatabaseId);
+})();
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
@@ -122,14 +118,21 @@ export function handleFirestoreError(error, operationType, path) {
 }
 
 export async function testConnection() {
-  try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-    console.log("Firebase Firestore connected successfully.");
-    return true;
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration.");
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await getDocFromServer(doc(db, 'test', 'connection'));
+      console.log("Firebase Firestore connected successfully.");
+      return true;
+    } catch (error) {
+      if (attempt < 3 && error instanceof Error && error.message.includes('the client is offline')) {
+        await new Promise(r => setTimeout(r, 600));
+        continue;
+      }
+      if (error instanceof Error && error.message.includes('the client is offline')) {
+        console.error("Please check your Firebase configuration.");
+      }
+      return false;
     }
-    return false;
   }
+  return false;
 }
