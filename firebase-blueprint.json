@@ -371,6 +371,23 @@
         "readBy": { "type": "array", "items": { "type": "string" } }
       },
       "required": ["conversationId", "senderId", "text"]
+    },
+    "temoignage": {
+      "title": "Témoignage",
+      "description": "Commentaire et avis client vérifié sur la vitrine publique",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "nom": { "type": "string", "maxLength": 150 },
+        "titre": { "type": "string", "maxLength": 150 },
+        "etoiles": { "type": "number" },
+        "commentaire": { "type": "string", "maxLength": 2000 },
+        "auteurId": { "type": "string", "maxLength": 128 },
+        "auteurEmail": { "type": "string", "maxLength": 150 },
+        "initiales": { "type": "string", "maxLength": 10 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["nom", "commentaire", "auteurId"]
     }
   },
   "firestore": {
@@ -437,6 +454,10 @@
     "/settings/{settingId}": {
       "schema": "setting",
       "description": "Paramètres et coordonnées de l'entreprise"
+    },
+    "/temoignages/{temoignageId}": {
+      "schema": "temoignage",
+      "description": "Avis et commentaires publics de la communauté Laperle Tour HT"
     }
   }
 }

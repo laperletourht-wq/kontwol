@@ -1,17 +1,107 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { UniversalFooter } from '../common/UniversalFooter';
+import { subscribeTemoignages, addTemoignage, deleteTemoignage, SEED_TEMOIGNAGES } from '../../../services/temoignages';
+import type { Temoignage } from '../../types';
 
 export const LandingPage: React.FC = () => {
   const { setAuthModalOpen, setAuthView, saveReservation, showToast, setIsPublicLanding, settings } = useApp();
-  const { user, profile } = useAuth();
+  const { user, profile, role, isSuperAdmin } = useAuth();
+  const isAdmin = isSuperAdmin || role === 'admin' || role === 'direction';
 
-  // Quote Simulator state
+  // Testimonials & Reviews state (Témoignages dynamiques)
+  const [temoignages, setTemoignages] = useState<Temoignage[]>(SEED_TEMOIGNAGES);
+  const [showCommentModal, setShowCommentModal] = useState<boolean>(false);
+  const [commentNom, setCommentNom] = useState<string>('');
+  const [commentTitre, setCommentTitre] = useState<string>('');
+  const [commentEtoiles, setCommentEtoiles] = useState<number>(5);
+  const [commentText, setCommentText] = useState<string>('');
+  const [submittingComment, setSubmittingComment] = useState<boolean>(false);
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
+
+  // Real-time synchronization of testimonials from Firestore
+  useEffect(() => {
+    const unsub = subscribeTemoignages((list) => {
+      setTemoignages(list);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleOpenCommentModal = () => {
+    if (!user) {
+      setAuthView('login');
+      setAuthModalOpen(true);
+      showToast('Connectez-vous ou créez un compte pour laisser votre avis.', 'info');
+      return;
+    }
+    const defaultName = profile?.nom || profile?.name || user.displayName || user.email?.split('@')[0] || '';
+    setCommentNom(defaultName);
+    setCommentTitre(profile?.societe ? `Client • ${profile.societe}` : 'Client vérifié');
+    setCommentEtoiles(5);
+    setCommentText('');
+    setShowCommentModal(true);
+  };
+
+  const handleSubmitComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) {
+      showToast('Vous devez posséder un compte pour ajouter un commentaire.', 'error');
+      return;
+    }
+    if (!commentText.trim()) {
+      showToast('Veuillez saisir votre commentaire.', 'warning');
+      return;
+    }
+    const finalNom = commentNom.trim() || user.displayName || user.email?.split('@')[0] || 'Client Laperle';
+
+    setSubmittingComment(true);
+    try {
+      await addTemoignage({
+        nom: finalNom,
+        titre: commentTitre.trim() || 'Client vérifié',
+        etoiles: commentEtoiles,
+        commentaire: commentText.trim()
+      });
+      showToast('Votre commentaire a été publié avec succès !', 'success');
+      setShowCommentModal(false);
+      setCommentText('');
+    } catch (err: any) {
+      console.error('Erreur ajout commentaire:', err);
+      showToast(`Impossible de publier votre avis : ${err?.message || 'Erreur'}`, 'error');
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const handleDeleteComment = async (id: string, authorName: string) => {
+    if (!isAdmin) {
+      showToast('Seul un administrateur peut effacer un commentaire.', 'error');
+      return;
+    }
+    if (!window.confirm(`Voulez-vous supprimer définitivement l'avis de ${authorName} ?`)) {
+      return;
+    }
+    setDeletingCommentId(id);
+    try {
+      await deleteTemoignage(id);
+      showToast('Commentaire supprimé par l\'administrateur.', 'success');
+    } catch (err: any) {
+      console.error('Erreur suppression commentaire:', err);
+      showToast(`Échec de la suppression : ${err?.message || 'Droits insuffisants'}`, 'error');
+    } finally {
+      setDeletingCommentId(null);
+    }
+  };
+
+  // Quote Simulator state (Option B & D)
   const [selectedService, setSelectedService] = useState('tourisme');
   const [selectedDepart, setSelectedDepart] = useState('Port-au-Prince Centre');
   const [selectedDestination, setSelectedDestination] = useState('Côte des Arcadins');
   const [selectedPassengers, setSelectedPassengers] = useState('1-2');
+  const [tripType, setTripType] = useState<'simple' | 'aller_retour' | 'journee'>('simple');
+  const [bagages, setBagages] = useState<'standard' | 'volumineux'>('standard');
+  const [siegeEnfant, setSiegeEnfant] = useState<boolean>(false);
   const [clientName, setClientName] = useState(profile?.nom || user?.displayName || '');
   const [clientPhone, setClientPhone] = useState(profile?.telephone || '');
   const [tripDate, setTripDate] = useState(() => {
@@ -19,23 +109,37 @@ export const LandingPage: React.FC = () => {
     return tomorrow.toISOString().slice(0, 10);
   });
 
-  // Interactive price calculation
+  // Interactive price calculation (Option B & D)
   const calculatePrice = () => {
     let base = 120;
-    if (selectedService === 'vip') base = 250;
-    if (selectedService === 'scolaire') base = 150;
-    if (selectedService === 'aeroport') base = 75;
-    if (selectedService === 'corporate') base = 300;
-    if (selectedService === 'course') base = 40;
+    if (selectedService === 'tourisme') base = Number(settings.tarifBaseTourisme) || 120;
+    else if (selectedService === 'vip') base = Number(settings.tarifBaseVip) || 250;
+    else if (selectedService === 'scolaire') base = Number(settings.tarifBaseScolaire) || 150;
+    else if (selectedService === 'aeroport') base = 75;
+    else if (selectedService === 'corporate') base = 300;
+    else if (selectedService === 'course') base = 40;
 
+    // Destination supplements
     if (selectedDestination.includes('Citadelle') || selectedDestination.includes('Cap-Haïtien')) base += 220;
     else if (selectedDestination.includes('Bassin Bleu') || selectedDestination.includes('Jacmel')) base += 140;
     else if (selectedDestination.includes('Côte des Arcadins')) base += 90;
     else if (selectedDestination.includes('Kenscoff')) base += 60;
 
+    // Passengers multiplier
     if (selectedPassengers === '3-5') base = Math.round(base * 1.25);
     else if (selectedPassengers === '6-12') base = Math.round(base * 1.6);
     else if (selectedPassengers === '13-25') base = Math.round(base * 2.2);
+
+    // Trip type adjustments (Option B)
+    if (tripType === 'aller_retour') {
+      base = Math.round(base * 1.85); // 15% discount on return leg
+    } else if (tripType === 'journee') {
+      base = Math.round(base * 1.6); // Full-day disposition
+    }
+
+    // Additional options (Option B)
+    if (bagages === 'volumineux') base += 15;
+    if (siegeEnfant) base += 10;
 
     const usd = base;
     const htg = Math.round(usd * (settings.tauxChangeUSD_HTG || 132));
@@ -56,26 +160,37 @@ export const LandingPage: React.FC = () => {
     }
   };
 
+  const getTripTypeLabel = (type: 'simple' | 'aller_retour' | 'journee') => {
+    switch (type) {
+      case 'aller_retour': return 'Aller-Retour';
+      case 'journee': return 'Mise à disposition Journée Complète';
+      case 'simple':
+      default: return 'Aller simple';
+    }
+  };
+
   const getWhatsAppLink = (customName?: string, customPhone?: string) => {
     const nom = customName || clientName || 'Client Laperle';
     const tel = customPhone || clientPhone || 'Non précisé';
     const text = encodeURIComponent(
-      `Bonjour LAPERLE TOUR HT, je souhaite valider un devis pour mon déplacement :\n` +
+      `Bonjour LAPERLE TOUR HT, je souhaite recevoir un devis officiel (Proforma) pour mon déplacement :\n` +
       `- Nom : ${nom}\n` +
       `- Téléphone : ${tel}\n` +
       `- Prestation : ${getServiceLabel(selectedService)}\n` +
+      `- Formule : ${getTripTypeLabel(tripType)}\n` +
       `- Date souhaitée : ${tripDate}\n` +
       `- Départ : ${selectedDepart}\n` +
       `- Destination : ${selectedDestination}\n` +
       `- Passagers : ${selectedPassengers}\n` +
-      `- Estimation tarifaire : $${usd} USD (~${htg.toLocaleString()} HTG)\n\n` +
-      `Merci de me confirmer la disponibilité d'un chauffeur et d'un véhicule.`
+      `- Bagages : ${bagages === 'volumineux' ? 'Volumineux / Matériel' : 'Standards / Cabine'}\n` +
+      `- Siège enfant : ${siegeEnfant ? 'Oui' : 'Non'}\n\n` +
+      `Merci de m'adresser mon Devis Proforma officiel sur WhatsApp et dans mon espace client.`
     );
     const waNumber = settings.whatsapp ? settings.whatsapp.replace(/\D/g, '') : '50944408687';
     return `https://wa.me/${waNumber}?text=${text}`;
   };
 
-  // Frictionless Validation Flow
+  // Frictionless Validation Flow (Sends official quote request via WhatsApp and creates reservation record)
   const handleValidateQuote = async () => {
     const finalName = clientName.trim() || user?.displayName || user?.email?.split('@')[0] || 'Client Laperle';
     const finalPhone = clientPhone.trim() || '';
@@ -83,19 +198,21 @@ export const LandingPage: React.FC = () => {
     const newRes = {
       client: finalName,
       telephone: finalPhone,
-      service: getServiceLabel(selectedService),
+      service: `${getServiceLabel(selectedService)} (${getTripTypeLabel(tripType)})`,
       origin: selectedDepart,
       destination: selectedDestination,
       passengers: parseInt(selectedPassengers.split('-')[0], 10) || 1,
       date: tripDate,
       time: '09:00',
-      amount: usd,
+      amount: usd, // Internal base estimate for proforma generation
       currency: 'USD' as const,
-      status: 'En attente' as const
+      status: 'En attente' as const,
+      demandeDevis: true,
+      notes: `Demande de Devis Proforma via WhatsApp (${finalPhone || 'Non précisé'}) | Formule: ${getTripTypeLabel(tripType)} | Bagages: ${bagages === 'volumineux' ? 'Volumineux' : 'Standard'} | Siège enfant: ${siegeEnfant ? 'Oui' : 'Non'}`
     };
 
     await saveReservation(newRes);
-    showToast(`Votre demande de devis a été enregistrée avec succès ! Ouverture de votre confirmation WhatsApp...`, 'success');
+    showToast(`Votre demande de devis proforma a été enregistrée avec succès ! Ouverture de votre confirmation WhatsApp...`, 'success');
 
     // Smooth redirection to WhatsApp with pre-filled message
     window.open(getWhatsAppLink(finalName, finalPhone), '_blank');
@@ -118,6 +235,47 @@ export const LandingPage: React.FC = () => {
 
   return (
     <div className="public-landing-page" style={{ display: 'block' }}>
+      {/* 0. Bandeau d'Annonce Promotionnelle Dynamique CMS (Option D) */}
+      {settings.bannierePromoActive && settings.bannierePromoTexte && (
+        <aside aria-label="Annonce promotionnelle" style={{
+          background: 'linear-gradient(90deg, #c2410c 0%, #ea580c 50%, #f97316 100%)',
+          color: '#ffffff',
+          padding: '9px 18px',
+          textAlign: 'center',
+          fontSize: '13px',
+          fontWeight: 650,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '12px',
+          boxShadow: '0 2px 8px rgba(194, 65, 12, 0.25)',
+          position: 'relative',
+          zIndex: 40
+        }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            {settings.bannierePromoTexte}
+          </span>
+          <button
+            type="button"
+            onClick={() => scrollToSection('plDevis')}
+            style={{
+              background: '#ffffff',
+              color: '#c2410c',
+              border: 'none',
+              borderRadius: '20px',
+              padding: '3px 12px',
+              fontSize: '11.5px',
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            Simuler mon devis ➔
+          </button>
+        </aside>
+      )}
+
       {/* 1. Barre de navigation officielle LAPERLE TOUR HT */}
       <header className="pl-navbar">
         <div className="pl-nav-inner">
@@ -242,6 +400,21 @@ export const LandingPage: React.FC = () => {
               </select>
             </div>
 
+            {/* Option B : Formule & Type de trajet */}
+            <div className="pl-sim-field">
+              <label htmlFor="plSimTripType"><span>🔄</span> Formule de trajet :</label>
+              <select 
+                id="plSimTripType" 
+                className="pl-sim-select"
+                value={tripType}
+                onChange={(e) => setTripType(e.target.value as any)}
+              >
+                <option value="simple">Aller simple (Trajet direct)</option>
+                <option value="aller_retour">Aller-Retour</option>
+                <option value="journee">Mise à disposition Journée (8h - 18h)</option>
+              </select>
+            </div>
+
             <div className="pl-sim-field">
               <label htmlFor="plSimDepart"><span>📍</span> Point de départ :</label>
               <select 
@@ -295,7 +468,20 @@ export const LandingPage: React.FC = () => {
               </select>
             </div>
 
-            {/* Nouveaux Champs de Contact Direct et Date (Frictionless UX) */}
+            {/* Option B : Bagages */}
+            <div className="pl-sim-field">
+              <label htmlFor="plSimBagages"><span>🧳</span> Bagages & Équipements :</label>
+              <select
+                id="plSimBagages"
+                className="pl-sim-select"
+                value={bagages}
+                onChange={(e) => setBagages(e.target.value as any)}
+              >
+                <option value="standard">Standards / Valises cabines (Inclus)</option>
+                <option value="volumineux">Bagages volumineux / Matériel</option>
+              </select>
+            </div>
+
             <div className="pl-sim-field">
               <label htmlFor="plSimDate"><span>📅</span> Date souhaitée du trajet :</label>
               <input
@@ -306,6 +492,21 @@ export const LandingPage: React.FC = () => {
                 onChange={(e) => setTripDate(e.target.value)}
                 style={{ background: '#fff' }}
               />
+            </div>
+
+            {/* Option B : Siège enfant */}
+            <div className="pl-sim-field" style={{ justifyContent: 'center' }}>
+              <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '10px' }}>
+                <input
+                  type="checkbox"
+                  checked={siegeEnfant}
+                  onChange={(e) => setSiegeEnfant(e.target.checked)}
+                  style={{ width: '18px', height: '18px', accentColor: '#ea580c', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: '13px', fontWeight: 650, color: '#1e293b' }}>
+                  👶 Siège auto enfant homologué
+                </span>
+              </label>
             </div>
 
             <div className="pl-sim-field">
@@ -321,7 +522,7 @@ export const LandingPage: React.FC = () => {
               />
             </div>
 
-            <div className="pl-sim-field pl-sim-field-full">
+            <div className="pl-sim-field">
               <label htmlFor="plSimClientPhone"><span>📱</span> Numéro WhatsApp ou Téléphone :</label>
               <input
                 id="plSimClientPhone"
@@ -335,26 +536,50 @@ export const LandingPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Résultat interactif calculé en direct */}
+          {/* Résultat interactif : Envoi direct du Devis Proforma sans affichage de prix public */}
           <div className="pl-sim-result-box" id="plSimResultBox">
             <div className="pl-result-left">
-              <span className="pl-result-kicker">DEVIS ESTIMATIF EN TEMPS RÉEL</span>
-              <div className="pl-result-price-wrap" style={{ display: 'flex', alignItems: 'baseline', gap: '12px', margin: '6px 0' }}>
-                <span className="pl-result-price-usd" style={{ fontSize: '28px', fontWeight: 800, color: '#082b70' }}>
-                  ${usd} USD
-                </span>
-                <span className="pl-result-price-htg" style={{ fontSize: '16px', color: '#65758b', fontWeight: 600 }}>
-                  ≈ {htg.toLocaleString()} HTG
-                </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span className="pl-result-kicker">DEVIS OFFICIEL SUR MESURE</span>
+                {tripType === 'aller_retour' && (
+                  <span style={{ background: '#16a34a', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 700 }}>
+                    Formule : Aller-Retour
+                  </span>
+                )}
+                {tripType === 'journee' && (
+                  <span style={{ background: '#ea580c', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 700 }}>
+                    Mise à disposition Journée
+                  </span>
+                )}
+                {bagages === 'volumineux' && (
+                  <span style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
+                    Bagages volumineux
+                  </span>
+                )}
+                {siegeEnfant && (
+                  <span style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
+                    Siège auto enfant
+                  </span>
+                )}
               </div>
+
+              <div style={{ margin: '8px 0 10px' }}>
+                <h4 style={{ fontSize: '20px', fontWeight: 800, color: '#ffffff', margin: '0 0 6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>📑</span> Devis Proforma Personnalisé
+                </h4>
+                <p style={{ fontSize: '13.5px', color: '#cbd5e1', margin: 0, fontWeight: 500, lineHeight: '1.5', maxWidth: '640px' }}>
+                  Renseignez vos coordonnées : votre <strong>Devis Proforma officiel chiffré</strong> vous est transmis instantanément par <strong>WhatsApp</strong> et dans votre <strong>Espace Client</strong> sans aucun engagement.
+                </p>
+              </div>
+
               <div className="pl-result-inclusions" id="plSimInclusions">
-                ✓ Chauffeur professionnel assermenté · ✓ Carburant inclus · ✓ Climatisation haute puissance · ✓ Assurance & Assistance 24/7
+                ✓ Chauffeur professionnel assermenté · ✓ Véhicule climatisé haut de gamme · ✓ Carburant inclus · ✓ Assistance & Assurance 24/7
               </div>
             </div>
 
             <div className="pl-result-actions">
               <button type="button" className="pl-btn-validate-quote" onClick={handleValidateQuote}>
-                <span>Valider & Réserver mon trajet</span> <span>➔</span>
+                <span>Recevoir mon Devis Proforma Gratuit</span> <span>➔</span>
               </button>
             </div>
           </div>
@@ -393,11 +618,11 @@ export const LandingPage: React.FC = () => {
               </ul>
               <div className="pl-service-foot">
                 <div className="pl-service-price-from">
-                  <span className="pl-service-price-label">À partir de</span>
-                  <span className="pl-service-price-val">$120 USD / pers.</span>
+                  <span className="pl-service-price-label">Tarification</span>
+                  <span className="pl-service-price-val" style={{ fontSize: '15px', color: '#082b70', fontWeight: 800 }}>Sur devis officiel</span>
                 </div>
                 <button type="button" className="pl-service-btn" onClick={() => selectServiceForQuote('tourisme')}>
-                  Réserver ce circuit
+                  Demander un devis
                 </button>
               </div>
             </div>
@@ -422,8 +647,8 @@ export const LandingPage: React.FC = () => {
               </ul>
               <div className="pl-service-foot">
                 <div className="pl-service-price-from">
-                  <span className="pl-service-price-label">À partir de</span>
-                  <span className="pl-service-price-val">$250 USD / jour</span>
+                  <span className="pl-service-price-label">Tarification</span>
+                  <span className="pl-service-price-val" style={{ fontSize: '15px', color: '#082b70', fontWeight: 800 }}>Sur devis officiel</span>
                 </div>
                 <button type="button" className="pl-service-btn" onClick={() => selectServiceForQuote('vip')}>
                   Demander un SUV VIP
@@ -451,11 +676,11 @@ export const LandingPage: React.FC = () => {
               </ul>
               <div className="pl-service-foot">
                 <div className="pl-service-price-from">
-                  <span className="pl-service-price-label">Abonnement dès</span>
-                  <span className="pl-service-price-val">$150 USD / mois</span>
+                  <span className="pl-service-price-label">Formule</span>
+                  <span className="pl-service-price-val" style={{ fontSize: '15px', color: '#082b70', fontWeight: 800 }}>Sur devis officiel</span>
                 </div>
                 <button type="button" className="pl-service-btn" onClick={() => selectServiceForQuote('scolaire')}>
-                  Inscrire mon enfant
+                  Demander un devis
                 </button>
               </div>
             </div>
@@ -516,6 +741,364 @@ export const LandingPage: React.FC = () => {
               <button type="button" className="pl-service-btn" style={{ width: '100%' }} onClick={() => selectServiceForQuote('scolaire')}>
                 Inscrire un Élève
               </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 6. Option A : Preuve Sociale & Avis Clients (5/5 Étoiles) */}
+      <section className="pl-section" id="plTestimonials" style={{ background: '#ffffff', borderTop: '1px solid #e2e8f0' }}>
+        <div className="pl-section-head">
+          <div className="pl-section-kicker" style={{ color: '#ea580c' }}>
+            ★ ★ ★ ★ ★ &nbsp; 4.9 / 5 · PLUS DE 350 MISSIONS ACCOMPLIES
+          </div>
+          <h2 className="pl-section-title">Ce que nos Clients et Partenaires disent de Nous</h2>
+          <p className="pl-section-sub">
+            Diplomates, directions d'ONG, parents d'élèves et voyageurs de la diaspora témoignent de notre ponctualité, discrétion et excellence opérationnelle.
+          </p>
+
+          {/* Bouton pour ajouter un commentaire (Accessible à toute personne ayant un compte) */}
+          <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'center' }}>
+            <button
+              type="button"
+              onClick={handleOpenCommentModal}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: user ? '#082b70' : '#ea580c',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '10px',
+                padding: '11px 22px',
+                fontSize: '13.5px',
+                fontWeight: 750,
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(8,43,112,0.18)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <span>✍️</span>
+              {user ? 'Ajouter mon avis / commentaire' : 'Se connecter pour ajouter un commentaire'}
+            </button>
+          </div>
+        </div>
+
+        {/* Grille dynamique des Témoignages & Avis Clients */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: '24px',
+          padding: '0 20px',
+          maxWidth: '1280px',
+          margin: '0 auto 48px'
+        }}>
+          {temoignages.map((t) => (
+            <div
+              key={t.id}
+              style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '16px',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                boxShadow: '0 4px 14px rgba(8,43,112,0.04)',
+                position: 'relative'
+              }}
+            >
+              {/* Seul l'administrateur peut effacer un commentaire */}
+              {isAdmin && (
+                <button
+                  type="button"
+                  title="Effacer ce commentaire (Action Administrateur)"
+                  disabled={deletingCommentId === t.id}
+                  onClick={() => handleDeleteComment(t.id, t.nom)}
+                  style={{
+                    position: 'absolute',
+                    top: '14px',
+                    right: '14px',
+                    background: '#fef2f2',
+                    color: '#dc2626',
+                    border: '1px solid #fecaca',
+                    borderRadius: '8px',
+                    padding: '4px 8px',
+                    fontSize: '11px',
+                    fontWeight: 750,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                  }}
+                >
+                  <span>🗑️</span> Effacer
+                </button>
+              )}
+
+              <div>
+                <div style={{ color: '#f59e0b', fontSize: '16px', letterSpacing: '2px', marginBottom: '12px' }}>
+                  {'★'.repeat(t.etoiles || 5)}
+                  {'☆'.repeat(Math.max(0, 5 - (t.etoiles || 5)))}
+                </div>
+                <p style={{ fontSize: '14px', lineHeight: '1.6', color: '#334155', fontStyle: 'italic', margin: '0 0 16px', whiteSpace: 'pre-line' }}>
+                  {t.commentaire.startsWith('«') ? t.commentaire : `« ${t.commentaire} »`}
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '14px' }}>
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '50%',
+                  background: '#082b70',
+                  color: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                  fontSize: '14px',
+                  flexShrink: 0
+                }}>
+                  {t.initiales || t.nom.slice(0, 2).toUpperCase() || 'CL'}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 750, color: '#0f172a', fontSize: '14px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                    {t.nom}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748b', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                    {t.titre || 'Client Laperle Tour'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Modal d'ajout de commentaire / avis (Accessible aux membres connectés) */}
+        {showCommentModal && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(4, 22, 57, 0.65)',
+              backdropFilter: 'blur(4px)',
+              zIndex: 9999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '16px'
+            }}
+            onClick={() => setShowCommentModal(false)}
+          >
+            <div
+              style={{
+                background: '#ffffff',
+                borderRadius: '16px',
+                width: '100%',
+                maxWidth: '520px',
+                boxShadow: '0 20px 50px rgba(0,0,0,0.25)',
+                overflow: 'hidden'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ background: '#082b70', color: '#ffffff', padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 800 }}>✍️ Ajouter un avis & commentaire</h3>
+                  <p style={{ margin: '3px 0 0', fontSize: '12.5px', color: '#93c5fd' }}>Votre témoignage sera visible sur la vitrine officielle</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCommentModal(false)}
+                  style={{ background: 'transparent', border: 'none', color: '#ffffff', fontSize: '20px', cursor: 'pointer', padding: '4px' }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmitComment} style={{ padding: '24px' }}>
+                {/* Note en étoiles */}
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                    Votre évaluation globale :
+                  </label>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        type="button"
+                        key={star}
+                        onClick={() => setCommentEtoiles(star)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          fontSize: '24px',
+                          cursor: 'pointer',
+                          color: star <= commentEtoiles ? '#f59e0b' : '#cbd5e1',
+                          padding: '0 2px',
+                          transition: 'transform 0.1s ease'
+                        }}
+                      >
+                        ★
+                      </button>
+                    ))}
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#082b70', marginLeft: '6px' }}>
+                      {commentEtoiles} / 5 étoiles
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                    Votre nom complet :
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={commentNom}
+                    onChange={(e) => setCommentNom(e.target.value)}
+                    placeholder="Ex: Jean-Marc Delacroix"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1.5px solid #cbd5e1',
+                      fontSize: '13.5px',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                    Votre titre ou organisation (facultatif) :
+                  </label>
+                  <input
+                    type="text"
+                    value={commentTitre}
+                    onChange={(e) => setCommentTitre(e.target.value)}
+                    placeholder="Ex: Client régulier • Directeur d'ONG • Parent d'élève"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1.5px solid #cbd5e1',
+                      fontSize: '13.5px',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                    Votre commentaire / témoignage :
+                  </label>
+                  <textarea
+                    required
+                    rows={4}
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    placeholder="Racontez votre expérience avec nos chauffeurs, la ponctualité, le confort de nos véhicules..."
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1.5px solid #cbd5e1',
+                      fontSize: '13.5px',
+                      fontFamily: 'inherit',
+                      boxSizing: 'border-box',
+                      resize: 'vertical'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowCommentModal(false)}
+                    style={{
+                      background: '#f1f5f9',
+                      color: '#475569',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '8px',
+                      padding: '10px 18px',
+                      fontWeight: 650,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingComment}
+                    style={{
+                      background: '#082b70',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '10px 22px',
+                      fontWeight: 750,
+                      cursor: submittingComment ? 'not-allowed' : 'pointer',
+                      opacity: submittingComment ? 0.7 : 1
+                    }}
+                  >
+                    {submittingComment ? 'Publication...' : 'Publier mon avis ➔'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* 7. Option A : Bandeau des Partenaires & Institutions de Confiance */}
+        <div style={{
+          background: 'linear-gradient(180deg, #f8fafc 0%, #edf2f7 100%)',
+          borderTop: '1px solid #e2e8f0',
+          borderBottom: '1px solid #e2e8f0',
+          padding: '40px 20px'
+        }}>
+          <div style={{ maxWidth: '1200px', margin: '0 auto', textAlign: 'center' }}>
+            <h4 style={{
+              fontSize: '12px',
+              textTransform: 'uppercase',
+              letterSpacing: '1.5px',
+              color: '#64748b',
+              fontWeight: 800,
+              margin: '0 0 24px'
+            }}>
+              PARTENAIRE LOGISTIQUE PRIVILÉGIÉ DES INSTITUTIONS EN HAÏTI
+            </h4>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '20px',
+              alignItems: 'center'
+            }}>
+              <div style={{ background: '#ffffff', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
+                <div style={{ fontSize: '24px', marginBottom: '6px' }}>🏛️</div>
+                <div style={{ fontWeight: 750, color: '#082b70', fontSize: '13.5px' }}>Corps Diplomatique</div>
+                <div style={{ fontSize: '11px', color: '#64748b' }}>Ambassades & Consulats</div>
+              </div>
+              <div style={{ background: '#ffffff', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
+                <div style={{ fontSize: '24px', marginBottom: '6px' }}>🌐</div>
+                <div style={{ fontWeight: 750, color: '#082b70', fontSize: '13.5px' }}>ONG Internationales</div>
+                <div style={{ fontSize: '11px', color: '#64748b' }}>Missions terrain & Agences UN</div>
+              </div>
+              <div style={{ background: '#ffffff', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
+                <div style={{ fontSize: '24px', marginBottom: '6px' }}>🎓</div>
+                <div style={{ fontWeight: 750, color: '#082b70', fontSize: '13.5px' }}>Établissements Partenaires</div>
+                <div style={{ fontSize: '11px', color: '#64748b' }}>Collèges & Lycées de référence</div>
+              </div>
+              <div style={{ background: '#ffffff', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
+                <div style={{ fontSize: '24px', marginBottom: '6px' }}>🏨</div>
+                <div style={{ fontWeight: 750, color: '#082b70', fontSize: '13.5px' }}>Resorts & Hôtels</div>
+                <div style={{ fontSize: '11px', color: '#64748b' }}>Moulin Sur Mer • Karibe • Decameron</div>
+              </div>
+              <div style={{ background: '#ffffff', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
+                <div style={{ fontSize: '24px', marginBottom: '6px' }}>✈️</div>
+                <div style={{ fontWeight: 750, color: '#082b70', fontSize: '13.5px' }}>Aéroport Toussaint Louverture</div>
+                <div style={{ fontSize: '11px', color: '#64748b' }}>Transferts VIP 24h/24</div>
+              </div>
             </div>
           </div>
         </div>

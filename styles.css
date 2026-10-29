@@ -8263,7 +8263,10 @@ button[disabled] {
 }
 
 .pl-result-price-wrap {
-  display: none !important;
+  display: flex !important;
+  align-items: baseline;
+  gap: 12px;
+  margin: 4px 0 6px;
 }
 
 .pl-result-price-usd {

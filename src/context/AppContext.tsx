@@ -40,7 +40,12 @@ const DEFAULT_SETTINGS: CompanySettings = {
   adresse: 'Delmas 75, Port-au-Prince, Haïti',
   tauxChangeUSD_HTG: 132.0,
   tvaPourcentage: 10,
-  numeroFiscal: '001-234-567-8'
+  numeroFiscal: '001-234-567-8',
+  bannierePromoActive: true,
+  bannierePromoTexte: '✨ Service Premium Laperle : Demandez votre Devis Proforma officiel en 1 clic sur WhatsApp et sur le site !',
+  tarifBaseTourisme: 120,
+  tarifBaseVip: 250,
+  tarifBaseScolaire: 150
 };
 
 // Seed samples for immediate rich visualization
@@ -681,8 +686,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         syncQueryOrCollection('reservations', query(collection(db, 'reservations'), where('clientId', '==', user.uid)), setRawReservations, []);
         syncQueryOrCollection('proformas', query(collection(db, 'proformas'), where('clientId', '==', user.uid)), setRawProformas, []);
         syncQueryOrCollection('factures', query(collection(db, 'factures'), where('clientId', '==', user.uid)), setRawFactures, []);
-        syncQueryOrCollection('notifications', query(collection(db, 'notifications'), where('targetUid', '==', user.uid)), setRawNotifications, []);
       }
+    }
+
+    // Real-time synchronization of company settings
+    if (isStaff) {
+      try {
+        const unsubSettings = onSnapshot(doc(db, 'settings', 'company'), (snap) => {
+          if (snap.exists()) {
+            setSettings((prev) => ({ ...prev, ...(snap.data() as CompanySettings) }));
+          }
+        }, () => {});
+        unsubs.push(unsubSettings);
+      } catch (err) {}
     }
 
     return () => {

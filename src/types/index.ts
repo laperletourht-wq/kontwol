@@ -349,4 +349,23 @@ export interface CompanySettings {
   tauxChangeUSD_HTG: number;
   tvaPourcentage: number;
   numeroFiscal?: string;
+  bannierePromoActive?: boolean;
+  bannierePromoTexte?: string;
+  tarifBaseTourisme?: number;
+  tarifBaseVip?: number;
+  tarifBaseScolaire?: number;
 }
+
+export interface Temoignage {
+  id: string;
+  nom: string;
+  titre?: string;
+  etoiles: number;
+  commentaire: string;
+  auteurId: string;
+  auteurEmail?: string;
+  initiales?: string;
+  createdAt: string;
+}
+
+

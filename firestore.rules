@@ -417,6 +417,19 @@ service cloud.firestore {
         (!('address' in data) || (data.address is string && data.address.size() <= 250));
     }
 
+    function isValidTemoignage(data) {
+      return data.keys().hasAll(['nom', 'commentaire', 'auteurId']) &&
+        data.keys().hasOnly(['id', 'nom', 'titre', 'etoiles', 'commentaire', 'auteurId', 'auteurEmail', 'initiales', 'createdAt']) &&
+        data.nom is string && data.nom.size() >= 1 && data.nom.size() <= 150 &&
+        data.commentaire is string && data.commentaire.size() >= 1 && data.commentaire.size() <= 2000 &&
+        data.auteurId is string && data.auteurId.size() <= 128 &&
+        (!('titre' in data) || (data.titre is string && data.titre.size() <= 150)) &&
+        (!('etoiles' in data) || (data.etoiles is number && data.etoiles >= 1 && data.etoiles <= 5)) &&
+        (!('auteurEmail' in data) || (data.auteurEmail is string && data.auteurEmail.size() <= 150)) &&
+        (!('initiales' in data) || (data.initiales is string && data.initiales.size() <= 10)) &&
+        (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 64));
+    }
+
     // -------------------------------------------------------------
     // Collections
     // -------------------------------------------------------------
@@ -784,6 +797,16 @@ service cloud.firestore {
         )
       );
       allow delete: if isAdmin() && isValidId(messageId);
+    }
+
+    // 20. Témoignages & Avis Clients
+    // Règle : N'importe qui possédant un compte peut ajouter un commentaire, seul l'admin peut effacer un commentaire.
+    match /temoignages/{temoignageId} {
+      allow get, list: if true;
+      allow create: if isSignedIn() && isValidId(temoignageId) && isValidTemoignage(incoming()) && (
+        incoming().auteurId == request.auth.uid
+      );
+      allow update, delete: if isAdmin() && isValidId(temoignageId);
     }
   }
 }
