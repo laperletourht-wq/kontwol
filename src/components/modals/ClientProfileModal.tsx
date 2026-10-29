@@ -104,7 +104,7 @@ export const ClientProfileModal: React.FC = () => {
     <div 
       className="modal-backdrop open" 
       onClick={(e) => {
-        if (e.target === e.currentTarget && isProfileComplete) {
+        if (e.target === e.currentTarget) {
           setClientProfileModalOpen(false);
         }
       }}
@@ -140,7 +140,7 @@ export const ClientProfileModal: React.FC = () => {
             position: 'relative'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{ fontSize: '26px' }}>👤</span>
               <div>
@@ -152,28 +152,30 @@ export const ClientProfileModal: React.FC = () => {
                 </p>
               </div>
             </div>
-            {isProfileComplete && (
-              <button 
-                type="button" 
-                onClick={() => setClientProfileModalOpen(false)}
-                style={{
-                  background: 'rgba(255,255,255,0.15)',
-                  border: 0,
-                  borderRadius: '50%',
-                  color: '#fff',
-                  width: '32px',
-                  height: '32px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-                title="Fermer"
-              >
-                ✕
-              </button>
-            )}
+            <button 
+              type="button" 
+              onClick={() => setClientProfileModalOpen(false)}
+              style={{
+                background: 'rgba(255,255,255,0.18)',
+                border: '1px solid rgba(255,255,255,0.25)',
+                borderRadius: '50%',
+                color: '#fff',
+                width: '34px',
+                height: '34px',
+                cursor: 'pointer',
+                fontSize: '16px',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                transition: 'background 0.15s ease'
+              }}
+              title="Fermer cette fenêtre"
+              aria-label="Fermer cette fenêtre"
+            >
+              ✕
+            </button>
           </div>
 
           {/* Progress Bar */}
@@ -389,16 +391,24 @@ export const ClientProfileModal: React.FC = () => {
               borderTop: '1px solid #e2e8f0' 
             }}
           >
-            {isProfileComplete && (
-              <button 
-                type="button"
-                onClick={() => setClientProfileModalOpen(false)}
-                className="secondary"
-                style={{ padding: '10px 18px', fontSize: '13px' }}
-              >
-                Fermer
-              </button>
-            )}
+            <button 
+              type="button"
+              onClick={() => setClientProfileModalOpen(false)}
+              className="secondary"
+              style={{
+                background: '#f1f5f9',
+                border: '1px solid #cbd5e1',
+                color: '#475569',
+                padding: '10px 18px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+              title="Fermer cette fenêtre"
+            >
+              Fermer
+            </button>
             <button 
               type="submit"
               disabled={saving}
