@@ -70,18 +70,27 @@ export const ClientProfileModal: React.FC = () => {
         );
         await saveClient({
           id: existingClient?.id || user?.uid || `CLI-${Date.now().toString().slice(-5)}`,
+          clientId: user?.uid,
+          clientUid: user?.uid,
+          uid: user?.uid,
           name: societe.trim().toLowerCase() === 'particulier' ? nom.trim() : `${nom.trim()} (${societe.trim()})`,
+          nom: nom.trim(),
           telephone: telephone.trim(),
+          phone: telephone.trim(),
           email: user?.email || profile?.email || '',
           address: `${adresse.trim()}, ${ville.trim()}`,
+          adresse: adresse.trim(),
           city: ville.trim(),
+          ville: ville.trim(),
+          societe: societe.trim(),
+          numeroFiscal: numeroFiscal.trim(),
           type: societe.trim().toLowerCase() === 'particulier' ? 'Particulier' : 'Entreprise'
         });
       } catch (clientErr) {
         console.warn('Sync to clients directory handled locally:', clientErr);
       }
 
-      showToast('Profil client complété et enregistré avec succès !', 'success');
+      showToast('Profil client complété et enregistré dans Firestore avec succès !', 'success');
       setClientProfileModalOpen(false);
     } catch (err: any) {
       console.error(err);

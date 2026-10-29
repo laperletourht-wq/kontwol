@@ -10,6 +10,11 @@ export const AuthModal: React.FC = () => {
   const [password, setPassword] = useState('');
   const [nom, setNom] = useState('');
   const [telephone, setTelephone] = useState('');
+  const [adresse, setAdresse] = useState('');
+  const [ville, setVille] = useState('Port-au-Prince');
+  const [societe, setSociete] = useState('');
+  const [numeroFiscal, setNumeroFiscal] = useState('');
+  const [expandProfileDetails, setExpandProfileDetails] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
   const [generatedCode, setGeneratedCode] = useState('839214');
   const [showPassword, setShowPassword] = useState(false);
@@ -114,8 +119,18 @@ export const AuthModal: React.FC = () => {
     setLoading(true);
     setErrorMessage('');
     try {
-      await registerWithEmail({ email, pass: password, nom, telephone });
-      showToast('Compte créé et vérifié avec succès !', 'success');
+      await registerWithEmail({ 
+        email, 
+        pass: password, 
+        nom, 
+        telephone,
+        adresse,
+        ville,
+        societe,
+        numeroFiscal
+      });
+      const hasFull = Boolean(nom.trim() && telephone.trim() && adresse.trim() && societe.trim() && numeroFiscal.trim());
+      showToast(hasFull ? 'Compte créé et profil client complété avec succès dans Firestore !' : 'Compte créé avec succès !', 'success');
       setAuthModalOpen(false);
       setIsPublicLanding(false);
     } catch (err: any) {
@@ -385,6 +400,130 @@ export const AuthModal: React.FC = () => {
                     style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
                     required
                   />
+                </div>
+
+                {/* Section optionnelle pour compléter le profil dès l'inscription */}
+                <div style={{ marginBottom: '18px', border: '1px solid #e2e8f0', borderRadius: '10px', background: '#f8fafc', padding: '12px 14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '18px' }}>📝</span>
+                      <div>
+                        <div style={{ fontSize: '12px', fontWeight: 750, color: '#082b70' }}>
+                          Compléter mon profil dès maintenant
+                        </div>
+                        <div style={{ fontSize: '10.5px', color: '#64748b' }}>
+                          Adresse, Ville, Entreprise, NIF (ou plus tard)
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setExpandProfileDetails(!expandProfileDetails)}
+                      style={{
+                        background: expandProfileDetails ? '#082b70' : '#e2e8f0',
+                        color: expandProfileDetails ? '#fff' : '#1e293b',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '4px 10px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {expandProfileDetails ? 'Masquer' : 'Remplir +'}
+                    </button>
+                  </div>
+
+                  {expandProfileDetails && (
+                    <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
+                      {/* Adresse & Ville */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
+                            Adresse de résidence / livraison :
+                          </label>
+                          <input
+                            type="text"
+                            value={adresse}
+                            onChange={(e) => setAdresse(e.target.value)}
+                            placeholder="Ex : 24, Rue Rebecca, Delmas 75"
+                            style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
+                            Ville :
+                          </label>
+                          <select
+                            value={ville}
+                            onChange={(e) => setVille(e.target.value)}
+                            style={{ width: '100%', padding: '8px 6px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', background: '#fff' }}
+                          >
+                            <option value="Port-au-Prince">Port-au-Prince</option>
+                            <option value="Pétion-Ville">Pétion-Ville</option>
+                            <option value="Delmas">Delmas</option>
+                            <option value="Tabarre">Tabarre</option>
+                            <option value="Carrefour">Carrefour</option>
+                            <option value="Cap-Haïtien">Cap-Haïtien</option>
+                            <option value="Jacmel">Jacmel</option>
+                            <option value="Saint-Marc">Saint-Marc</option>
+                            <option value="Gonaïves">Gonaïves</option>
+                            <option value="Les Cayes">Les Cayes</option>
+                            <option value="Autre">Autre</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Société / Entreprise */}
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                          <label style={{ fontSize: '11px', fontWeight: 700, color: '#334155', margin: 0 }}>
+                            Société / Entreprise :
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setSociete('Particulier')}
+                            style={{
+                              border: '1px solid #bfdbfe',
+                              background: '#eff6ff',
+                              color: '#1d4ed8',
+                              borderRadius: '4px',
+                              padding: '1px 6px',
+                              fontSize: '10px',
+                              cursor: 'pointer',
+                              fontWeight: 600
+                            }}
+                          >
+                            Cliquer si « Particulier »
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          value={societe}
+                          onChange={(e) => setSociete(e.target.value)}
+                          placeholder="Ex : Particulier ou Ambassade / Entreprise"
+                          style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px' }}
+                        />
+                      </div>
+
+                      {/* Numéro fiscal NIF/CIF */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
+                          Numéro fiscal (NIF / CIF / Matricule) :
+                        </label>
+                        <input
+                          type="text"
+                          value={numeroFiscal}
+                          onChange={(e) => setNumeroFiscal(e.target.value)}
+                          placeholder="Ex : 001-234-567-8"
+                          style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px' }}
+                        />
+                        <span style={{ fontSize: '10px', color: '#64748b', marginTop: '2px', display: 'block' }}>
+                          Requis par la DGI pour l'émission des factures officielles.
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <button

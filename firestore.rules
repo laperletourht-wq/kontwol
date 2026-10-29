@@ -186,9 +186,10 @@ service cloud.firestore {
       return (('clientId' in data) && data.clientId == request.auth.uid) ||
              (('uid' in data) && data.uid == request.auth.uid) ||
              (('clientUid' in data) && data.clientUid == request.auth.uid) ||
-             (('email' in data) && ('email' in request.auth.token) && data.email == request.auth.token.email) ||
-             (('clientEmail' in data) && ('email' in request.auth.token) && data.clientEmail == request.auth.token.email) ||
-             (('parentEmail' in data) && ('email' in request.auth.token) && data.parentEmail == request.auth.token.email);
+             (('id' in data) && data.id == request.auth.uid) ||
+             (('email' in data) && ('email' in request.auth.token) && data.email.lower() == request.auth.token.email.lower()) ||
+             (('clientEmail' in data) && ('email' in request.auth.token) && data.clientEmail.lower() == request.auth.token.email.lower()) ||
+             (('parentEmail' in data) && ('email' in request.auth.token) && data.parentEmail.lower() == request.auth.token.email.lower());
     }
 
     function isClientDoc(data) {
@@ -203,7 +204,7 @@ service cloud.firestore {
         (('uid' in data) && data.uid == request.auth.uid) ||
         (('clientId' in data) && data.clientId == request.auth.uid) ||
         (('chauffeurId' in data) && data.chauffeurId == request.auth.uid) ||
-        (('email' in data) && ('email' in request.auth.token) && data.email == request.auth.token.email)
+        (('email' in data) && ('email' in request.auth.token) && data.email.lower() == request.auth.token.email.lower())
       );
     }
 
@@ -221,7 +222,11 @@ service cloud.firestore {
         (!('telephone' in data) || (data.telephone is string && data.telephone.size() <= 50)) &&
         (!('type' in data) || (data.type is string && data.type.size() <= 50)) &&
         (!('address' in data) || (data.address is string && data.address.size() <= 300)) &&
+        (!('adresse' in data) || (data.adresse is string && data.adresse.size() <= 300)) &&
         (!('city' in data) || (data.city is string && data.city.size() <= 100)) &&
+        (!('ville' in data) || (data.ville is string && data.ville.size() <= 100)) &&
+        (!('societe' in data) || (data.societe is string && data.societe.size() <= 150)) &&
+        (!('numeroFiscal' in data) || (data.numeroFiscal is string && data.numeroFiscal.size() <= 100)) &&
         (!('email' in data) || (data.email is string && data.email.size() <= 150)) &&
         (!('zone' in data) || (data.zone is string && data.zone.size() <= 100)) &&
         (!('service' in data) || (data['service'] is string && data['service'].size() <= 100)) &&
@@ -232,6 +237,7 @@ service cloud.firestore {
         (!('archived' in data) || data.archived is bool) &&
         (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000)) &&
         (!('clientId' in data) || (data.clientId is string && data.clientId.size() <= 128)) &&
+        (!('clientUid' in data) || (data.clientUid is string && data.clientUid.size() <= 128)) &&
         (!('uid' in data) || (data.uid is string && data.uid.size() <= 128));
     }
 
@@ -366,12 +372,18 @@ service cloud.firestore {
 
     function isValidUtilisateur(data) {
       return (!('email' in data) || (data.email is string && data.email.size() <= 150)) &&
+        (!('name' in data) || (data.name is string && data.name.size() <= 150)) &&
+        (!('nom' in data) || (data.nom is string && data.nom.size() <= 150)) &&
+        (!('prenom' in data) || (data.prenom is string && data.prenom.size() <= 150)) &&
+        (!('username' in data) || (data.username is string && data.username.size() <= 100)) &&
         (!('telephone' in data) || (data.telephone is string && data.telephone.size() <= 50)) &&
         (!('phone' in data) || (data.phone is string && data.phone.size() <= 50)) &&
         (!('adresse' in data) || (data.adresse is string && data.adresse.size() <= 300)) &&
         (!('ville' in data) || (data.ville is string && data.ville.size() <= 100)) &&
         (!('societe' in data) || (data.societe is string && data.societe.size() <= 150)) &&
         (!('numeroFiscal' in data) || (data.numeroFiscal is string && data.numeroFiscal.size() <= 100)) &&
+        (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500)) &&
+        (!('avatar' in data) || (data.avatar is string && data.avatar.size() <= 500)) &&
         (!('profileComplete' in data) || data.profileComplete is bool) &&
         (!('statutCompte' in data) || (data.statutCompte in ["actif", "inactif", "Actif", "Inactif"])) &&
         (!('status' in data) || (data.status in ["actif", "inactif", "Actif", "Inactif"])) &&
@@ -642,16 +654,14 @@ service cloud.firestore {
         (isSecretaire() && utilisateurId != request.auth.uid && !hasRoleFor(existing(), "admin") && !isSuperAdminDoc(existing()) &&
           incoming().diff(existing()).affectedKeys().hasOnly(['updatedAt', 'updatedBy', 'status', 'statutCompte'])) ||
         (isSignedIn() && request.auth.uid == utilisateurId &&
-          (!('uid' in existing()) || incoming().uid == existing().uid) &&
-          (!('id' in existing()) || incoming().id == existing().id) &&
-          (!('role' in existing()) || incoming().role == existing().role) &&
-          (!('roles' in existing()) || incoming().roles == existing().roles) &&
-          (!('permissions' in existing()) || incoming().permissions == existing().permissions) &&
-          (!('allowedModules' in existing()) || incoming().allowedModules == existing().allowedModules) &&
-          (!('statutClient' in existing()) || incoming().statutClient == existing().statutClient) &&
-          (!('status' in existing()) || incoming().status == existing().status) &&
-          (!('statutCompte' in existing()) || incoming().statutCompte == existing().statutCompte) &&
-          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'nom', 'prenom', 'username', 'phone', 'telephone', 'email', 'photoURL', 'avatar', 'adresse', 'ville', 'societe', 'numeroFiscal', 'profileComplete', 'updatedAt', 'lastLoginAt', 'status', 'statutCompte', 'statutClient', 'permissions']))
+          (!('uid' in incoming()) || incoming().uid == request.auth.uid) &&
+          (!('id' in incoming()) || incoming().id == request.auth.uid) &&
+          (!('role' in incoming()) || incoming().role == existing().role) &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'name', 'nom', 'prenom', 'username', 'phone', 'telephone', 'email', 
+            'photoURL', 'avatar', 'adresse', 'ville', 'societe', 'numeroFiscal', 
+            'profileComplete', 'updatedAt', 'lastLoginAt'
+          ]))
       );
       allow delete: if isAdmin() && utilisateurId != request.auth.uid && !isSuperAdminDoc(existing());
     }

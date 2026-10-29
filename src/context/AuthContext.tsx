@@ -238,7 +238,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const registerWithEmail = async ({ email, pass, nom, telephone }: { email: string; pass: string; nom: string; telephone?: string }) => {
+  const registerWithEmail = async (data: { 
+    email: string; 
+    pass: string; 
+    nom: string; 
+    telephone?: string;
+    adresse?: string;
+    ville?: string;
+    societe?: string;
+    numeroFiscal?: string;
+  }) => {
+    const { email, pass, nom, telephone, adresse, ville, societe, numeroFiscal } = data;
     const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
     const cred = await createUserWithEmailAndPassword(auth, email, pass);
     if (cred.user) {
@@ -248,28 +258,92 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const isSuper = isSuperAdminEmail(email);
       const defaultRole: UserRole = isSuper ? 'admin' : 'client';
+      const nomVal = (nom || '').trim();
+      const phoneVal = (telephone || '').trim();
+      const adresseVal = (adresse || '').trim();
+      const villeVal = (ville || 'Port-au-Prince').trim();
+      const societeVal = (societe || '').trim();
+      const nifVal = (numeroFiscal || '').trim();
+      const isComplete = Boolean(nomVal && phoneVal && adresseVal && societeVal && nifVal);
+      const nowIso = new Date().toISOString();
+
       const initialProfile: UserProfile = {
         id: cred.user.uid,
         uid: cred.user.uid,
         email,
-        nom,
-        name: nom,
-        telephone: telephone || '',
-        phone: telephone || '',
+        nom: nomVal,
+        name: nomVal,
+        telephone: phoneVal,
+        phone: phoneVal,
+        adresse: adresseVal,
+        ville: villeVal,
+        societe: societeVal,
+        numeroFiscal: nifVal,
+        profileComplete: isComplete,
         role: defaultRole,
         roles: [defaultRole],
         status: 'actif',
         statutCompte: 'actif',
         statutClient: defaultRole === 'admin' ? 'admin' : 'client',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        createdAt: nowIso,
+        updatedAt: nowIso
       };
 
+      // 1. Direct Firestore user profile creation
       try {
         await setDoc(doc(db, 'utilisateurs', cred.user.uid), initialProfile);
       } catch (e) {
         console.warn('Initial registration setDoc fallback:', e);
       }
+
+      // 2. Direct Firestore client record creation if not super admin
+      if (defaultRole !== 'admin') {
+        const clientDoc = {
+          id: cred.user.uid,
+          clientId: cred.user.uid,
+          clientUid: cred.user.uid,
+          uid: cred.user.uid,
+          name: societeVal.toLowerCase() === 'particulier' ? nomVal : (societeVal ? `${nomVal} (${societeVal})` : nomVal),
+          nom: nomVal,
+          telephone: phoneVal,
+          phone: phoneVal,
+          email,
+          address: adresseVal ? `${adresseVal}, ${villeVal}` : '',
+          adresse: adresseVal,
+          city: villeVal,
+          ville: villeVal,
+          type: societeVal.toLowerCase() === 'particulier' ? 'Particulier' : 'Entreprise',
+          societe: societeVal,
+          numeroFiscal: nifVal,
+          status: 'Actif',
+          archived: false,
+          createdAt: nowIso,
+          updatedAt: nowIso
+        };
+        try {
+          await setDoc(doc(db, 'clients', cred.user.uid), clientDoc, { merge: true });
+        } catch (clientErr) {
+          console.warn('Clients sync on register notice:', clientErr);
+        }
+      }
+
+      // 3. Server-side sync via /api/auth/register
+      try {
+        const token = await cred.user.getIdToken();
+        if (token) {
+          await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(initialProfile)
+          });
+        }
+      } catch (apiErr) {
+        console.warn('Backend API register sync notice:', apiErr);
+      }
+
       setProfile(initialProfile);
     }
   };
@@ -290,11 +364,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const nomVal = (data.nom ?? profile?.nom ?? data.name ?? profile?.name ?? '').trim();
     const phoneVal = (data.telephone ?? profile?.telephone ?? data.phone ?? profile?.phone ?? '').trim();
     const adresseVal = (data.adresse ?? profile?.adresse ?? '').trim();
-    const villeVal = (data.ville ?? profile?.ville ?? '').trim();
+    const villeVal = (data.ville ?? profile?.ville ?? 'Port-au-Prince').trim();
     const societeVal = (data.societe ?? profile?.societe ?? '').trim();
     const nifVal = (data.numeroFiscal ?? profile?.numeroFiscal ?? '').trim();
 
     const isComplete = Boolean(nomVal && phoneVal && adresseVal && societeVal && nifVal);
+    const nowIso = new Date().toISOString();
 
     const updatedProfile: UserProfile = {
       ...(profile || {
@@ -317,39 +392,89 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       societe: societeVal,
       numeroFiscal: nifVal,
       profileComplete: isComplete,
-      updatedAt: new Date().toISOString()
+      updatedAt: nowIso
     };
 
+    const userRef = doc(db, 'utilisateurs', user.uid);
+    const updateData: Record<string, any> = {
+      nom: nomVal,
+      name: nomVal,
+      telephone: phoneVal,
+      phone: phoneVal,
+      adresse: adresseVal,
+      ville: villeVal,
+      societe: societeVal,
+      numeroFiscal: nifVal,
+      profileComplete: isComplete,
+      updatedAt: nowIso
+    };
+
+    // If profile was empty or not in Firestore yet, supply identity fields
+    if (!profile) {
+      updateData.id = user.uid;
+      updateData.uid = user.uid;
+      updateData.email = user.email || '';
+      updateData.role = 'client';
+      updateData.roles = ['client'];
+      updateData.status = 'actif';
+      updateData.statutCompte = 'actif';
+      updateData.statutClient = 'client';
+      updateData.createdAt = nowIso;
+    }
+
+    // 1. Direct Firestore write
     try {
-      const userRef = doc(db, 'utilisateurs', user.uid);
-      const updateData: Record<string, any> = {
+      await setDoc(userRef, updateData, { merge: true });
+    } catch (err: any) {
+      console.warn("Direct Firestore setDoc notice, continuing to client and backend sync:", err?.message || err);
+    }
+
+    // 2. Direct Firestore 'clients' directory upsert
+    try {
+      const clientDoc = {
+        id: user.uid,
+        clientId: user.uid,
+        clientUid: user.uid,
+        uid: user.uid,
+        name: societeVal.toLowerCase() === 'particulier' ? nomVal : (societeVal ? `${nomVal} (${societeVal})` : nomVal),
         nom: nomVal,
-        name: nomVal,
         telephone: phoneVal,
         phone: phoneVal,
+        email: user.email || profile?.email || '',
+        address: adresseVal ? `${adresseVal}, ${villeVal}` : '',
         adresse: adresseVal,
+        city: villeVal,
         ville: villeVal,
+        type: societeVal.toLowerCase() === 'particulier' ? 'Particulier' : 'Entreprise',
         societe: societeVal,
         numeroFiscal: nifVal,
-        profileComplete: isComplete,
-        updatedAt: updatedProfile.updatedAt
+        status: 'Actif',
+        archived: false,
+        updatedAt: nowIso
       };
-
-      // Only super admin or admin can modify administrative fields
-      if (isSuperAdmin || role === 'admin') {
-        if (updatedProfile.status) updateData.status = updatedProfile.status;
-        if (updatedProfile.statutCompte) updateData.statutCompte = updatedProfile.statutCompte;
-        if (updatedProfile.statutClient) updateData.statutClient = updatedProfile.statutClient;
-        if (updatedProfile.role) updateData.role = updatedProfile.role;
-        if (updatedProfile.roles) updateData.roles = updatedProfile.roles;
-      }
-
-      await setDoc(userRef, updateData, { merge: true });
-      setProfile(updatedProfile);
-    } catch (err) {
-      console.error("Erreur de mise à jour Firestore :", err);
-      throw err;
+      await setDoc(doc(db, 'clients', user.uid), clientDoc, { merge: true });
+    } catch (clientWriteErr) {
+      console.warn('Direct Firestore client record sync notice:', clientWriteErr);
     }
+
+    // 3. Server-side sync via /api/auth/profile
+    try {
+      const token = await user.getIdToken();
+      if (token) {
+        await fetch('/api/auth/profile', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(updateData)
+        });
+      }
+    } catch (apiErr) {
+      console.warn('Backend API profile sync notice:', apiErr);
+    }
+
+    setProfile(updatedProfile);
   };
 
   const logout = async () => {

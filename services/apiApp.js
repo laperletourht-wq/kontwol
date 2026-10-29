@@ -273,6 +273,75 @@ app.post('/api/auth/register', async (req, res) => {
   return res.status(201).json({ success: true, profile: safeProfile });
 });
 
+app.post('/api/auth/profile', async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+
+  const body = req.body || {};
+  const safeName = String(body.nom || body.name || user.name || user.email?.split('@')[0] || '').trim().slice(0, 150);
+  const safePhone = String(body.telephone || body.phone || '').trim().slice(0, 50);
+  const safeAdresse = String(body.adresse || '').trim().slice(0, 300);
+  const safeVille = String(body.ville || 'Port-au-Prince').trim().slice(0, 100);
+  const safeSociete = String(body.societe || '').trim().slice(0, 150);
+  const safeNumeroFiscal = String(body.numeroFiscal || '').trim().slice(0, 100);
+  const isComplete = Boolean(safeName && safePhone && safeAdresse && safeSociete && safeNumeroFiscal);
+
+  const updates = {
+    id: user.uid,
+    uid: user.uid,
+    email: user.email,
+    name: safeName,
+    nom: safeName,
+    telephone: safePhone,
+    phone: safePhone,
+    adresse: safeAdresse,
+    ville: safeVille,
+    societe: safeSociete,
+    numeroFiscal: safeNumeroFiscal,
+    profileComplete: isComplete,
+    updatedAt: new Date().toISOString()
+  };
+
+  if (adminDb) {
+    try {
+      const userRef = adminDb.collection('utilisateurs').doc(user.uid);
+      await userRef.set({
+        ...updates,
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      // Upsert client entry in clients collection for seamless invoicing & bookings
+      const clientRef = adminDb.collection('clients').doc(user.uid);
+      await clientRef.set({
+        id: user.uid,
+        clientId: user.uid,
+        clientUid: user.uid,
+        uid: user.uid,
+        name: safeSociete.toLowerCase() === 'particulier' ? safeName : `${safeName} (${safeSociete})`,
+        nom: safeName,
+        telephone: safePhone,
+        phone: safePhone,
+        email: user.email,
+        address: `${safeAdresse}, ${safeVille}`,
+        adresse: safeAdresse,
+        city: safeVille,
+        ville: safeVille,
+        type: safeSociete.toLowerCase() === 'particulier' ? 'Particulier' : 'Entreprise',
+        societe: safeSociete,
+        numeroFiscal: safeNumeroFiscal,
+        status: 'Actif',
+        archived: false,
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+    } catch (adminErr) {
+      console.warn('[AdminDB Profile Sync Error]:', adminErr?.message);
+    }
+  }
+
+  saveLocalUser(updates);
+  return res.json({ success: true, profile: updates });
+});
+
 app.get('/api/auth/user/:uid', async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;

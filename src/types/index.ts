@@ -161,12 +161,21 @@ export interface Facture {
 
 export interface Client {
   id: string;
+  clientId?: string;
+  clientUid?: string;
+  uid?: string;
   name: string;
-  type?: 'Particulier' | 'Entreprise' | 'École' | 'Ambassade / ONG' | 'Touriste';
+  nom?: string;
+  type?: 'Particulier' | 'Entreprise' | 'École' | 'Ambassade / ONG' | 'Touriste' | string;
   telephone: string;
+  phone?: string;
   email?: string;
   address?: string;
+  adresse?: string;
   city?: string;
+  ville?: string;
+  societe?: string;
+  numeroFiscal?: string;
   notes?: string;
   totalOrders?: number;
   archived?: boolean;
