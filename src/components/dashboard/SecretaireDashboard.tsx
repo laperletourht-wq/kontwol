@@ -46,24 +46,33 @@ export const SecretaireDashboard: React.FC<SecretaireDashboardProps> = ({ onOpen
 
   // Operational metrics for the 3 highlight cards
   const navettesScolairesCount = useMemo(() => {
-    return reservations.filter(r => (r.serviceType || r.service || '').toLowerCase().includes('scolaire') || (r.circuit || '').toLowerCase().includes('scolaire')).length || 14;
+    return reservations.filter(r => (r.serviceType || r.service || '').toLowerCase().includes('scolaire') || (r.circuit || '').toLowerCase().includes('scolaire')).length;
   }, [reservations]);
 
   const circuitsTouristiquesCount = useMemo(() => {
-    return reservations.filter(r => (r.serviceType || r.service || '').toLowerCase().includes('tour') || (r.circuit || '').toLowerCase().includes('tour')).length || 6;
+    return reservations.filter(r => (r.serviceType || r.service || '').toLowerCase().includes('tour') || (r.circuit || '').toLowerCase().includes('tour')).length;
   }, [reservations]);
 
   const vipSuvCount = useMemo(() => {
-    return reservations.filter(r => (r.serviceType || r.service || '').toLowerCase().includes('vip') || (r.vehicleType || '').toLowerCase().includes('suv')).length || 9;
+    return reservations.filter(r => (r.serviceType || r.service || '').toLowerCase().includes('vip') || (r.vehicleType || '').toLowerCase().includes('suv')).length;
   }, [reservations]);
 
   // Map markers for live map
-  const liveVehicles = useMemo(() => [
-    { id: 'v1', nom: 'Toyota HiAce Navette 01', immatriculation: 'TP-48291', status: 'En route', zone: 'Pétion-Ville - Canapé-Vert', driver: 'Jean-Baptiste M.', lat: 42, lng: 38 },
-    { id: 'v2', nom: 'Nissan Urvan Navette 03', immatriculation: 'TP-39104', status: 'En ramassage', zone: 'Delmas 33 - Aéroport', driver: 'Ronald Pierre', lat: 30, lng: 65 },
-    { id: 'v3', nom: 'Toyota Prado VIP SUV', immatriculation: 'AA-92810', status: 'En service VIP', zone: 'Hôtel Karibe - Pétion-Ville', driver: 'Fritz Gerald', lat: 68, lng: 52 },
-    { id: 'v4', nom: 'Hyundai H-1 Express', immatriculation: 'TP-18302', status: 'Disponible au dépôt', zone: 'Base Centrale Laperle', driver: 'Marc Alix', lat: 55, lng: 22 }
-  ], []);
+  const liveVehicles = useMemo(() => {
+    if (vehicules.length > 0) {
+      return vehicules.map((v, i) => ({
+        id: v.id,
+        nom: `${v.marque || ''} ${v.modele || ''}`.trim() || 'Véhicule',
+        immatriculation: v.plaque || `VEH-${i + 1}`,
+        status: v.statut || 'Disponible',
+        zone: v.categorie || 'Base Centrale',
+        driver: v.chauffeurAttitre || 'Non assigné',
+        lat: 30 + ((i * 17) % 45),
+        lng: 25 + ((i * 23) % 45)
+      }));
+    }
+    return [];
+  }, [vehicules]);
 
   return (
     <div className="secretaire-dash-wrapper">
@@ -187,7 +196,7 @@ export const SecretaireDashboard: React.FC<SecretaireDashboardProps> = ({ onOpen
               </div>
               <div className="sec-stat-box highlight">
                 <span className="sec-stat-label">Courses confirmées</span>
-                <div className="sec-stat-value tabular-nums">{reservations.length || 24}</div>
+                <div className="sec-stat-value tabular-nums">{reservations.length}</div>
                 <span className="sec-stat-sub">{activeReservations.length} en circulation</span>
               </div>
               <div className="sec-stat-box">
@@ -347,14 +356,14 @@ export const SecretaireDashboard: React.FC<SecretaireDashboardProps> = ({ onOpen
                 className={`sec-tab-btn ${driverTab === 'actifs' ? 'active' : ''}`}
                 onClick={() => setDriverTab('actifs')}
               >
-                En tournée ({activeDriversCount || 4})
+                En tournée ({activeDriversCount})
               </button>
               <button 
                 type="button" 
                 className={`sec-tab-btn ${driverTab === 'tous' ? 'active' : ''}`}
                 onClick={() => setDriverTab('tous')}
               >
-                Tous ({chauffeurs.length || 8})
+                Tous ({chauffeurs.length})
               </button>
             </div>
 

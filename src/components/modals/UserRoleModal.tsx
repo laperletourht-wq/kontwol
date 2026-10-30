@@ -162,6 +162,7 @@ export const UserRoleModal: React.FC<UserRoleModalProps> = ({ userToEdit, onClos
               <option value="comptabilite">Comptabilité & Trésorerie (Factures, devis, paiements, finances)</option>
               <option value="secretaire">Secrétariat & Accueil (Réservations, clients, devis, plannings)</option>
               <option value="operations">Opérations & Régulation (Flotte, chauffeurs, courses en direct)</option>
+              <option value="vendeur">Commercial / Vendeur (Devis proformas, conversion factures, clients)</option>
               <option value="chauffeur">Chauffeur VIP (Missions assignées, véhicule attitré)</option>
               <option value="client">Client VIP Portefeuille (Espace client sécurisé, réservations, devis, factures)</option>
               <option value="prospect">Prospect (Demande de devis et tarifs)</option>

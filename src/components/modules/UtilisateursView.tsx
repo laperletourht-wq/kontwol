@@ -145,7 +145,8 @@ export const UtilisateursView: React.FC<UtilisateursViewProps> = ({ onOpenModal 
               <option value="admin">Administrateur</option>
               <option value="comptabilite">Comptabilité & Finances</option>
               <option value="secretaire">Secrétariat & Accueil</option>
-              <option value="dispatch">Dispatch & Logistique</option>
+              <option value="operations">Opérations & Flotte</option>
+              <option value="vendeur">Commercial / Vendeur</option>
               <option value="chauffeur">Chauffeur Privé</option>
               <option value="client">Client & Passager</option>
             </select>

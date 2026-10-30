@@ -6,6 +6,7 @@ import { DocRefBadge } from '../common/DocRefBadge';
 import { DashboardUniversalSearchBar } from '../common/DashboardUniversalSearchBar';
 import { SecretaireDashboard } from '../dashboard/SecretaireDashboard';
 import { ClientDashboard } from '../dashboard/ClientDashboard';
+import { DashboardVendeur } from '../dashboard/DashboardVendeur';
 
 interface DashboardViewProps {
   onOpenModal: (type: string, data?: any) => void;
@@ -45,7 +46,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenModal }) => 
   }
 
   // =========================================================================
-  // 2. CLIENTS, PROSPECTS, CHAUFFEURS & AUTRES NON-ADMINS (MAQUETTE 2 : PROFIL, TIMELINE & PAIEMENTS)
+  // 2. VENDEUR DASHBOARD (MAQUETTE VENDEUR : KPIS VENTES, ENTONNOIR & DEVIS)
+  // =========================================================================
+  if (role === 'vendeur') {
+    return <DashboardVendeur onOpenModal={onOpenModal} />;
+  }
+
+  // =========================================================================
+  // 3. CLIENTS, PROSPECTS, CHAUFFEURS & AUTRES NON-ADMINS (MAQUETTE 2 : PROFIL, TIMELINE & PAIEMENTS)
   // =========================================================================
   if (isClient || isChauffeur || role === 'lecture_seule') {
     return <ClientDashboard onOpenModal={onOpenModal} />;
@@ -512,8 +520,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenModal }) => 
               </svg>
             </div>
             <div className="kpi-header-label">VÉHICULE ATTITRÉ</div>
-            <div className="kpi-main-number" style={{ fontSize: '18px' }}>Toyota Prado</div>
-            <div className="kpi-sub-text">Contrôle journalier validé</div>
+            <div className="kpi-main-number" style={{ fontSize: '18px' }}>
+              {vehicules.find(v => v.chauffeurAttitre === displayName || (profile?.nom && v.chauffeurAttitre?.includes(profile.nom)))?.modele || (vehicules[0]?.modele || 'Aucun')}
+            </div>
+            <div className="kpi-sub-text">Statut flotte en temps réel</div>
           </div>
 
           <div className="kpi-card-exact" onClick={() => setChatModalOpen(true)}>
@@ -570,17 +580,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenModal }) => 
   // =========================================================================
   // 3. STAFF / DIRECTION / ADMIN / COMPTABILITÉ DASHBOARD (FULL ENTERPRISE VIEW)
   // =========================================================================
-  const activeClients = clients.length || 4;
-  const activeVehicles = vehicules.filter((v) => v.statut === 'Disponible' || v.statut === 'En mission').length || 2;
-  const totalVehicles = vehicules.length || 5;
-  const activeDrivers = chauffeurs.length || 4;
-  const activeReservations = reservations.filter((r) => r.status === 'En attente' || r.status === 'En cours' || r.status === 'Confirmée').length || 2;
-  const totalReservations = reservations.length || 3;
+  const activeClients = clients.length;
+  const activeVehicles = vehicules.filter((v) => v.statut === 'Disponible' || v.statut === 'En mission').length;
+  const totalVehicles = vehicules.length;
+  const activeDrivers = chauffeurs.length;
+  const activeReservations = reservations.filter((r) => r.status === 'En attente' || r.status === 'En cours' || r.status === 'Confirmée').length;
+  const totalReservations = reservations.length;
   
   // Total payments collected
   const totalRevenueUSD = paiements
     .filter((p) => p.devise === 'USD' && p.statut === 'Validé')
-    .reduce((sum, p) => sum + p.montant, 0) || 695;
+    .reduce((sum, p) => sum + p.montant, 0);
 
   const totalRevenueHTG = Math.round(totalRevenueUSD * 132);
 

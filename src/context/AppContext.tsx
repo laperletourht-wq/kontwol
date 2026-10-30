@@ -6,6 +6,7 @@ import {
   doc, 
   setDoc, 
   deleteDoc, 
+  getDocs,
   onSnapshot, 
   testConnection,
   query,
@@ -48,423 +49,19 @@ const DEFAULT_SETTINGS: CompanySettings = {
   tarifBaseScolaire: 150
 };
 
-// Seed samples for immediate rich visualization
-const SEED_VEHICULES: Vehicule[] = [
-  {
-    id: 'VEH-01',
-    plaque: 'AA-98124',
-    marque: 'Toyota',
-    modele: 'Land Cruiser Prado TXL',
-    annee: 2024,
-    couleur: 'Noir Métallisé',
-    categorie: 'SUV VIP',
-    capacitePassagers: 5,
-    statut: 'Disponible',
-    chauffeurAttitre: 'Jean-Baptiste Pierre',
-    kilometrage: 18450,
-    climatisation: true,
-    gpsActif: true
-  },
-  {
-    id: 'VEH-02',
-    plaque: 'BB-44210',
-    marque: 'Toyota',
-    modele: 'HiAce VIP Grand Cabin',
-    annee: 2023,
-    couleur: 'Blanc Nacré',
-    categorie: 'Minibus HiAce',
-    capacitePassagers: 12,
-    statut: 'En mission',
-    chauffeurAttitre: 'Marc Antoine Saint-Louis',
-    kilometrage: 32100,
-    climatisation: true,
-    gpsActif: true
-  },
-  {
-    id: 'VEH-03',
-    plaque: 'SC-10522',
-    marque: 'Toyota',
-    modele: 'Coaster Navette Scolaire',
-    annee: 2022,
-    couleur: 'Jaune & Bleu Laperle',
-    categorie: 'Autocar / Coaster',
-    capacitePassagers: 28,
-    statut: 'Disponible',
-    chauffeurAttitre: 'Samuel Joseph',
-    kilometrage: 41200,
-    climatisation: true,
-    gpsActif: true
-  },
-  {
-    id: 'VEH-04',
-    plaque: 'PR-88190',
-    marque: 'Toyota',
-    modele: 'Land Cruiser 300 VXR',
-    annee: 2025,
-    couleur: 'Noir Vierge',
-    categorie: 'SUV VIP',
-    capacitePassagers: 6,
-    statut: 'Disponible',
-    chauffeurAttitre: 'Jean-Baptiste Pierre',
-    kilometrage: 6200,
-    climatisation: true,
-    gpsActif: true
-  }
-];
-
-const SEED_CHAUFFEURS: Chauffeur[] = [
-  {
-    id: 'CHF-01',
-    nom: 'Pierre',
-    prenom: 'Jean-Baptiste',
-    telephone: '+509 3788 1245',
-    email: 'j.pierre@laperletour.ht',
-    permisNumero: 'HT-P-449102',
-    statut: 'En service',
-    vehiculeActuel: 'Toyota Land Cruiser Prado TXL',
-    noteService: 4.9,
-    zonesHabituelles: 'Port-au-Prince, Pétion-Ville, Côte des Arcadins'
-  },
-  {
-    id: 'CHF-02',
-    nom: 'Saint-Louis',
-    prenom: 'Marc Antoine',
-    telephone: '+509 4412 8890',
-    email: 'm.saintlouis@laperletour.ht',
-    permisNumero: 'HT-P-118432',
-    statut: 'En course',
-    vehiculeActuel: 'Toyota HiAce VIP Grand Cabin',
-    noteService: 4.8,
-    zonesHabituelles: 'Aéroport, Cap-Haïtien, Jacmel'
-  },
-  {
-    id: 'CHF-03',
-    nom: 'Joseph',
-    prenom: 'Samuel',
-    telephone: '+509 3690 7714',
-    email: 's.joseph@laperletour.ht',
-    permisNumero: 'HT-P-882310',
-    statut: 'En service',
-    vehiculeActuel: 'Toyota Coaster Navette Scolaire',
-    noteService: 4.9,
-    zonesHabituelles: 'Lycée Français, Institution Saint-Louis, Delmas'
-  }
-];
-
-const SEED_CLIENTS: Client[] = [
-  {
-    id: 'CLI-01',
-    name: 'Délégation Diplomatique Union Européenne',
-    type: 'Ambassade / ONG',
-    telephone: '+509 2940 1000',
-    email: 'contact@delegation-ue.ht',
-    address: 'Pétion-Ville, Route de Montagne Noire',
-    totalOrders: 14
-  },
-  {
-    id: 'CLI-02',
-    name: 'Famille Delacroix',
-    type: 'Particulier',
-    telephone: '+509 3441 9920',
-    email: 'delacroix.famille@gmail.com',
-    address: 'Delmas 75',
-    totalOrders: 6
-  },
-  {
-    id: 'CLI-03',
-    name: 'Digicel Business Haïti',
-    type: 'Entreprise',
-    telephone: '+509 3700 1122',
-    email: 'logistique@digicelgroup.com',
-    address: 'Turgeau, Port-au-Prince',
-    totalOrders: 28
-  }
-];
-
-const SEED_RESERVATIONS: Reservation[] = [
-  {
-    id: 'RES-001',
-    client: 'Délégation Diplomatique Union Européenne',
-    service: 'Location VIP avec Chauffeur',
-    origin: 'Hôtel Karibe, Pétion-Ville',
-    destination: 'Côte des Arcadins (Decameron Resort)',
-    date: new Date().toISOString().slice(0, 10),
-    time: '08:30',
-    passengers: 4,
-    amount: 350,
-    currency: 'USD',
-    driver: 'Jean-Baptiste Pierre',
-    vehicle: 'Toyota Land Cruiser Prado TXL',
-    status: 'En cours',
-    telephone: '+509 2940 1000'
-  },
-  {
-    id: 'RES-002',
-    client: 'Digicel Business Haïti',
-    service: 'Transfert Aéroport Toussaint Louverture',
-    origin: 'Aéroport International',
-    destination: 'Siège Digicel Turgeau',
-    date: new Date().toISOString().slice(0, 10),
-    time: '14:15',
-    passengers: 8,
-    amount: 180,
-    currency: 'USD',
-    driver: 'Marc Antoine Saint-Louis',
-    vehicle: 'Toyota HiAce VIP Grand Cabin',
-    status: 'Confirmée',
-    telephone: '+509 3700 1122'
-  },
-  {
-    id: 'RES-003',
-    client: 'Dr. Émile Beauvoir',
-    service: 'Circuit Touristique & Découverte',
-    origin: 'Pétion-Ville',
-    destination: 'Citadelle Laferrière & Cap-Haïtien',
-    date: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10),
-    time: '06:00',
-    passengers: 3,
-    amount: 580,
-    currency: 'USD',
-    driver: 'Jean-Baptiste Pierre',
-    vehicle: 'Toyota Land Cruiser 300 VXR',
-    status: 'En attente',
-    telephone: '+509 3810 5544'
-  }
-];
-
-const SEED_PROFORMAS: Proforma[] = [
-  {
-    id: 'PRO-2026-001',
-    number: 'PRO-2026-001',
-    client: 'Délégation Diplomatique Union Européenne',
-    service: 'Mise à disposition VIP Prado TXL 3 jours',
-    date: new Date().toISOString().slice(0, 10),
-    amount: 1050,
-    currency: 'USD',
-    items: [
-      { description: 'Location SUV Prado TXL climatisé avec chauffeur assermenté (3 jours)', quantity: 3, unitPrice: 350, total: 1050 }
-    ],
-    tva: 105,
-    totalTTC: 1155,
-    status: 'Acceptée'
-  },
-  {
-    id: 'PRO-2026-002',
-    number: 'PRO-2026-002',
-    client: 'Ministère du Tourisme Haïti',
-    service: 'Excursion Citadelle Laferrière & Bassin Zim',
-    date: new Date().toISOString().slice(0, 10),
-    amount: 2400,
-    currency: 'USD',
-    items: [
-      { description: 'Minibus HiAce VIP avec guide certifié & rafraîchissements', quantity: 2, unitPrice: 1200, total: 2400 }
-    ],
-    tva: 240,
-    totalTTC: 2640,
-    status: 'En attente'
-  }
-];
-
-const SEED_FACTURES: Facture[] = [
-  {
-    id: 'FAC-2026-001',
-    number: 'FAC-2026-001',
-    proformaNumber: 'PRO-2026-001',
-    client: 'Délégation Diplomatique Union Européenne',
-    service: 'Mise à disposition VIP Prado TXL 3 jours',
-    date: new Date().toISOString().slice(0, 10),
-    dueDate: new Date(Date.now() + 86400000 * 15).toISOString().slice(0, 10),
-    amount: 1155,
-    currency: 'USD',
-    paidAmount: 1155,
-    status: 'Payée',
-    paymentMethod: 'Virement Bancaire'
-  },
-  {
-    id: 'FAC-2026-002',
-    number: 'FAC-2026-002',
-    client: 'Digicel Business Haïti',
-    service: 'Transferts Navettes Janvier 2026',
-    date: new Date(Date.now() - 86400000 * 5).toISOString().slice(0, 10),
-    dueDate: new Date(Date.now() + 86400000 * 10).toISOString().slice(0, 10),
-    amount: 1450,
-    currency: 'USD',
-    paidAmount: 0,
-    status: 'En attente',
-    paymentMethod: 'Chèque Commercial'
-  }
-];
-
-const SEED_ELEVES: Eleve[] = [
-  {
-    id: 'ELV-01',
-    nom: 'Delacroix',
-    prenom: 'Lucas',
-    ecole: 'Lycée Alexandre Dumas (Lycée Français)',
-    classe: '6ème A',
-    arretRamassage: 'Delmas 75, angle rue Rebecca',
-    parentNom: 'Jean-Marc Delacroix',
-    parentTelephone: '+509 3441 9920',
-    parentEmail: 'delacroix.famille@gmail.com',
-    chauffeurAssigne: 'Samuel Joseph',
-    vehiculeAssigne: 'Coaster Scolaire SC-10522',
-    statut: 'Actif',
-    fraisMensuel: 150
-  },
-  {
-    id: 'ELV-02',
-    nom: 'Moïse',
-    prenom: 'Sarah',
-    ecole: 'Institution Sainte Rose de Lima',
-    classe: '4ème B',
-    arretRamassage: 'Pétion-Ville, Place Boyer',
-    parentNom: 'Dr. Moïse',
-    parentTelephone: '+509 4440 8687',
-    chauffeurAssigne: 'Samuel Joseph',
-    vehiculeAssigne: 'Coaster Scolaire SC-10522',
-    statut: 'Actif',
-    fraisMensuel: 150
-  }
-];
-
-const SEED_ABONNEMENTS: Abonnement[] = [
-  {
-    id: 'ABO-01',
-    client: 'Jean-Marc Delacroix',
-    eleveNom: 'Lucas Delacroix',
-    typeAbonnement: 'Scolaire',
-    tarifMensuel: 150,
-    currency: 'USD',
-    dateDebut: '2026-09-01',
-    dateFin: '2026-06-30',
-    statut: 'Actif',
-    prochainRenouvellement: '2026-11-01'
-  },
-  {
-    id: 'ABO-02',
-    client: 'Digicel Business Haïti',
-    typeAbonnement: 'Corporate',
-    tarifMensuel: 1800,
-    currency: 'USD',
-    dateDebut: '2026-01-01',
-    dateFin: '2026-12-31',
-    statut: 'Actif',
-    prochainRenouvellement: '2026-11-01'
-  }
-];
-
-const SEED_PLANNINGS: Planning[] = [
-  {
-    id: 'PLN-01',
-    date: new Date().toISOString().slice(0, 10),
-    heure: '06:45',
-    heureRetour: '15:30',
-    client: 'Navette Scolaire Laperle Matin',
-    service: 'Ramassage Scolaire Ligne Pétion-Ville / Delmas',
-    depart: 'Place Boyer, Pétion-Ville',
-    destination: 'Lycée Français & Sainte Rose',
-    passagers: 22,
-    chauffeur: 'Samuel Joseph',
-    vehicule: 'Toyota Coaster SC-10522',
-    statut: 'En cours'
-  },
-  {
-    id: 'PLN-02',
-    date: new Date().toISOString().slice(0, 10),
-    heure: '09:00',
-    heureRetour: '18:00',
-    client: 'Délégation Diplomatique Union Européenne',
-    service: 'Mission officielle Côte des Arcadins',
-    depart: 'Hôtel Karibe',
-    destination: 'Decameron Beach Resort',
-    passagers: 4,
-    chauffeur: 'Jean-Baptiste Pierre',
-    vehicule: 'Toyota Land Cruiser Prado TXL',
-    statut: 'En cours'
-  }
-];
-
-const SEED_PAIEMENTS: Paiement[] = [
-  {
-    id: 'PAI-001',
-    reference: 'MONCASH-991204',
-    date: new Date().toISOString().slice(0, 10),
-    client: 'Délégation Diplomatique Union Européenne',
-    montant: 1155,
-    devise: 'USD',
-    modePaiement: 'Virement Bancaire',
-    motif: 'Règlement intégral Facture FAC-2026-001',
-    factureAssociee: 'FAC-2026-001',
-    statut: 'Validé',
-    recuPar: 'Comptabilité Laperle'
-  },
-  {
-    id: 'PAI-002',
-    reference: 'NATCASH-552109',
-    date: new Date().toISOString().slice(0, 10),
-    client: 'Jean-Marc Delacroix',
-    montant: 19800,
-    devise: 'HTG',
-    modePaiement: 'MonCash',
-    motif: 'Abonnement scolaire Lucas Delacroix',
-    statut: 'Validé',
-    recuPar: 'Secrétariat Laperle'
-  }
-];
-
-const SEED_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: 'notif-1',
-    title: 'Nouveau devis demandé',
-    message: 'Dr. Beauvoir a configuré une demande de circuit Citadelle Laferrière.',
-    type: 'info',
-    date: new Date().toISOString(),
-    read: false,
-    link: 'reservations',
-    targetId: 'RES-003'
-  },
-  {
-    id: 'notif-2',
-    title: 'Paiement confirmé ($1,155 USD)',
-    message: 'Virement bancaire validé pour la facture FAC-2026-001 (Délégation UE).',
-    type: 'success',
-    date: new Date().toISOString(),
-    read: false,
-    link: 'factures',
-    targetId: 'FAC-2026-001'
-  },
-  {
-    id: 'notif-3',
-    title: 'Contrôle technique préventif',
-    message: 'La révision périodique du Minibus HiAce VIP BB-44210 est programmée dans 5 jours.',
-    type: 'warning',
-    date: new Date().toISOString(),
-    read: false,
-    link: 'vehicules',
-    targetId: 'BB-44210'
-  }
-];
-
-const SEED_MESSAGES: ChatMessage[] = [
-  {
-    id: 'msg-1',
-    channelId: 'dispatch',
-    senderId: 'system',
-    senderName: 'Secrétariat Dispatch',
-    senderRole: 'secretaire',
-    text: 'Bonjour à tous les conducteurs en service. Météo favorable sur la nationale 1. Bonne route.',
-    createdAt: new Date(Date.now() - 3600000).toISOString()
-  },
-  {
-    id: 'msg-2',
-    channelId: 'chauffeurs',
-    senderId: 'chf-1',
-    senderName: 'Jean-Baptiste Pierre',
-    senderRole: 'chauffeur',
-    text: 'Prado TXL vérifié, réservoir plein et climatisation OK pour la mission Côte des Arcadins.',
-    createdAt: new Date(Date.now() - 1800000).toISOString()
-  }
-];
+// Site data reset to 0 for initial first-time use
+const SEED_VEHICULES: Vehicule[] = [];
+const SEED_CHAUFFEURS: Chauffeur[] = [];
+const SEED_CLIENTS: Client[] = [];
+const SEED_RESERVATIONS: Reservation[] = [];
+const SEED_PROFORMAS: Proforma[] = [];
+const SEED_FACTURES: Facture[] = [];
+const SEED_ELEVES: Eleve[] = [];
+const SEED_ABONNEMENTS: Abonnement[] = [];
+const SEED_PLANNINGS: Planning[] = [];
+const SEED_PAIEMENTS: Paiement[] = [];
+const SEED_NOTIFICATIONS: NotificationItem[] = [];
+const SEED_MESSAGES: ChatMessage[] = [];
 
 interface AppContextType {
   // Navigation & UI
@@ -562,6 +159,7 @@ interface AppContextType {
     notes?: string
   ) => Promise<string>;
   completeReservationByDriver: (reservationId: string) => Promise<void>;
+  resetAllSiteDataToZero: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -581,21 +179,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [globalSearchQuery, setGlobalSearchQuery] = useState<string>('');
   const [firebaseOnline, setFirebaseOnline] = useState<boolean>(true);
 
-  // Raw Data states with sensible seed defaults
-  const [rawReservations, setRawReservations] = useState<Reservation[]>(SEED_RESERVATIONS);
-  const [rawProformas, setRawProformas] = useState<Proforma[]>(SEED_PROFORMAS);
-  const [rawFactures, setRawFactures] = useState<Facture[]>(SEED_FACTURES);
-  const [rawClients, setRawClients] = useState<Client[]>(SEED_CLIENTS);
-  const [rawEleves, setRawEleves] = useState<Eleve[]>(SEED_ELEVES);
-  const [rawAbonnements, setRawAbonnements] = useState<Abonnement[]>(SEED_ABONNEMENTS);
-  const [rawVehicules, setRawVehicules] = useState<Vehicule[]>(SEED_VEHICULES);
-  const [rawChauffeurs, setRawChauffeurs] = useState<Chauffeur[]>(SEED_CHAUFFEURS);
-  const [rawPlannings, setRawPlannings] = useState<Planning[]>(SEED_PLANNINGS);
-  const [rawPaiements, setRawPaiements] = useState<Paiement[]>(SEED_PAIEMENTS);
+  // Raw Data states starting clean at 0 (first-time use)
+  const [rawReservations, setRawReservations] = useState<Reservation[]>([]);
+  const [rawProformas, setRawProformas] = useState<Proforma[]>([]);
+  const [rawFactures, setRawFactures] = useState<Facture[]>([]);
+  const [rawClients, setRawClients] = useState<Client[]>([]);
+  const [rawEleves, setRawEleves] = useState<Eleve[]>([]);
+  const [rawAbonnements, setRawAbonnements] = useState<Abonnement[]>([]);
+  const [rawVehicules, setRawVehicules] = useState<Vehicule[]>([]);
+  const [rawChauffeurs, setRawChauffeurs] = useState<Chauffeur[]>([]);
+  const [rawPlannings, setRawPlannings] = useState<Planning[]>([]);
+  const [rawPaiements, setRawPaiements] = useState<Paiement[]>([]);
   const [utilisateurs, setUtilisateurs] = useState<UserProfile[]>([]);
-  const [rawNotifications, setRawNotifications] = useState<NotificationItem[]>(SEED_NOTIFICATIONS);
+  const [rawNotifications, setRawNotifications] = useState<NotificationItem[]>([]);
   const [settings, setSettings] = useState<CompanySettings>(DEFAULT_SETTINGS);
-  const [messages, setMessages] = useState<ChatMessage[]>(SEED_MESSAGES);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   const showToast = useCallback((message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
     setToast({ message, type });
@@ -659,17 +257,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (isStaff) {
       // Staff members have administrative read access to full operational collections
-      syncQueryOrCollection('reservations', collection(db, 'reservations'), setRawReservations, SEED_RESERVATIONS);
-      syncQueryOrCollection('proformas', collection(db, 'proformas'), setRawProformas, SEED_PROFORMAS);
-      syncQueryOrCollection('factures', collection(db, 'factures'), setRawFactures, SEED_FACTURES);
-      syncQueryOrCollection('notifications', collection(db, 'notifications'), setRawNotifications, SEED_NOTIFICATIONS);
-      syncQueryOrCollection('clients', collection(db, 'clients'), setRawClients, SEED_CLIENTS);
-      syncQueryOrCollection('eleves', collection(db, 'eleves'), setRawEleves, SEED_ELEVES);
-      syncQueryOrCollection('abonnements', collection(db, 'abonnements'), setRawAbonnements, SEED_ABONNEMENTS);
-      syncQueryOrCollection('vehicules', collection(db, 'vehicules'), setRawVehicules, SEED_VEHICULES);
-      syncQueryOrCollection('chauffeurs', collection(db, 'chauffeurs'), setRawChauffeurs, SEED_CHAUFFEURS);
-      syncQueryOrCollection('plannings', collection(db, 'plannings'), setRawPlannings, SEED_PLANNINGS);
-      syncQueryOrCollection('paiements', collection(db, 'paiements'), setRawPaiements, SEED_PAIEMENTS);
+      syncQueryOrCollection('reservations', collection(db, 'reservations'), setRawReservations, []);
+      syncQueryOrCollection('proformas', collection(db, 'proformas'), setRawProformas, []);
+      syncQueryOrCollection('factures', collection(db, 'factures'), setRawFactures, []);
+      syncQueryOrCollection('notifications', collection(db, 'notifications'), setRawNotifications, []);
+      syncQueryOrCollection('clients', collection(db, 'clients'), setRawClients, []);
+      syncQueryOrCollection('eleves', collection(db, 'eleves'), setRawEleves, []);
+      syncQueryOrCollection('abonnements', collection(db, 'abonnements'), setRawAbonnements, []);
+      syncQueryOrCollection('vehicules', collection(db, 'vehicules'), setRawVehicules, []);
+      syncQueryOrCollection('chauffeurs', collection(db, 'chauffeurs'), setRawChauffeurs, []);
+      syncQueryOrCollection('plannings', collection(db, 'plannings'), setRawPlannings, []);
+      syncQueryOrCollection('paiements', collection(db, 'paiements'), setRawPaiements, []);
       if (role === 'admin' || role === 'secretaire' || isSuperAdmin) {
         syncQueryOrCollection('utilisateurs', collection(db, 'utilisateurs'), setUtilisateurs, []);
       }
@@ -677,11 +275,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Drivers have scoped mission access
       if (user?.uid) {
         syncQueryOrCollection('plannings', query(collection(db, 'plannings'), where('chauffeurId', '==', user.uid)), setRawPlannings, []);
-        syncQueryOrCollection('vehicules', collection(db, 'vehicules'), setRawVehicules, SEED_VEHICULES);
+        syncQueryOrCollection('vehicules', collection(db, 'vehicules'), setRawVehicules, []);
         syncQueryOrCollection('notifications', query(collection(db, 'notifications'), where('targetUid', '==', user.uid)), setRawNotifications, []);
       }
-    } else {
-      // Clients & prospects query strictly their own personal dossiers
       if (user?.uid) {
         syncQueryOrCollection('reservations', query(collection(db, 'reservations'), where('clientId', '==', user.uid)), setRawReservations, []);
         syncQueryOrCollection('proformas', query(collection(db, 'proformas'), where('clientId', '==', user.uid)), setRawProformas, []);
@@ -789,13 +385,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return role === 'chauffeur' || (Array.isArray(roles) && roles.includes('chauffeur'));
   }, [role, roles]);
 
+  const isVendeurRole = useMemo(() => {
+    return role === 'vendeur' || (Array.isArray(roles) && roles.includes('vendeur'));
+  }, [role, roles]);
+
   const isClientRole = useMemo(() => {
     return (
       role === 'client' ||
       role === 'prospect' ||
-      (!isGlobalRole && !isSecretaireRole && !isOperationsRole && !isChauffeurRole)
+      (!isGlobalRole && !isSecretaireRole && !isOperationsRole && !isChauffeurRole && !isVendeurRole)
     );
-  }, [role, isGlobalRole, isSecretaireRole, isOperationsRole, isChauffeurRole]);
+  }, [role, isGlobalRole, isSecretaireRole, isOperationsRole, isChauffeurRole, isVendeurRole]);
 
   // Name & Identity normalization helpers for multi-criteria matching
   const nameVariants = useMemo(() => {
@@ -851,7 +451,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // 1. Scoped Reservations
   const reservations = useMemo(() => {
-    if (!user || isGlobalRole || isSecretaireRole || isOperationsRole) {
+    if (!user || isGlobalRole || isSecretaireRole || isOperationsRole || isVendeurRole) {
       return rawReservations;
     }
     if (isChauffeurRole) {
@@ -868,11 +468,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (matchPhone(r.telephone)) return true;
       return false;
     });
-  }, [rawReservations, user, isGlobalRole, isSecretaireRole, isOperationsRole, isChauffeurRole, profile?.id, userEmail, matchName, matchPhone]);
+  }, [rawReservations, user, isGlobalRole, isSecretaireRole, isOperationsRole, isVendeurRole, isChauffeurRole, profile?.id, userEmail, matchName, matchPhone]);
 
   // 2. Scoped Proformas
   const proformas = useMemo(() => {
-    if (!user || isGlobalRole || isSecretaireRole) {
+    if (!user || isGlobalRole || isSecretaireRole || isVendeurRole) {
       return rawProformas;
     }
     if (isChauffeurRole || isOperationsRole) {
@@ -888,7 +488,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (matchPhone(p.telephone)) return true;
       return false;
     });
-  }, [rawProformas, user, isGlobalRole, isSecretaireRole, isChauffeurRole, isOperationsRole, profile?.id, userEmail, matchName, matchPhone]);
+  }, [rawProformas, user, isGlobalRole, isSecretaireRole, isVendeurRole, isChauffeurRole, isOperationsRole, profile?.id, userEmail, matchName, matchPhone]);
 
   const clientProformaNumbers = useMemo(() => {
     return new Set(proformas.map((p) => p.number).filter(Boolean));
@@ -896,7 +496,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // 3. Scoped Factures
   const factures = useMemo(() => {
-    if (!user || isGlobalRole || isSecretaireRole) {
+    if (!user || isGlobalRole || isSecretaireRole || isVendeurRole) {
       return rawFactures;
     }
     if (isChauffeurRole || isOperationsRole) {
@@ -911,7 +511,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (matchPhone(f.telephone)) return true;
       return false;
     });
-  }, [rawFactures, user, isGlobalRole, isSecretaireRole, isChauffeurRole, isOperationsRole, profile?.id, userEmail, clientProformaNumbers, matchName, matchPhone]);
+  }, [rawFactures, user, isGlobalRole, isSecretaireRole, isVendeurRole, isChauffeurRole, isOperationsRole, profile?.id, userEmail, clientProformaNumbers, matchName, matchPhone]);
 
   const clientFactureNumbers = useMemo(() => {
     return new Set(factures.map((f) => f.number).filter(Boolean));
@@ -993,7 +593,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // 8. Scoped Clients Directory
   const clients = useMemo(() => {
-    if (!user || isGlobalRole || isSecretaireRole || isOperationsRole) {
+    if (!user || isGlobalRole || isSecretaireRole || isOperationsRole || isVendeurRole) {
       return rawClients;
     }
     if (isChauffeurRole) return [];
@@ -1004,7 +604,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (matchPhone(c.telephone)) return true;
       return false;
     });
-  }, [rawClients, user, isGlobalRole, isSecretaireRole, isOperationsRole, isChauffeurRole, profile?.id, userEmail, matchName, matchPhone]);
+  }, [rawClients, user, isGlobalRole, isSecretaireRole, isOperationsRole, isVendeurRole, isChauffeurRole, profile?.id, userEmail, matchName, matchPhone]);
 
   // 9. Vehicules (Accessible to staff and client showcase)
   const vehicules = useMemo(() => {
@@ -1779,6 +1379,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast(`Course ${targetRes.id} terminée avec succès ! La régulation et la direction ont été notifiées.`, 'success');
   };
 
+  const resetAllSiteDataToZero = async () => {
+    // 1. Reset all in-memory React states to empty arrays (clean slate)
+    setRawReservations([]);
+    setRawProformas([]);
+    setRawFactures([]);
+    setRawClients([]);
+    setRawEleves([]);
+    setRawAbonnements([]);
+    setRawVehicules([]);
+    setRawChauffeurs([]);
+    setRawPlannings([]);
+    setRawPaiements([]);
+    setRawNotifications([]);
+    setMessages([]);
+
+    // 2. If authenticated, purge existing documents in Firestore collections
+    if (auth.currentUser) {
+      const collectionsToPurge = [
+        'reservations',
+        'proformas',
+        'factures',
+        'paiements',
+        'plannings',
+        'eleves',
+        'abonnements',
+        'clients',
+        'chauffeurs',
+        'vehicules',
+        'notifications',
+        'messages',
+        'conversations',
+        'demandesProformas'
+      ];
+      for (const colName of collectionsToPurge) {
+        try {
+          const snap = await getDocs(collection(db, colName));
+          for (const d of snap.docs) {
+            try {
+              await deleteDoc(doc(db, colName, d.id));
+            } catch (delErr) {
+              // Ignore single doc delete errors if permission restricted
+            }
+          }
+        } catch (colErr) {
+          // Ignore collection access errors
+        }
+      }
+    }
+
+    showToast('Toutes les données ont été remises à zéro (première utilisation du site).', 'success');
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -1854,7 +1506,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         convertFactureToPaiement,
         generateEleveAbonnementEtFacture,
         assignDriverAndDispatch,
-        completeReservationByDriver
+        completeReservationByDriver,
+        resetAllSiteDataToZero
       }}
     >
       {children}

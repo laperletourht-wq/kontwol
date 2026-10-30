@@ -4,6 +4,7 @@ export type UserRole =
   | 'comptabilite' 
   | 'secretaire' 
   | 'operations' 
+  | 'vendeur'
   | 'chauffeur' 
   | 'client' 
   | 'prospect' 
@@ -55,6 +56,7 @@ export const ALL_SYSTEM_ZONES: SystemZoneDefinition[] = [
   { key: 'eleves', label: 'Élèves & Ramassage', icon: '🎒', category: 'Scolaire', description: 'Inscriptions scolaires, écoles partenaires et arrêts de navette' },
   { key: 'abonnements', label: 'Abonnements Scolaires', icon: '🎫', category: 'Scolaire', description: 'Contrats de transport mensuels et forfaits récurrents' },
   { key: 'proformas', label: 'Devis Proforma', icon: '📄', category: 'Facturation & Trésorerie', description: 'Émissions d\'estimations et propositions commerciales' },
+  { key: 'vendeur', label: 'Espace Vendeur & Devis', icon: '💼', category: 'Facturation & Trésorerie', description: 'Tableau de bord commercial, KPI de vente et conversion de devis' },
   { key: 'factures', label: 'Factures & Règlements', icon: '💳', category: 'Facturation & Trésorerie', description: 'Facturation officielle DGI, suivi des soldes et preuves de paiement' },
   { key: 'paiements', label: 'Trésorerie & Encaissements', icon: '💰', category: 'Facturation & Trésorerie', description: 'MonCash, virements bancaires, chèques et dépenses de service' },
   { key: 'finances', label: 'Comptabilité & Rentabilité', icon: '📈', category: 'Facturation & Trésorerie', description: 'Rapports de recettes, marges et bilans financiers' },

@@ -46,12 +46,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   admin: [
-    'dashboard', 'reservations', 'proformas', 'factures', 'clients', 
+    'dashboard', 'vendeur', 'reservations', 'proformas', 'factures', 'clients', 
     'eleves', 'abonnements', 'vehicules', 'chauffeurs', 'plannings', 
     'paiements', 'finances', 'utilisateurs', 'vitrine', 'parametres'
   ],
   direction: [
-    'dashboard', 'reservations', 'proformas', 'factures', 'clients', 
+    'dashboard', 'vendeur', 'reservations', 'proformas', 'factures', 'clients', 
     'eleves', 'abonnements', 'vehicules', 'chauffeurs', 'plannings', 
     'paiements', 'finances', 'vitrine', 'parametres'
   ],
@@ -65,6 +65,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   ],
   operations: [
     'dashboard', 'reservations', 'vehicules', 'chauffeurs', 'plannings'
+  ],
+  vendeur: [
+    'dashboard', 'vendeur', 'proformas', 'factures', 'clients', 'reservations', 'parametres'
   ],
   chauffeur: [
     'dashboard', 'plannings', 'vehicules', 'parametres'

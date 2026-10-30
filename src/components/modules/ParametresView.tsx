@@ -3,11 +3,13 @@ import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 
 export const ParametresView: React.FC = () => {
-  const { settings, saveSettings, showToast, saveClient, clients } = useApp();
+  const { settings, saveSettings, showToast, saveClient, clients, resetAllSiteDataToZero } = useApp();
   const { user, profile, role, isSuperAdmin, updateUserProfile, isProfileComplete } = useAuth();
 
   const isStaff = isSuperAdmin || role === 'admin' || role === 'direction' || role === 'comptabilite';
   const [activeTab, setActiveTab] = useState<'profil' | 'entreprise'>(isStaff ? 'entreprise' : 'profil');
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   // Personal Profile fields
   const [userNom, setUserNom] = useState(profile?.nom || profile?.name || user?.displayName || '');
@@ -368,6 +370,106 @@ export const ParametresView: React.FC = () => {
               </button>
             </div>
           </form>
+
+          {/* DANGER ZONE : Remise à zéro complète du site */}
+          {(isSuperAdmin || role === 'admin') && (
+            <div style={{
+              marginTop: '40px',
+              borderTop: '2px dashed #fecaca',
+              paddingTop: '24px'
+            }}>
+              <div style={{
+                background: '#fff5f5',
+                border: '1px solid #fecaca',
+                borderRadius: '12px',
+                padding: '20px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '20px' }}>⚠️</span>
+                  <h4 style={{ margin: 0, color: '#991b1b', fontSize: '15px', fontWeight: 800 }}>
+                    Zone de Maintenance : Démarrage à neuf & Première Utilisation
+                  </h4>
+                </div>
+                <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#7f1d1d', lineHeight: '1.5' }}>
+                  Effacer l'ensemble des données opérationnelles (réservations, proformas, factures, plannings, paiements, véhicules, chauffeurs, élèves) pour démarrer l'application avec des listes totalement vides.
+                </p>
+
+                {!confirmResetOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmResetOpen(true)}
+                    style={{
+                      background: '#dc2626',
+                      color: '#ffffff',
+                      border: 0,
+                      borderRadius: '8px',
+                      padding: '10px 18px',
+                      fontSize: '13px',
+                      fontWeight: 750,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: '0 2px 6px rgba(220, 38, 38, 0.25)'
+                    }}
+                  >
+                    <span>🗑️</span>
+                    <span>Remettre toutes les données à zéro (Première utilisation)</span>
+                  </button>
+                ) : (
+                  <div style={{ background: '#ffffff', border: '1px solid #f87171', borderRadius: '8px', padding: '16px' }}>
+                    <p style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: 700, color: '#b91c1c' }}>
+                      Confirmez-vous la purge totale de toutes les données du site à zéro ?
+                    </p>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setResetting(true);
+                          try {
+                            await resetAllSiteDataToZero();
+                            setConfirmResetOpen(false);
+                          } finally {
+                            setResetting(false);
+                          }
+                        }}
+                        disabled={resetting}
+                        style={{
+                          background: '#b91c1c',
+                          color: '#ffffff',
+                          border: 0,
+                          borderRadius: '6px',
+                          padding: '8px 16px',
+                          fontSize: '12.5px',
+                          fontWeight: 750,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {resetting ? 'Purge en cours...' : 'Oui, effacer toutes les données'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmResetOpen(false)}
+                        disabled={resetting}
+                        style={{
+                          background: '#f1f5f9',
+                          color: '#475569',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '6px',
+                          padding: '8px 16px',
+                          fontSize: '12.5px',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Annuler
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

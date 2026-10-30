@@ -9,6 +9,7 @@ export const ROLES = {
   COMPTABILITE: 'comptabilite',
   SECRETAIRE: 'secretaire',
   OPERATIONS: 'operations',
+  VENDEUR: 'vendeur',
   CHAUFFEUR: 'chauffeur',
   CLIENT: 'client',
   PROSPECT: 'prospect',
@@ -21,6 +22,7 @@ export const ROLE_LABELS = {
   comptabilite: 'Comptabilité',
   secretaire: 'Secrétariat',
   operations: 'Opérations Transport',
+  vendeur: 'Commercial / Vendeur',
   chauffeur: 'Chauffeur',
   client: 'Espace Client',
   prospect: 'Prospect',
@@ -60,6 +62,7 @@ export function normalizeRole(role) {
   if (r === 'comptabilite' || r === 'comptabilité') return ROLES.COMPTABILITE;
   if (r === 'secretaire' || r === 'secrétaire' || r === 'secrétariat') return ROLES.SECRETAIRE;
   if (r === 'operations' || r === 'opérations') return ROLES.OPERATIONS;
+  if (r === 'vendeur' || r === 'commercial' || r === 'sales') return ROLES.VENDEUR;
   if (r === 'chauffeur') return ROLES.CHAUFFEUR;
   if (r === 'client') return ROLES.CLIENT;
   if (r === 'prospect') return ROLES.PROSPECT;
@@ -132,6 +135,7 @@ export const BUSINESS_ROLES = [
   ROLES.COMPTABILITE,
   ROLES.SECRETAIRE,
   ROLES.OPERATIONS,
+  ROLES.VENDEUR,
   ROLES.CHAUFFEUR,
   ROLES.CLIENT,
   ROLES.PROSPECT
@@ -187,6 +191,14 @@ function roleCanAccessModule(normRole, m) {
       'dashboard', 'clients', 'eleves', 'chauffeurs', 
       'vehicules', 'plannings', 'reservations', 'abonnements', 
       'prospects', 'notifications'
+    ];
+    return allowed.includes(m);
+  }
+
+  if (normRole === ROLES.VENDEUR) {
+    const allowed = [
+      'dashboard', 'vendeur', 'proformas', 'factures', 'clients', 
+      'reservations', 'notifications', 'profile', 'profil'
     ];
     return allowed.includes(m);
   }
@@ -297,6 +309,15 @@ function roleHasAction(normRole, m, act) {
     return act === 'read';
   }
 
+  if (normRole === ROLES.VENDEUR) {
+    const writeAllowed = ['proformas', 'factures', 'clients', 'reservations', 'notifications'];
+    if (writeAllowed.includes(m)) {
+      if (act === 'delete') return false;
+      return true;
+    }
+    return act === 'read';
+  }
+
   if (normRole === ROLES.CHAUFFEUR) {
     if (m === 'plannings' && act === 'update') return true;
     return act === 'read';
@@ -394,6 +415,15 @@ export function filterDataForUser(moduleKey, items, userProfile) {
   if (roles.includes(ROLES.OPERATIONS)) {
     // Pas d'accès aux finances de l'entreprise ni aux comptes utilisateurs
     if (['finances', 'expenses', 'utilisateurs', 'settings', 'factures', 'proformas', 'paiements'].includes(m)) {
+      return [];
+    }
+    return items;
+  }
+
+  // 4b. VENDEUR (COMMERCIAL) :
+  // Accès complet aux devis, clients, réservations et factures pour son activité de vente, sans finances globales
+  if (roles.includes(ROLES.VENDEUR)) {
+    if (['finances', 'expenses', 'utilisateurs', 'settings'].includes(m)) {
       return [];
     }
     return items;

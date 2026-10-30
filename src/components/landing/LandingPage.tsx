@@ -785,96 +785,128 @@ export const LandingPage: React.FC = () => {
         </div>
 
         {/* Grille dynamique des Témoignages & Avis Clients */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: '24px',
-          padding: '0 20px',
-          maxWidth: '1280px',
-          margin: '0 auto 48px'
-        }}>
-          {temoignages.map((t) => (
-            <div
-              key={t.id}
+        {temoignages.length === 0 ? (
+          <div style={{
+            maxWidth: '600px',
+            margin: '0 auto 48px',
+            textAlign: 'center',
+            padding: '36px 20px',
+            background: '#f8fafc',
+            border: '1px dashed #cbd5e1',
+            borderRadius: '16px'
+          }}>
+            <div style={{ fontSize: '32px', marginBottom: '8px' }}>💬</div>
+            <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: '0 0 6px' }}>Aucun avis pour le moment</h4>
+            <p style={{ fontSize: '13.5px', color: '#64748b', margin: '0 0 16px' }}>Soyez le premier à partager votre expérience de transport avec LAPERLE TOUR HT !</p>
+            <button
+              type="button"
+              onClick={handleOpenCommentModal}
               style={{
-                background: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                borderRadius: '16px',
-                padding: '24px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                boxShadow: '0 4px 14px rgba(8,43,112,0.04)',
-                position: 'relative'
+                background: '#082b70',
+                color: '#fff',
+                border: 0,
+                borderRadius: '8px',
+                padding: '10px 20px',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: 'pointer'
               }}
             >
-              {/* Seul l'administrateur peut effacer un commentaire */}
-              {isAdmin && (
-                <button
-                  type="button"
-                  title="Effacer ce commentaire (Action Administrateur)"
-                  disabled={deletingCommentId === t.id}
-                  onClick={() => handleDeleteComment(t.id, t.nom)}
-                  style={{
-                    position: 'absolute',
-                    top: '14px',
-                    right: '14px',
-                    background: '#fef2f2',
-                    color: '#dc2626',
-                    border: '1px solid #fecaca',
-                    borderRadius: '8px',
-                    padding: '4px 8px',
-                    fontSize: '11px',
-                    fontWeight: 750,
-                    cursor: 'pointer',
+              ✍️ Laisser un avis
+            </button>
+          </div>
+        ) : (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: '24px',
+            padding: '0 20px',
+            maxWidth: '1280px',
+            margin: '0 auto 48px'
+          }}>
+            {temoignages.map((t) => (
+              <div
+                key={t.id}
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '16px',
+                  padding: '24px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  boxShadow: '0 4px 14px rgba(8,43,112,0.04)',
+                  position: 'relative'
+                }}
+              >
+                {/* Seul l'administrateur peut effacer un commentaire */}
+                {isAdmin && (
+                  <button
+                    type="button"
+                    title="Effacer ce commentaire (Action Administrateur)"
+                    disabled={deletingCommentId === t.id}
+                    onClick={() => handleDeleteComment(t.id, t.nom)}
+                    style={{
+                      position: 'absolute',
+                      top: '14px',
+                      right: '14px',
+                      background: '#fef2f2',
+                      color: '#dc2626',
+                      border: '1px solid #fecaca',
+                      borderRadius: '8px',
+                      padding: '4px 8px',
+                      fontSize: '11px',
+                      fontWeight: 750,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                    }}
+                  >
+                    <span>🗑️</span> Effacer
+                  </button>
+                )}
+
+                <div>
+                  <div style={{ color: '#f59e0b', fontSize: '16px', letterSpacing: '2px', marginBottom: '12px' }}>
+                    {'★'.repeat(t.etoiles || 5)}
+                    {'☆'.repeat(Math.max(0, 5 - (t.etoiles || 5)))}
+                  </div>
+                  <p style={{ fontSize: '14px', lineHeight: '1.6', color: '#334155', fontStyle: 'italic', margin: '0 0 16px', whiteSpace: 'pre-line' }}>
+                    {t.commentaire.startsWith('«') ? t.commentaire : `« ${t.commentaire} »`}
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '14px' }}>
+                  <div style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '50%',
+                    background: '#082b70',
+                    color: '#fff',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '4px',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-                  }}
-                >
-                  <span>🗑️</span> Effacer
-                </button>
-              )}
-
-              <div>
-                <div style={{ color: '#f59e0b', fontSize: '16px', letterSpacing: '2px', marginBottom: '12px' }}>
-                  {'★'.repeat(t.etoiles || 5)}
-                  {'☆'.repeat(Math.max(0, 5 - (t.etoiles || 5)))}
-                </div>
-                <p style={{ fontSize: '14px', lineHeight: '1.6', color: '#334155', fontStyle: 'italic', margin: '0 0 16px', whiteSpace: 'pre-line' }}>
-                  {t.commentaire.startsWith('«') ? t.commentaire : `« ${t.commentaire} »`}
-                </p>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '14px' }}>
-                <div style={{
-                  width: '42px',
-                  height: '42px',
-                  borderRadius: '50%',
-                  background: '#082b70',
-                  color: '#fff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 800,
-                  fontSize: '14px',
-                  flexShrink: 0
-                }}>
-                  {t.initiales || t.nom.slice(0, 2).toUpperCase() || 'CL'}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 750, color: '#0f172a', fontSize: '14px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                    {t.nom}
+                    justifyContent: 'center',
+                    fontWeight: 800,
+                    fontSize: '14px',
+                    flexShrink: 0
+                  }}>
+                    {t.initiales || t.nom.slice(0, 2).toUpperCase() || 'CL'}
                   </div>
-                  <div style={{ fontSize: '12px', color: '#64748b', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                    {t.titre || 'Client Laperle Tour'}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 750, color: '#0f172a', fontSize: '14px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                      {t.nom}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                      {t.titre || 'Client Laperle Tour'}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* Modal d'ajout de commentaire / avis (Accessible aux membres connectés) */}
         {showCommentModal && (

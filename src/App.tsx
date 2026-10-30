@@ -24,6 +24,7 @@ import { FinancesView } from './components/modules/FinancesView';
 import { UtilisateursView } from './components/modules/UtilisateursView';
 import { VitrineCMSView } from './components/modules/VitrineCMSView';
 import { ParametresView } from './components/modules/ParametresView';
+import { DashboardVendeur } from './components/dashboard/DashboardVendeur';
 import { useAuth } from './context/AuthContext';
 
 const MainRouter: React.FC = () => {
@@ -45,6 +46,8 @@ const MainRouter: React.FC = () => {
     switch (currentModule) {
       case 'dashboard':
         return <DashboardView onOpenModal={handleOpenModal} />;
+      case 'vendeur':
+        return <DashboardVendeur onOpenModal={handleOpenModal} />;
       case 'reservations':
         return <ReservationsView onOpenModal={handleOpenModal} />;
       case 'proformas':

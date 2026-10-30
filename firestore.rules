@@ -141,6 +141,10 @@ service cloud.firestore {
       return hasRole("prospect");
     }
 
+    function isVendeur() {
+      return hasRole("vendeur");
+    }
+
     function isLectureSeule() {
       return hasRole("lecture_seule");
     }
@@ -151,7 +155,7 @@ service cloud.firestore {
     }
 
     function canReadOperations() {
-      return isAdmin() || isDirection() || isOperations() || isSecretaire() || isComptabilite();
+      return isAdmin() || isDirection() || isOperations() || isSecretaire() || isComptabilite() || isVendeur();
     }
 
     function canManageFinances() {
@@ -159,7 +163,7 @@ service cloud.firestore {
     }
 
     function canReadFinances() {
-      return isAdmin() || isDirection() || isComptabilite() || isSecretaire();
+      return isAdmin() || isDirection() || isComptabilite() || isSecretaire() || isVendeur();
     }
 
     function canReadGlobalFinances() {
@@ -392,14 +396,14 @@ service cloud.firestore {
           data.role.lower() in [
             "admin", "direction", "comptabilite", 
             "secretaire", "operations", "chauffeur", 
-            "client", "lecture_seule", "prospect"
+            "client", "lecture_seule", "prospect", "vendeur"
           ]
         ))) &&
         (!('roles' in data) || (data.roles is list && data.roles.size() > 0 && data.roles.size() <= 10 &&
           data.roles.hasOnly([
             "admin", "direction", "comptabilite", 
             "secretaire", "operations", "chauffeur", 
-            "client", "lecture_seule", "prospect"
+            "client", "lecture_seule", "prospect", "vendeur"
           ])
         )) &&
         (!('allowedModules' in data) || (data.allowedModules is list && data.allowedModules.size() <= 25));
@@ -441,11 +445,11 @@ service cloud.firestore {
       allow list: if canReadOperations() || 
         ((isClient() || isProspect()) && isClientDoc(existing()));
       allow create: if isValidId(clientId) && (
-        canManageOperations() ||
+        canManageOperations() || isVendeur() ||
         (isSignedIn() && (clientId == request.auth.uid || isOwnClientIdentity(incoming())))
       ) && isValidClient(incoming());
       allow update: if isValidId(clientId) && (
-        canManageOperations() ||
+        canManageOperations() || isVendeur() ||
         (isSignedIn() && (clientId == request.auth.uid || isClientDoc(existing())))
       ) && isValidClient(incoming());
       allow delete: if isAdmin() && isValidId(clientId);
@@ -551,7 +555,7 @@ service cloud.firestore {
         )) ||
         (isChauffeur() && isChauffeurDoc(existing()));
       allow create: if isValidId(reservationId) && (
-        canManageOperations() || (
+        canManageOperations() || isVendeur() || (
           isSignedIn() && (
             isOwnClientIdentity(incoming()) ||
             (('clientId' in incoming()) && incoming().clientId == request.auth.uid) ||
@@ -562,7 +566,7 @@ service cloud.firestore {
         )
       );
       allow update: if isValidId(reservationId) && (
-        canManageOperations() || (
+        canManageOperations() || isVendeur() || (
           isSignedIn() && (
             isOwnClientIdentity(existing()) ||
             isOwnClientIdentity(incoming()) ||
@@ -577,7 +581,7 @@ service cloud.firestore {
     }
     match /bookings/{bookingId} {
       allow get, list: if canReadOperations() || (isSignedIn() && isClientDoc(existing())) || (isChauffeur() && isChauffeurDoc(existing()));
-      allow create, update: if isValidId(bookingId) && (canManageOperations() || (isSignedIn() && (isOwnClientIdentity(incoming()) || incoming().clientId == request.auth.uid)));
+      allow create, update: if isValidId(bookingId) && (canManageOperations() || isVendeur() || (isSignedIn() && (isOwnClientIdentity(incoming()) || incoming().clientId == request.auth.uid)));
       allow delete: if isAdmin() && isValidId(bookingId);
     }
 
@@ -601,9 +605,9 @@ service cloud.firestore {
           (('clientId' in existing()) && existing().clientId == request.auth.uid) ||
           (('uid' in existing()) && existing().uid == request.auth.uid)
         ));
-      allow create: if (canManageFinances() || isSecretaire()) && isValidId(proformaId) && isValidProforma(incoming());
+      allow create: if (canManageFinances() || isSecretaire() || isVendeur()) && isValidId(proformaId) && isValidProforma(incoming());
       allow update: if isValidId(proformaId) && (
-        ((canManageFinances() || isSecretaire()) && isValidProforma(incoming())) ||
+        ((canManageFinances() || isSecretaire() || isVendeur()) && isValidProforma(incoming())) ||
         (isSignedIn() && isClientDoc(existing()) &&
           incoming().diff(existing()).affectedKeys().hasOnly(['demandeFacture', 'dateDemandeFacture', 'moyenPaiement', 'modalitePaiement', 'referencePaiement', 'noteFacturation', 'status', 'updatedAt', 'updatedBy']))
       );
@@ -617,7 +621,7 @@ service cloud.firestore {
     }
     match /quotes/{quoteId} {
       allow get, list: if canReadFinances() || (isSignedIn() && (isClientDoc(existing()) || (('clientId' in existing()) && existing().clientId == request.auth.uid)));
-      allow create, update: if (canManageFinances() || isSecretaire()) && isValidId(quoteId);
+      allow create, update: if (canManageFinances() || isSecretaire() || isVendeur()) && isValidId(quoteId);
       allow delete: if isAdmin() && isValidId(quoteId);
     }
 
@@ -629,9 +633,9 @@ service cloud.firestore {
           (('clientId' in existing()) && existing().clientId == request.auth.uid) ||
           (('uid' in existing()) && existing().uid == request.auth.uid)
         ));
-      allow create: if (canManageFinances() || isSecretaire()) && isValidId(factureId) && isValidFacture(incoming());
+      allow create: if (canManageFinances() || isSecretaire() || isVendeur()) && isValidId(factureId) && isValidFacture(incoming());
       allow update: if isValidId(factureId) && (
-        ((canManageFinances() || isSecretaire()) && isValidFacture(incoming())) ||
+        ((canManageFinances() || isSecretaire() || isVendeur()) && isValidFacture(incoming())) ||
         (isSignedIn() && isClientDoc(existing()) &&
           incoming().diff(existing()).affectedKeys().hasOnly(['paymentProof', 'paymentMethod', 'paymentReference', 'status', 'updatedAt', 'updatedBy']))
       );
@@ -639,7 +643,7 @@ service cloud.firestore {
     }
     match /invoices/{invoiceId} {
       allow get, list: if canReadFinances() || ((isClient() || isProspect()) && isClientDoc(existing()));
-      allow create, update: if (canManageFinances() || isSecretaire()) && isValidId(invoiceId);
+      allow create, update: if (canManageFinances() || isSecretaire() || isVendeur()) && isValidId(invoiceId);
       allow delete: if isAdmin() && isValidId(invoiceId);
     }
 
