@@ -119,7 +119,7 @@ async function requireFirebaseUser(req, res) {
     // Check revoked = false verifies the token cryptographically via Google public certificates
     // without requiring an external IAM Identity Toolkit service account call.
     const decoded = await adminAuth.verifyIdToken(token, false);
-    return { ...decoded, uid: decoded.uid, email: String(decoded.email || '').toLowerCase() };
+    return { ...decoded, uid: decoded.uid, email: String(decoded.email || '').toLowerCase(), _rawToken: token };
   } catch (err) {
     console.warn('[requireFirebaseUser] verifyIdToken error:', err?.code || err?.message);
     res.status(401).json({ error: 'Jeton Firebase invalide ou révoqué.' });
@@ -127,7 +127,7 @@ async function requireFirebaseUser(req, res) {
   }
 }
 
-async function getServerProfile(uid) {
+async function getServerProfile(uid, token = null) {
   if (adminDb) {
     try {
       const snap = await adminDb.collection('utilisateurs').doc(uid).get();
@@ -136,11 +136,43 @@ async function getServerProfile(uid) {
       // Admin DB permissions or offline
     }
   }
+
+  // Interrogation de secours via l'API REST Firestore authentifiée si disponible
+  if (token) {
+    try {
+      const projId = firebaseConfig.projectId;
+      const dbId = firebaseConfig.firestoreDatabaseId;
+      const res = await fetch(`https://firestore.googleapis.com/v1/projects/${projId}/databases/${dbId}/documents/utilisateurs/${uid}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const fields = json.fields || {};
+        const profile = {};
+        for (const [k, v] of Object.entries(fields)) {
+          if (v.stringValue !== undefined) profile[k] = v.stringValue;
+          else if (v.booleanValue !== undefined) profile[k] = v.booleanValue;
+          else if (v.integerValue !== undefined) profile[k] = parseInt(v.integerValue, 10);
+          else if (v.doubleValue !== undefined) profile[k] = parseFloat(v.doubleValue);
+          else if (v.arrayValue !== undefined) profile[k] = (v.arrayValue.values || []).map(item => item.stringValue || item);
+          else if (v.mapValue !== undefined) profile[k] = v.mapValue.fields || {};
+        }
+        if (profile.role || profile.roles) {
+          saveLocalUser({ ...profile, id: uid, uid });
+          return profile;
+        }
+      }
+    } catch (restErr) {
+      // Tolérer
+    }
+  }
+
   return getLocalUserProfile(uid);
 }
 
 // Vérifie si l'utilisateur possède réellement les privilèges administrateur côté serveur
-// Utilise les Custom Claims Firebase Auth, les identités maîtres déclarées et la base Firestore / locale
+// Utilise les Custom Claims Firebase Auth et les données de rôle vérifiées dans Firestore avec Firebase Admin SDK
+// Aucun e-mail n'est codé en dur : seul le rôle Firestore ou les claims Admin font foi.
 async function isServerAdmin(user) {
   if (!user || !user.uid) return false;
 
@@ -149,24 +181,14 @@ async function isServerAdmin(user) {
     return true;
   }
 
-  // 2. Identité propriétaire Super Administrateur maître (conforme aux firestore.rules)
-  const email = String(user.email || '').toLowerCase().trim();
-  const phone = String(user.phone_number || '').trim();
-  if (
-    email === 'castimamoise@gmail.com' ||
-    email === 'laperletourht@gmail.com' ||
-    phone === '+50937233816' ||
-    phone === '+50942858888'
-  ) {
-    return true;
-  }
-
-  // 3. Vérification de la collection /admins/{uid} ou du document /utilisateurs/{uid} via Firestore Admin
+  // 2. Vérification de rôle côté serveur dans Firestore avec Firebase Admin SDK
   if (adminDb) {
     try {
+      // a. Présence dans la collection des administrateurs /admins/{uid}
       const adminDoc = await adminDb.collection('admins').doc(user.uid).get();
       if (adminDoc.exists) return true;
 
+      // b. Document utilisateur direct par UID /utilisateurs/{uid}
       const userDoc = await adminDb.collection('utilisateurs').doc(user.uid).get();
       if (userDoc.exists) {
         const data = userDoc.data();
@@ -177,13 +199,54 @@ async function isServerAdmin(user) {
           return true;
         }
       }
+
+      // c. Recherche par e-mail dans /utilisateurs (si le document a été enregistré sous un identifiant alternatif)
+      if (user.email) {
+        const snapEmail = await adminDb.collection('utilisateurs')
+          .where('email', '==', user.email.toLowerCase().trim())
+          .limit(1)
+          .get();
+        if (!snapEmail.empty) {
+          const data = snapEmail.docs[0].data();
+          const role = String(data?.role || '').toLowerCase();
+          const roles = Array.isArray(data?.roles) ? data.roles.map(r => String(r).toLowerCase()) : [];
+          const status = String(data?.status || data?.statutCompte || 'actif').toLowerCase();
+          if ((role === 'admin' || roles.includes('admin') || Boolean(data?.isSuperAdmin)) && status !== 'inactif' && status !== 'suspendu') {
+            return true;
+          }
+        }
+      }
     } catch (e) {
-      // Fallback
+      console.warn('[isServerAdmin Firestore]:', e?.message);
+    }
+  }
+
+  // 3. Vérification de secours via requête Firestore authentifiée avec le jeton utilisateur vérifié
+  if (user._rawToken) {
+    try {
+      const projId = firebaseConfig.projectId;
+      const dbId = firebaseConfig.firestoreDatabaseId;
+      const res = await fetch(`https://firestore.googleapis.com/v1/projects/${projId}/databases/${dbId}/documents/utilisateurs/${user.uid}`, {
+        headers: { 'Authorization': `Bearer ${user._rawToken}` }
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const fields = json.fields || {};
+        const role = String(fields.role?.stringValue || '').toLowerCase();
+        const roles = fields.roles?.arrayValue?.values?.map(v => String(v.stringValue || '').toLowerCase()) || [];
+        const isSuperAdmin = Boolean(fields.isSuperAdmin?.booleanValue);
+        const status = String(fields.status?.stringValue || fields.statutCompte?.stringValue || 'actif').toLowerCase();
+        if ((role === 'admin' || roles.includes('admin') || isSuperAdmin) && status !== 'inactif' && status !== 'suspendu') {
+          return true;
+        }
+      }
+    } catch (e) {
+      // Tolérer
     }
   }
 
   // 4. Vérification dans le magasin de profils local
-  const local = getLocalUserProfile(user.uid);
+  const local = getLocalUserProfile(user.uid) || (user.email ? getLocalUserProfile(user.email) : null);
   if (local) {
     const role = String(local.role || '').toLowerCase();
     const roles = Array.isArray(local.roles) ? local.roles.map(r => String(r).toLowerCase()) : [];
@@ -201,18 +264,12 @@ async function isServerAdmin(user) {
 async function isEmailVerifiedServer(user) {
   if (!user || !user.uid) return false;
 
-  // 1. Les comptes maîtres propriétaires super-administrateurs sont considérés comme vérifiés
-  const email = String(user.email || '').toLowerCase().trim();
-  if (email === 'castimamoise@gmail.com' || email === 'laperletourht@gmail.com') {
-    return true;
-  }
-
-  // 2. Claim cryptographique email_verified ou emailVerified issu du jeton décodé
+  // 1. Claim cryptographique email_verified ou emailVerified issu du jeton décodé
   if (user.email_verified === true || user.emailVerified === true) {
     return true;
   }
 
-  // 3. Consultation en direct de l'état du compte dans Firebase Authentication via Firebase Admin SDK
+  // 2. Consultation en direct de l'état du compte dans Firebase Authentication via Firebase Admin SDK
   if (adminAuth) {
     try {
       const userRecord = await adminAuth.getUser(user.uid);
@@ -367,17 +424,25 @@ app.post('/api/auth/register', async (req, res) => {
   const safeName = String(req.body?.name || req.body?.nom || user.name || user.email?.split('@')[0] || '').trim().slice(0, 150);
   const safeUsername = String(req.body?.username || user.email?.split('@')[0] || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 50);
   const safePhone = String(req.body?.telephone || req.body?.phone || '').trim().slice(0, 50);
+  const safeAdresse = String(req.body?.adresse || req.body?.address || '').trim().slice(0, 300);
+  const safeVille = String(req.body?.ville || req.body?.city || 'Port-au-Prince').trim().slice(0, 100);
+  const safeSociete = String(req.body?.societe || '').trim().slice(0, 150);
+  const safeNumeroFiscal = String(req.body?.numeroFiscal || '').trim().slice(0, 100);
+  const isComplete = Boolean(safeName && safePhone && safeAdresse && safeSociete && safeNumeroFiscal);
 
   // Sécurité : Les privilèges d'administration ne peuvent jamais être auto-attribués lors de l'inscription.
-  // L'attribution du rôle administrateur est strictement réservée au Firebase Admin SDK côté serveur.
-  const role = 'prospect';
-  const roles = ['prospect'];
-  const statutClient = 'prospect';
+  // Les rôles autorisés à l'inscription publique sont exclusivement 'client' ou 'prospect'.
+  const requestedRole = String(req.body?.role || '').toLowerCase().trim();
+  const role = (requestedRole === 'prospect') ? 'prospect' : 'client';
+  const roles = [role];
+  const statutClient = role;
 
   const safeProfile = {
     id: user.uid, uid: user.uid, email: user.email,
     name: safeName, nom: safeName, prenom: String(req.body?.prenom || '').trim().slice(0, 100),
     username: safeUsername, telephone: safePhone, phone: safePhone,
+    adresse: safeAdresse, ville: safeVille, societe: safeSociete, numeroFiscal: safeNumeroFiscal,
+    profileComplete: isComplete,
     photoURL: String(req.body?.photoURL || user.picture || '').slice(0, 500),
     role, roles, statutClient,
     status: 'actif', statutCompte: 'actif', permissions: {},
@@ -391,7 +456,7 @@ app.post('/api/auth/register', async (req, res) => {
       const snap = await ref.get();
       if (snap.exists) {
         const existing = snap.data();
-        const merged = { ...existing, id: user.uid, uid: user.uid };
+        const merged = { ...existing, ...safeProfile, id: user.uid, uid: user.uid, role: existing.role || role, roles: existing.roles || roles };
         saveLocalUser(merged);
         return res.status(200).json({ success: true, profile: merged });
       }
@@ -400,6 +465,23 @@ app.post('/api/auth/register', async (req, res) => {
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp()
       });
+
+      // Synchronisation immédiate dans la collection /clients
+      if (role === 'client') {
+        const clientRef = adminDb.collection('clients').doc(user.uid);
+        await clientRef.set({
+          id: user.uid, clientId: user.uid, clientUid: user.uid, uid: user.uid,
+          name: safeSociete.toLowerCase() === 'particulier' ? safeName : (safeSociete ? `${safeName} (${safeSociete})` : safeName),
+          nom: safeName, telephone: safePhone, phone: safePhone, email: user.email,
+          address: safeAdresse ? `${safeAdresse}, ${safeVille}` : '',
+          adresse: safeAdresse, city: safeVille, ville: safeVille,
+          type: safeSociete.toLowerCase() === 'particulier' ? 'Particulier' : 'Entreprise',
+          societe: safeSociete, numeroFiscal: safeNumeroFiscal,
+          status: 'Actif', archived: false,
+          createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()
+        }, { merge: true });
+      }
+
       saveLocalUser(safeProfile);
       return res.status(201).json({ success: true, profile: safeProfile });
     } catch (adminErr) {
@@ -451,16 +533,14 @@ app.post('/api/auth/bootstrap-first-admin', async (req, res) => {
     });
   }
 
-  // 2. Vérification stricte d'identité ou du secret d'initialisation serveur défini par le propriétaire
-  const userEmail = String(user.email || '').toLowerCase().trim();
-  const isMasterOwner = userEmail === 'castimamoise@gmail.com' || userEmail === 'laperletourht@gmail.com';
+  // 2. Vérification stricte du secret d'initialisation serveur défini par le propriétaire
   const expectedInitToken = process.env.ADMIN_BOOTSTRAP_SECRET || process.env.ADMIN_INIT_TOKEN;
   const providedToken = req.headers['x-admin-bootstrap-token'] || req.body?.initToken;
   const hasValidSecret = Boolean(expectedInitToken && providedToken === expectedInitToken);
 
-  if (!isMasterOwner && !hasValidSecret) {
+  if (!hasValidSecret) {
     return res.status(403).json({
-      error: "Accès refusé. Seul le propriétaire autorisé peut initialiser le rôle administrateur."
+      error: "Accès refusé. Jeton secret d'initialisation administrateur requis."
     });
   }
 
@@ -863,16 +943,14 @@ app.put(['/api/users/:uid/role', '/api/admin/users/:uid/role'], async (req, res)
     return res.status(404).json({ error: "Utilisateur cible introuvable." });
   }
 
-  // Protection stricte du Super Administrateur maître
-  const targetEmail = String(targetProfile.email || '').toLowerCase().trim();
+  // Protection stricte du Super Administrateur (basée exclusivement sur les rôles et drapeaux vérifiés)
   const isTargetSuperAdmin = Boolean(targetProfile.isSuperAdmin) ||
-    targetEmail === 'castimamoise@gmail.com' ||
-    targetEmail === 'laperletourht@gmail.com';
+    targetProfile.role === 'superadmin' ||
+    (Array.isArray(targetProfile.roles) && targetProfile.roles.includes('superadmin'));
 
-  const callerEmail = String(admin.email || '').toLowerCase().trim();
-  const isCallerSuperAdmin = callerEmail === 'castimamoise@gmail.com' ||
-    callerEmail === 'laperletourht@gmail.com' ||
-    Boolean(admin.isSuperAdmin);
+  const isCallerSuperAdmin = Boolean(admin.isSuperAdmin) ||
+    admin.role === 'superadmin' ||
+    (Array.isArray(admin.roles) && admin.roles.includes('superadmin'));
 
   if (isTargetSuperAdmin && !isCallerSuperAdmin) {
     return res.status(403).json({ error: "Seul un Super Administrateur peut modifier le compte d'un autre Super Administrateur." });
@@ -967,8 +1045,7 @@ app.put(['/api/users/:uid/status', '/api/admin/users/:uid/status'], async (req, 
     return res.status(404).json({ error: "Utilisateur introuvable." });
   }
 
-  const targetEmail = String(targetProfile.email || '').toLowerCase().trim();
-  if (targetProfile.isSuperAdmin || targetEmail === 'castimamoise@gmail.com' || targetEmail === 'laperletourht@gmail.com') {
+  if (targetProfile.isSuperAdmin || targetProfile.role === 'superadmin' || (Array.isArray(targetProfile.roles) && targetProfile.roles.includes('superadmin'))) {
     return res.status(403).json({ error: "Le compte Super Administrateur ne peut jamais être désactivé." });
   }
 
@@ -1009,8 +1086,7 @@ app.delete(['/api/users/:uid', '/api/admin/users/:uid'], async (req, res) => {
     return res.status(404).json({ error: "Utilisateur introuvable." });
   }
 
-  const targetEmail = String(targetProfile.email || '').toLowerCase().trim();
-  if (targetProfile.isSuperAdmin || targetEmail === 'castimamoise@gmail.com' || targetEmail === 'laperletourht@gmail.com') {
+  if (targetProfile.isSuperAdmin || targetProfile.role === 'superadmin' || (Array.isArray(targetProfile.roles) && targetProfile.roles.includes('superadmin'))) {
     return res.status(403).json({ error: "Le compte Super Administrateur ne peut jamais être supprimé." });
   }
 

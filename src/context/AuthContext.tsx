@@ -1,11 +1,11 @@
-import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
 import { 
   auth, 
   db, 
   googleProvider, 
   signInWithPopup, 
   signOut, 
-  onAuthStateChanged,
+  onAuthStateChanged, 
   doc, 
   getDoc, 
   setDoc,
@@ -30,7 +30,16 @@ interface AuthContextType {
   canAccess: (moduleKey: string) => boolean;
   loginWithGoogle: () => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
-  registerWithEmail: (data: { email: string; pass: string; nom: string; telephone?: string }) => Promise<void>;
+  registerWithEmail: (data: { 
+    email: string; 
+    pass: string; 
+    nom: string; 
+    telephone?: string;
+    adresse?: string;
+    ville?: string;
+    societe?: string;
+    numeroFiscal?: string;
+  }) => Promise<void>;
   updateUserProfile: (data: Partial<UserProfile>) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -85,15 +94,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const isRegisteringRef = useRef(false);
 
   const fetchProfile = async (firebaseUser: User) => {
     try {
+      // 1. Contrôle des Custom Claims Firebase Auth pour garantir la cohérence
+      let isSuperAdminFromClaims = false;
+      let isAdminFromClaims = false;
+      try {
+        const tokenRes = await firebaseUser.getIdTokenResult();
+        if (tokenRes?.claims) {
+          if (tokenRes.claims.isSuperAdmin === true) isSuperAdminFromClaims = true;
+          if (tokenRes.claims.role === 'admin' || tokenRes.claims.admin === true) isAdminFromClaims = true;
+        }
+      } catch (claimErr) {
+        // Ignorer les erreurs ponctuelles de récupération de claims
+      }
+
       const userRef = doc(db, 'utilisateurs', firebaseUser.uid);
       const snap = await getDoc(userRef);
 
       if (snap.exists()) {
         const data = snap.data() as UserProfile;
-        const assignedRole: UserRole = data.role || 'client';
+        const finalIsSuperAdmin = Boolean(data.isSuperAdmin || (data.role === 'admin' && data.isSuperAdmin) || isSuperAdminFromClaims);
+        const assignedRole: UserRole = (finalIsSuperAdmin || isAdminFromClaims || data.role === 'admin')
+          ? 'admin'
+          : (data.role || 'client');
+
         const assignedRoles: UserRole[] = Array.isArray(data.roles) && data.roles.length 
           ? data.roles 
           : [assignedRole];
@@ -101,15 +128,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ? data.allowedModules
           : (ROLE_PERMISSIONS[assignedRole] || []);
 
+        const nomVal = data.nom || data.name || firebaseUser.displayName || 'Utilisateur';
+        const phoneVal = data.telephone || data.phone || '';
+        const adresseVal = data.adresse || (data as any).address || '';
+        const villeVal = data.ville || (data as any).city || 'Port-au-Prince';
+        const societeVal = data.societe || '';
+        const nifVal = data.numeroFiscal || '';
+        const isComplete = data.profileComplete !== undefined
+          ? Boolean(data.profileComplete)
+          : Boolean(nomVal && phoneVal && adresseVal && societeVal && nifVal);
+
         const fullProfile: UserProfile = {
           ...data,
           id: firebaseUser.uid,
           uid: firebaseUser.uid,
-          email: firebaseUser.email || '',
-          name: data.nom || data.name || firebaseUser.displayName || 'Utilisateur',
+          email: firebaseUser.email || data.email || '',
+          nom: nomVal,
+          name: nomVal,
+          telephone: phoneVal,
+          phone: phoneVal,
+          adresse: adresseVal,
+          ville: villeVal,
+          societe: societeVal,
+          numeroFiscal: nifVal,
+          profileComplete: isComplete,
           role: assignedRole,
           roles: assignedRoles,
-          isSuperAdmin: Boolean(data.isSuperAdmin || (data.role === 'admin' && data.isSuperAdmin)),
+          isSuperAdmin: finalIsSuperAdmin,
           allowedModules: assignedAllowedModules,
           status: data.status || 'actif'
         };
@@ -117,39 +162,77 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      // Automatically initialize default profile for new user as standard client
-      const defaultRole: UserRole = 'client';
+      // Si l'inscription via registerWithEmail est en cours d'exécution, ne pas écraser avec un profil vide
+      if (isRegisteringRef.current) {
+        return;
+      }
+
+      // Initialisation sécurisée du profil pour nouvel utilisateur si absent de Firestore
+      const finalIsSuperAdmin = isSuperAdminFromClaims;
+      const defaultRole: UserRole = (finalIsSuperAdmin || isAdminFromClaims) ? 'admin' : 'client';
+      const defaultName = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Utilisateur';
+      const nowIso = new Date().toISOString();
+
       const newProfile: UserProfile = {
         id: firebaseUser.uid,
         uid: firebaseUser.uid,
         email: firebaseUser.email || '',
-        nom: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Utilisateur',
-        name: firebaseUser.displayName || 'Utilisateur',
+        nom: defaultName,
+        name: defaultName,
+        telephone: firebaseUser.phoneNumber || '',
+        phone: firebaseUser.phoneNumber || '',
+        adresse: '',
+        ville: 'Port-au-Prince',
+        societe: '',
+        numeroFiscal: '',
+        profileComplete: false,
         role: defaultRole,
         roles: [defaultRole],
-        isSuperAdmin: false,
+        isSuperAdmin: finalIsSuperAdmin,
         status: 'actif',
+        statutCompte: 'actif',
+        statutClient: defaultRole === 'admin' ? 'admin' : 'client',
         photoURL: firebaseUser.photoURL || '',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        createdAt: nowIso,
+        updatedAt: nowIso
       };
 
       try {
-        await setDoc(userRef, newProfile);
+        await setDoc(userRef, newProfile, { merge: true });
       } catch (writeErr) {
         console.warn('Could not write initial profile to Firestore (using memory profile):', writeErr);
       }
+
+      // Synchronisation d'arrière-plan avec le serveur
+      try {
+        const token = await firebaseUser.getIdToken();
+        if (token) {
+          await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(newProfile)
+          });
+        }
+      } catch (syncErr) {
+        // Ignorer les erreurs de synchronisation non bloquantes
+      }
+
       setProfile(newProfile);
     } catch (err: any) {
       console.warn('Notice fetching user profile (using memory fallback):', err?.message || err);
       // Fallback
       setProfile({
         id: firebaseUser.uid,
+        uid: firebaseUser.uid,
         email: firebaseUser.email || '',
         role: 'client',
         roles: ['client'],
         isSuperAdmin: false,
         status: 'actif',
+        nom: firebaseUser.displayName || 'Utilisateur',
         name: firebaseUser.displayName || 'Utilisateur'
       });
     }
@@ -225,110 +308,115 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     societe?: string;
     numeroFiscal?: string;
   }) => {
-    const { email, pass, nom, telephone, adresse, ville, societe, numeroFiscal } = data;
-    const { createUserWithEmailAndPassword, updateProfile, sendEmailVerification } = await import('firebase/auth');
-    const cred = await createUserWithEmailAndPassword(auth, email, pass);
-    if (cred.user) {
-      try {
-        await updateProfile(cred.user, { displayName: nom });
-      } catch (e) {}
+    isRegisteringRef.current = true;
+    try {
+      const { email, pass, nom, telephone, adresse, ville, societe, numeroFiscal } = data;
+      const { createUserWithEmailAndPassword, updateProfile, sendEmailVerification } = await import('firebase/auth');
+      const cred = await createUserWithEmailAndPassword(auth, email, pass);
+      if (cred.user) {
+        try {
+          await updateProfile(cred.user, { displayName: nom });
+        } catch (e) {}
 
-      // Envoi officiel du mail de vérification Firebase Authentication
-      try {
-        await sendEmailVerification(cred.user);
-      } catch (verifErr) {
-        console.warn('[Firebase Auth] sendEmailVerification notice:', verifErr);
-      }
+        // Envoi officiel du mail de vérification Firebase Authentication
+        try {
+          await sendEmailVerification(cred.user);
+        } catch (verifErr) {
+          console.warn('[Firebase Auth] sendEmailVerification notice:', verifErr);
+        }
 
-      const defaultRole: UserRole = 'client';
-      const nomVal = (nom || '').trim();
-      const phoneVal = (telephone || '').trim();
-      const adresseVal = (adresse || '').trim();
-      const villeVal = (ville || 'Port-au-Prince').trim();
-      const societeVal = (societe || '').trim();
-      const nifVal = (numeroFiscal || '').trim();
-      const isComplete = Boolean(nomVal && phoneVal && adresseVal && societeVal && nifVal);
-      const nowIso = new Date().toISOString();
+        const defaultRole: UserRole = 'client';
+        const nomVal = (nom || '').trim();
+        const phoneVal = (telephone || '').trim();
+        const adresseVal = (adresse || '').trim();
+        const villeVal = (ville || 'Port-au-Prince').trim();
+        const societeVal = (societe || '').trim();
+        const nifVal = (numeroFiscal || '').trim();
+        const isComplete = Boolean(nomVal && phoneVal && adresseVal && societeVal && nifVal);
+        const nowIso = new Date().toISOString();
 
-      const initialProfile: UserProfile = {
-        id: cred.user.uid,
-        uid: cred.user.uid,
-        email,
-        nom: nomVal,
-        name: nomVal,
-        telephone: phoneVal,
-        phone: phoneVal,
-        adresse: adresseVal,
-        ville: villeVal,
-        societe: societeVal,
-        numeroFiscal: nifVal,
-        profileComplete: isComplete,
-        role: defaultRole,
-        roles: [defaultRole],
-        isSuperAdmin: false,
-        status: 'actif',
-        statutCompte: 'actif',
-        statutClient: 'client',
-        createdAt: nowIso,
-        updatedAt: nowIso
-      };
-
-      // 1. Direct Firestore user profile creation
-      try {
-        await setDoc(doc(db, 'utilisateurs', cred.user.uid), initialProfile);
-      } catch (e) {
-        console.warn('Initial registration setDoc fallback:', e);
-      }
-
-      // 2. Direct Firestore client record creation if not super admin
-      if (defaultRole !== 'admin') {
-        const clientDoc = {
+        const initialProfile: UserProfile = {
           id: cred.user.uid,
-          clientId: cred.user.uid,
-          clientUid: cred.user.uid,
           uid: cred.user.uid,
-          name: societeVal.toLowerCase() === 'particulier' ? nomVal : (societeVal ? `${nomVal} (${societeVal})` : nomVal),
+          email,
           nom: nomVal,
+          name: nomVal,
           telephone: phoneVal,
           phone: phoneVal,
-          email,
-          address: adresseVal ? `${adresseVal}, ${villeVal}` : '',
           adresse: adresseVal,
-          city: villeVal,
           ville: villeVal,
-          type: societeVal.toLowerCase() === 'particulier' ? 'Particulier' : 'Entreprise',
           societe: societeVal,
           numeroFiscal: nifVal,
-          status: 'Actif',
-          archived: false,
+          profileComplete: isComplete,
+          role: defaultRole,
+          roles: [defaultRole],
+          isSuperAdmin: false,
+          status: 'actif',
+          statutCompte: 'actif',
+          statutClient: 'client',
           createdAt: nowIso,
           updatedAt: nowIso
         };
+
+        // 1. Enregistrement direct du profil utilisateur dans Firestore
         try {
-          await setDoc(doc(db, 'clients', cred.user.uid), clientDoc, { merge: true });
-        } catch (clientErr) {
-          console.warn('Clients sync on register notice:', clientErr);
+          await setDoc(doc(db, 'utilisateurs', cred.user.uid), initialProfile, { merge: true });
+        } catch (e) {
+          console.warn('Initial registration setDoc fallback:', e);
         }
-      }
 
-      // 3. Server-side sync via /api/auth/register
-      try {
-        const token = await cred.user.getIdToken();
-        if (token) {
-          await fetch('/api/auth/register', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(initialProfile)
-          });
+        // 2. Création automatique de la fiche client pour le cycle commercial
+        if (defaultRole !== 'admin') {
+          const clientDoc = {
+            id: cred.user.uid,
+            clientId: cred.user.uid,
+            clientUid: cred.user.uid,
+            uid: cred.user.uid,
+            name: societeVal.toLowerCase() === 'particulier' ? nomVal : (societeVal ? `${nomVal} (${societeVal})` : nomVal),
+            nom: nomVal,
+            telephone: phoneVal,
+            phone: phoneVal,
+            email,
+            address: adresseVal ? `${adresseVal}, ${villeVal}` : '',
+            adresse: adresseVal,
+            city: villeVal,
+            ville: villeVal,
+            type: societeVal.toLowerCase() === 'particulier' ? 'Particulier' : 'Entreprise',
+            societe: societeVal,
+            numeroFiscal: nifVal,
+            status: 'Actif',
+            archived: false,
+            createdAt: nowIso,
+            updatedAt: nowIso
+          };
+          try {
+            await setDoc(doc(db, 'clients', cred.user.uid), clientDoc, { merge: true });
+          } catch (clientErr) {
+            console.warn('Clients sync on register notice:', clientErr);
+          }
         }
-      } catch (apiErr) {
-        console.warn('Backend API register sync notice:', apiErr);
-      }
 
-      setProfile(initialProfile);
+        // 3. Synchronisation côté serveur
+        try {
+          const token = await cred.user.getIdToken();
+          if (token) {
+            await fetch('/api/auth/register', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify(initialProfile)
+            });
+          }
+        } catch (apiErr) {
+          console.warn('Backend API register sync notice:', apiErr);
+        }
+
+        setProfile(initialProfile);
+      }
+    } finally {
+      isRegisteringRef.current = false;
     }
   };
 
@@ -468,7 +556,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const refreshProfile = async () => {
-    if (user) {
+    if (auth.currentUser) {
+      try {
+        await auth.currentUser.reload();
+        await auth.currentUser.getIdToken(true);
+      } catch (e) {}
+      setUser(auth.currentUser);
+      await fetchProfile(auth.currentUser);
+    } else if (user) {
       await fetchProfile(user);
     }
   };

@@ -4,7 +4,7 @@ import { useApp } from '../../context/AppContext';
 
 export const AuthModal: React.FC = () => {
   const { authModalOpen, setAuthModalOpen, authView, setAuthView, showToast, setIsPublicLanding } = useApp();
-  const { loginWithGoogle, loginWithEmail, registerWithEmail, resendVerificationEmail } = useAuth();
+  const { loginWithGoogle, loginWithEmail, registerWithEmail, resendVerificationEmail, refreshProfile } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -42,6 +42,18 @@ export const AuthModal: React.FC = () => {
     }
     if (code.includes('weak-password')) {
       return 'Le mot de passe doit comporter au moins 6 caractères.';
+    }
+    if (code.includes('too-many-requests') || message.includes('too-many-requests')) {
+      return 'Trop de tentatives infructueuses. L\'accès est temporairement suspendu par mesure de sécurité. Veuillez patienter un instant ou réinitialiser votre mot de passe.';
+    }
+    if (code.includes('user-disabled') || message.includes('user-disabled')) {
+      return 'Ce compte utilisateur a été désactivé par un administrateur. Veuillez contacter la direction.';
+    }
+    if (code.includes('network-request-failed') || message.includes('network-request-failed')) {
+      return 'Erreur de connexion réseau avec Firebase. Veuillez vérifier votre accès Internet et réessayer.';
+    }
+    if (code.includes('invalid-email') || message.includes('invalid-email')) {
+      return 'Le format de l\'adresse e-mail saisie est invalide.';
     }
     return message || 'Une erreur est survenue lors de l\'authentification.';
   };
@@ -124,6 +136,10 @@ export const AuthModal: React.FC = () => {
       if (auth.currentUser) {
         await auth.currentUser.reload();
         if (auth.currentUser.emailVerified) {
+          try {
+            await auth.currentUser.getIdToken(true);
+          } catch (tErr) {}
+          await refreshProfile();
           showToast('Adresse e-mail confirmée avec succès !', 'success');
           setAuthModalOpen(false);
           setIsPublicLanding(false);
