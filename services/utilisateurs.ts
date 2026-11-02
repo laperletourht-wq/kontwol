@@ -74,6 +74,49 @@ export async function getUtilisateur(id: string): Promise<UtilisateurData | null
 export async function updateUtilisateur(id: string, updates: Partial<UtilisateurData>): Promise<Partial<UtilisateurData>> {
   if (!auth.currentUser) throw new Error('Une session Firebase est requise.');
   if (id === auth.currentUser.uid && ('role' in updates || 'roles' in updates)) throw new Error('Vous ne pouvez pas modifier votre propre rôle.');
+  
+  const token = await auth.currentUser.getIdToken();
+
+  // Si modification de rôle, passer par l'API administrateur sécurisée côté serveur
+  if ('role' in updates || 'roles' in updates) {
+    const rawRole = String(updates.role || '').toLowerCase();
+    const res = await fetch(`/api/admin/users/${id}/role`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        role: rawRole,
+        roles: Array.isArray(updates.roles) ? updates.roles : [rawRole],
+        status: updates.status
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      if (res.status === 403) {
+        throw new Error(err.error || "Accès refusé. Privilèges administrateur requis côté serveur.");
+      }
+      throw new Error(err.error || `Erreur serveur (${res.status})`);
+    }
+  } else if ('status' in updates) {
+    const res = await fetch(`/api/admin/users/${id}/status`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ status: updates.status })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      if (res.status === 403) {
+        throw new Error(err.error || "Accès refusé. Privilèges administrateur requis côté serveur.");
+      }
+      throw new Error(err.error || `Erreur serveur (${res.status})`);
+    }
+  }
+
   const currentUserEmail = auth.currentUser.email || '';
   const payload = {
     ...updates,
@@ -82,19 +125,34 @@ export async function updateUtilisateur(id: string, updates: Partial<Utilisateur
   };
   try {
     await updateDoc(doc(db, COLLECTION_NAME, id), payload);
-    return { id, ...payload };
   } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, `${COLLECTION_NAME}/${id}`);
+    console.warn('Notice sync local Firestore après mise à jour serveur:', error);
   }
+  return { id, ...payload };
 }
 
 export async function deleteUtilisateur(id: string): Promise<boolean> {
+  if (!auth.currentUser) throw new Error('Une session Firebase est requise.');
+  const token = await auth.currentUser.getIdToken();
+  const res = await fetch(`/api/admin/users/${id}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    if (res.status === 403) {
+      throw new Error(err.error || "Accès refusé. Privilèges administrateur requis côté serveur.");
+    }
+    throw new Error(err.error || `Erreur serveur (${res.status})`);
+  }
   try {
     await deleteDoc(doc(db, COLLECTION_NAME, id));
-    return true;
   } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, `${COLLECTION_NAME}/${id}`);
+    console.warn('Notice deleteDoc local:', error);
   }
+  return true;
 }
 
 export function subscribeUtilisateurs(callback: (items: UtilisateurData[]) => void, includeArchived = false): Unsubscribe {

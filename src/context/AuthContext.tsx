@@ -471,9 +471,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     allowedModules: string[],
     status: 'actif' | 'inactif' = 'actif'
   ) => {
-    if (role !== 'admin' && !isSuperAdmin) {
-      throw new Error("Seul l'administrateur peut modifier le rôle d'une personne et lui attribuer l'accès aux zones.");
+    if (!user) {
+      throw new Error("Authentification Firebase requise.");
     }
+    const token = await user.getIdToken();
+    if (!token) {
+      throw new Error("Jeton Firebase introuvable.");
+    }
+
+    // 1. Validation et exécution stricte côté serveur via Firebase Admin SDK
+    const response = await fetch(`/api/admin/users/${targetUserId}/role`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        role: newRole,
+        roles: [newRole],
+        allowedModules,
+        status
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      if (response.status === 403) {
+        throw new Error(errorData.error || "Accès refusé. Privilèges administrateur requis côté serveur.");
+      }
+      throw new Error(errorData.error || `Erreur serveur (${response.status}) lors de la modification des permissions.`);
+    }
+
+    // 2. Synchronisation miroir locale
     const userRef = doc(db, 'utilisateurs', targetUserId);
     const updatePayload = {
       role: newRole,
@@ -483,7 +512,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updatedAt: new Date().toISOString(),
       updatedBy: user?.email || 'admin'
     };
-    await setDoc(userRef, updatePayload, { merge: true });
+    try {
+      await setDoc(userRef, updatePayload, { merge: true });
+    } catch (e) {
+      console.warn('Notice sync local Firestore après validation serveur:', e);
+    }
+
     if (user?.uid === targetUserId) {
       setProfile((prev) => (prev ? { ...prev, ...updatePayload } : null));
     }

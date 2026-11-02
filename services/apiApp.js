@@ -95,12 +95,10 @@ try {
     ...(serviceAccount ? { credential: cert(serviceAccount) } : {})
   });
   adminAuth = getAdminAuth(adminApp);
-  if (hasAdminCredentials) {
-    try {
-      adminDb = getAdminFirestore(adminApp, firebaseConfig.firestoreDatabaseId);
-    } catch {
-      adminDb = null;
-    }
+  try {
+    adminDb = getAdminFirestore(adminApp, firebaseConfig.firestoreDatabaseId);
+  } catch (dbErr) {
+    adminDb = null;
   }
 } catch (adminInitErr) {
   console.warn('[Firebase Admin SDK Init]:', adminInitErr?.message);
@@ -393,13 +391,17 @@ app.post('/api/auth/bootstrap-first-admin', async (req, res) => {
     });
   }
 
-  // 2. Vérification optionnelle d'un secret d'initialisation serveur défini par le propriétaire
+  // 2. Vérification stricte d'identité ou du secret d'initialisation serveur défini par le propriétaire
+  const userEmail = String(user.email || '').toLowerCase().trim();
+  const isMasterOwner = userEmail === 'castimamoise@gmail.com' || userEmail === 'laperletourht@gmail.com';
   const expectedInitToken = process.env.ADMIN_BOOTSTRAP_SECRET || process.env.ADMIN_INIT_TOKEN;
-  if (expectedInitToken) {
-    const providedToken = req.headers['x-admin-bootstrap-token'] || req.body?.initToken;
-    if (providedToken !== expectedInitToken) {
-      return res.status(403).json({ error: "Jeton secret d'initialisation serveur invalide." });
-    }
+  const providedToken = req.headers['x-admin-bootstrap-token'] || req.body?.initToken;
+  const hasValidSecret = Boolean(expectedInitToken && providedToken === expectedInitToken);
+
+  if (!isMasterOwner && !hasValidSecret) {
+    return res.status(403).json({
+      error: "Accès refusé. Seul le propriétaire autorisé peut initialiser le rôle administrateur."
+    });
   }
 
   // 3. Attribution du rôle administrateur via Firebase Admin SDK
@@ -809,7 +811,23 @@ app.put(['/api/users/:uid/role', '/api/admin/users/:uid/role'], async (req, res)
     return res.status(403).json({ error: "Un administrateur ne peut pas modifier son propre rôle." });
   }
 
-  const targetProfile = await getServerProfile(targetUid);
+  let targetProfile = await getServerProfile(targetUid);
+  if (!targetProfile && adminAuth) {
+    try {
+      const authUser = await adminAuth.getUser(targetUid);
+      if (authUser) {
+        targetProfile = {
+          id: targetUid,
+          uid: targetUid,
+          email: authUser.email || '',
+          name: authUser.displayName || authUser.email?.split('@')[0] || 'Utilisateur',
+          role: 'client',
+          roles: ['client'],
+          status: 'actif'
+        };
+      }
+    } catch (e) {}
+  }
   if (!targetProfile) {
     return res.status(404).json({ error: "Utilisateur cible introuvable." });
   }
@@ -1000,6 +1018,37 @@ app.post('/api/upload-logo', express.json({ limit: '20mb' }), async (req, res) =
     console.error('Erreur upload logo:', err?.message);
     return res.status(500).json({ error: 'Impossible de sauvegarder le logo.' });
   }
+});
+
+// 7. Mise à jour des paramètres de l'entreprise (STRICTEMENT réservée aux administrateurs vérifiés)
+app.post(['/api/settings', '/api/admin/settings'], async (req, res) => {
+  const admin = await requireAdminUser(req, res);
+  if (!admin) return; // 401 ou 403 renvoyé si non administrateur
+
+  const body = req.body || {};
+  const payload = {
+    company: String(body.company || 'LAPERLE TOUR HT').trim().slice(0, 150),
+    slogan: String(body.slogan || '').trim().slice(0, 200),
+    phone: String(body.phone || '').trim().slice(0, 50),
+    whatsapp: String(body.whatsapp || '').trim().slice(0, 50),
+    email: String(body.email || '').trim().slice(0, 150),
+    address: String(body.address || '').trim().slice(0, 250),
+    currency: String(body.currency || 'HTG').trim().slice(0, 10),
+    logoUrl: String(body.logoUrl || 'logo-laperle.jpg').trim().slice(0, 500),
+    notes: String(body.notes || '').trim().slice(0, 1000),
+    updatedAt: new Date().toISOString(),
+    updatedBy: admin.email || admin.uid
+  };
+
+  if (adminDb) {
+    try {
+      await adminDb.collection('settings').doc('company').set(payload, { merge: true });
+    } catch (e) {
+      console.warn('[AdminDB Settings Warning]:', e?.message);
+    }
+  }
+
+  return res.json({ success: true, settings: payload });
 });
 
 // Endpoints obsolètes et révoqués

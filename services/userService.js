@@ -100,8 +100,29 @@ export async function updateUserRoles(userId, newRolesInput) {
     throw new Error('Un administrateur ne peut modifier que le rôle d’un autre compte.');
   }
   const cleanRoles = normalizeRoles(newRolesInput);
+  const token = await auth.currentUser.getIdToken();
+  const res = await fetch(`/api/admin/users/${userId}/role`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      roles: cleanRoles,
+      role: cleanRoles[0] || ROLES.LECTURE_SEULE
+    })
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    if (res.status === 403) {
+      throw new Error(errorData.error || "Accès refusé. Privilèges administrateur requis côté serveur.");
+    }
+    throw new Error(errorData.error || `Erreur serveur (${res.status})`);
+  }
   const updates = { roles: cleanRoles, role: cleanRoles[0] || ROLES.LECTURE_SEULE, updatedAt: new Date().toISOString() };
-  await updateDoc(doc(db, COLLECTION_NAME, String(userId)), updates);
+  try {
+    await updateDoc(doc(db, COLLECTION_NAME, String(userId)), updates);
+  } catch (e) {}
   return { id: userId, ...updates };
 }
 
@@ -120,8 +141,26 @@ export async function updateUserStatus(userId, newStatus) {
     throw new Error('Un administrateur ne peut modifier que le statut d’un autre compte.');
   }
   const status = normalizeStatus(newStatus);
+  const token = await auth.currentUser.getIdToken();
+  const res = await fetch(`/api/admin/users/${userId}/status`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({ status })
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    if (res.status === 403) {
+      throw new Error(errorData.error || "Accès refusé. Privilèges administrateur requis côté serveur.");
+    }
+    throw new Error(errorData.error || `Erreur serveur (${res.status})`);
+  }
   const updates = { status, statutCompte: status, updatedAt: new Date().toISOString() };
-  await updateDoc(doc(db, COLLECTION_NAME, String(userId)), updates);
+  try {
+    await updateDoc(doc(db, COLLECTION_NAME, String(userId)), updates);
+  } catch (e) {}
   return { id: userId, ...updates };
 }
 

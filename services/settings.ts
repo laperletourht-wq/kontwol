@@ -57,20 +57,41 @@ export async function getCompanySettings(): Promise<CompanySettingsData> {
 }
 
 export async function saveCompanySettings(data: Partial<CompanySettingsData>): Promise<CompanySettingsData> {
-  const userEmail = auth.currentUser?.email || 'admin';
+  const user = auth.currentUser;
+  if (!user) throw new Error('Une session Firebase est requise.');
+  const token = await user.getIdToken();
+
+  const res = await fetch('/api/admin/settings', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify(data)
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    if (res.status === 403) {
+      throw new Error(err.error || "Accès refusé. Privilèges administrateur requis côté serveur.");
+    }
+    throw new Error(err.error || `Erreur serveur (${res.status}) lors de la sauvegarde des paramètres.`);
+  }
+
   const payload: CompanySettingsData = {
     ...DEFAULT_COMPANY_SETTINGS,
     ...data,
     id: DOC_ID,
     updatedAt: new Date().toISOString(),
-    updatedBy: userEmail
+    updatedBy: user.email || 'admin'
   };
+
   try {
     await setDoc(doc(db, COLLECTION_NAME, DOC_ID), payload, { merge: true });
-    return payload;
   } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, `${COLLECTION_NAME}/${DOC_ID}`);
+    console.warn('Notice setDoc local settings après validation serveur:', error);
   }
+  return payload;
 }
 
 export function subscribeCompanySettings(callback: (settings: CompanySettingsData) => void): Unsubscribe {
