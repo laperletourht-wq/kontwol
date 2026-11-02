@@ -1007,37 +1007,21 @@ export async function requestPasswordReset(identifier) {
 }
 
 /**
- * Envoie un code PIN à 6 chiffres pour vérifier si l'adresse e-mail est valide et accessible
+ * Envoie un e-mail officiel de vérification Firebase Authentication
  */
-export async function sendEmailVerificationCode(email, name = '') {
-  const cleanEmail = String(email || '').trim().toLowerCase();
-  const res = await fetch('/api/auth/send-verification-code', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: cleanEmail, name })
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || "Impossible d'envoyer le code de vérification.");
-  }
-  return data;
+export async function sendEmailVerificationCode() {
+  if (!auth.currentUser) throw new Error('Une session Firebase Authentication est requise.');
+  const { sendEmailVerification } = await import('firebase/auth');
+  await sendEmailVerification(auth.currentUser);
+  return { success: true, message: `E-mail de confirmation officiel envoyé à ${auth.currentUser.email}.` };
 }
 
 /**
- * Valide le code PIN à 6 chiffres saisi par l'utilisateur
+ * Valide si l'utilisateur a confirmé son e-mail via le lien Firebase
  */
-export async function verifyEmailVerificationCode(email, code) {
-  const cleanEmail = String(email || '').trim().toLowerCase();
-  const cleanCode = String(code || '').trim();
-  const res = await fetch('/api/auth/verify-email-code', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: cleanEmail, code: cleanCode })
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || "Code de vérification incorrect ou expiré.");
-  }
-  return data;
+export async function verifyEmailVerificationCode() {
+  if (!auth.currentUser) throw new Error('Une session Firebase Authentication est requise.');
+  await auth.currentUser.reload();
+  return { success: true, verified: Boolean(auth.currentUser.emailVerified) };
 }
 

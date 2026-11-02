@@ -34,6 +34,7 @@ interface AuthContextType {
   updateUserProfile: (data: Partial<UserProfile>) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  resendVerificationEmail: () => Promise<void>;
   updateUserRoleAndZones: (targetUserId: string, newRole: UserRole, allowedModules: string[], status?: 'actif' | 'inactif') => Promise<void>;
 }
 
@@ -225,12 +226,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     numeroFiscal?: string;
   }) => {
     const { email, pass, nom, telephone, adresse, ville, societe, numeroFiscal } = data;
-    const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
+    const { createUserWithEmailAndPassword, updateProfile, sendEmailVerification } = await import('firebase/auth');
     const cred = await createUserWithEmailAndPassword(auth, email, pass);
     if (cred.user) {
       try {
         await updateProfile(cred.user, { displayName: nom });
       } catch (e) {}
+
+      // Envoi officiel du mail de vérification Firebase Authentication
+      try {
+        await sendEmailVerification(cred.user);
+      } catch (verifErr) {
+        console.warn('[Firebase Auth] sendEmailVerification notice:', verifErr);
+      }
 
       const defaultRole: UserRole = 'client';
       const nomVal = (nom || '').trim();
@@ -523,6 +531,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const resendVerificationEmail = async () => {
+    if (auth.currentUser) {
+      const { sendEmailVerification } = await import('firebase/auth');
+      await sendEmailVerification(auth.currentUser);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -540,6 +555,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateUserProfile,
         logout,
         refreshProfile,
+        resendVerificationEmail,
         updateUserRoleAndZones
       }}
     >

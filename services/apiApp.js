@@ -196,10 +196,70 @@ async function isServerAdmin(user) {
   return false;
 }
 
-// Middleware de contrôle strict administrateur : renvoie 401 si non authentifié, 403 si non administrateur
+// Vérifie si l'adresse e-mail de l'utilisateur est confirmée via Firebase Authentication
+// Utilise les claims cryptographiques du jeton ou l'état en direct via Firebase Admin SDK
+async function isEmailVerifiedServer(user) {
+  if (!user || !user.uid) return false;
+
+  // 1. Les comptes maîtres propriétaires super-administrateurs sont considérés comme vérifiés
+  const email = String(user.email || '').toLowerCase().trim();
+  if (email === 'castimamoise@gmail.com' || email === 'laperletourht@gmail.com') {
+    return true;
+  }
+
+  // 2. Claim cryptographique email_verified ou emailVerified issu du jeton décodé
+  if (user.email_verified === true || user.emailVerified === true) {
+    return true;
+  }
+
+  // 3. Consultation en direct de l'état du compte dans Firebase Authentication via Firebase Admin SDK
+  if (adminAuth) {
+    try {
+      const userRecord = await adminAuth.getUser(user.uid);
+      if (userRecord && userRecord.emailVerified) {
+        return true;
+      }
+    } catch (e) {
+      // Tolérer les absences temporaires de connexion réseau admin
+    }
+  }
+
+  return false;
+}
+
+// Middleware de contrôle strict pour les actions nécessitant une adresse e-mail vérifiée
+// Bloque avec HTTP 403 si l'adresse e-mail n'est pas vérifiée par Firebase Authentication
+async function requireVerifiedEmailUser(req, res) {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return null; // 401 déjà envoyé par requireFirebaseUser
+
+  const isVerified = await isEmailVerifiedServer(user);
+  if (!isVerified) {
+    res.status(403).json({
+      error: "Adresse e-mail non vérifiée. Veuillez confirmer votre adresse e-mail via le lien officiel envoyé par Firebase Authentication avant d'effectuer cette action.",
+      code: "EMAIL_NOT_VERIFIED",
+      emailVerified: false
+    });
+    return null;
+  }
+
+  return user;
+}
+
+// Middleware de contrôle strict administrateur : renvoie 401 si non authentifié, 403 si non administrateur ou non vérifié
 async function requireAdminUser(req, res) {
   const user = await requireFirebaseUser(req, res);
   if (!user) return null; // 401 déjà envoyé par requireFirebaseUser
+
+  const isVerified = await isEmailVerifiedServer(user);
+  if (!isVerified) {
+    res.status(403).json({
+      error: "Accès refusé. Votre adresse e-mail doit être confirmée via Firebase Authentication.",
+      code: "EMAIL_NOT_VERIFIED",
+      emailVerified: false
+    });
+    return null;
+  }
 
   const isAdmin = await isServerAdmin(user);
   if (!isAdmin) {
@@ -461,8 +521,8 @@ app.post('/api/auth/bootstrap-first-admin', async (req, res) => {
 });
 
 app.post('/api/auth/profile', async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
-  if (!user) return;
+  const user = await requireVerifiedEmailUser(req, res);
+  if (!user) return; // 401 ou 403 renvoyé si non authentifié ou e-mail non vérifié
 
   const body = req.body || {};
   const safeName = String(body.nom || body.name || user.name || user.email?.split('@')[0] || '').trim().slice(0, 150);
@@ -545,9 +605,8 @@ app.get('/api/auth/user/:uid', async (req, res) => {
 });
 
 // =========================================================================
-// SERVICES D'AUTHENTIFICATION, RÉINITIALISATION & VÉRIFICATION D'EMAIL
+// SERVICES D'AUTHENTIFICATION, RÉINITIALISATION & VÉRIFICATION D'EMAIL (OFFICIEL FIREBASE)
 // =========================================================================
-const emailVerifications = new Map();
 
 app.post('/api/auth/reset-password', async (req, res) => {
   const email = String(req.body?.email || req.body?.identifier || '').trim().toLowerCase();
@@ -585,88 +644,60 @@ app.post('/api/auth/reset-password', async (req, res) => {
   }
 });
 
+// Envoi ou renvoi du lien officiel de vérification d'adresse e-mail Firebase Authentication
 app.post('/api/auth/send-verification-code', async (req, res) => {
-  const email = String(req.body?.email || '').trim().toLowerCase();
-  const name = String(req.body?.name || req.body?.nom || 'Client').trim();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.status(400).json({ error: "Veuillez renseigner une adresse e-mail valide." });
-  }
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
 
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
-
-  emailVerifications.set(email, {
-    code,
-    expiresAt,
-    attempts: 0,
-    name
-  });
-
-  // Tenter d'envoyer l'e-mail officiel Google Firebase pour toucher la boîte de réception
   try {
+    const header = String(req.headers.authorization || '');
+    const token = header.startsWith('Bearer ') ? header.slice(7) : '';
     const key = firebaseConfig.apiKey || "AIzaSyD4D5AajRVUFI6tkf42NlkrmwNMRcuCfbI";
-    fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${key}`, {
+
+    // Envoi via l'API officielle Google Identity Toolkit Firebase (sendOobCode VERIFY_EMAIL)
+    await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${key}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        requestType: 'PASSWORD_RESET',
-        email
+        requestType: 'VERIFY_EMAIL',
+        idToken: token
       })
-    }).catch(() => {});
-  } catch (e) {}
-
-  console.log(`[LAPERLE AUTH] Code de vérification généré pour ${email} : ${code}`);
+    });
+  } catch (e) {
+    console.warn('[send-verification-code warning]:', e?.message);
+  }
 
   return res.json({
     success: true,
-    email,
-    code, // Fourni pour permettre la validation fluide à l'écran
-    expiresAt,
-    message: `Code de vérification envoyé à ${email}.`
+    email: user.email,
+    message: `E-mail de confirmation officiel Firebase envoyé à ${user.email}.`
   });
 });
 
+// Vérification de la propriété emailVerified de Firebase Authentication côté serveur avec Firebase Admin SDK
 app.post('/api/auth/verify-email-code', async (req, res) => {
-  const email = String(req.body?.email || '').trim().toLowerCase();
-  const code = String(req.body?.code || '').trim();
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
 
-  if (!email || !code) {
-    return res.status(400).json({ error: "Adresse e-mail et code de vérification requis." });
+  const isVerified = await isEmailVerifiedServer(user);
+  if (!isVerified) {
+    return res.status(403).json({
+      error: "Votre adresse e-mail n'a pas encore été confirmée. Veuillez cliquer sur le lien reçu dans votre boîte de réception.",
+      code: "EMAIL_NOT_VERIFIED",
+      verified: false
+    });
   }
 
-  const record = emailVerifications.get(email);
-  if (!record) {
-    return res.status(400).json({ error: "Aucun code en attente ou session expirée. Veuillez redemander un code." });
-  }
-
-  if (Date.now() > record.expiresAt) {
-    emailVerifications.delete(email);
-    return res.status(400).json({ error: "Ce code a expiré (validité 10 minutes). Veuillez cliquer sur « Renvoyer un code »." });
-  }
-
-  if (record.attempts >= 5) {
-    emailVerifications.delete(email);
-    return res.status(400).json({ error: "Nombre maximum de tentatives atteint. Veuillez demander un nouveau code." });
-  }
-
-  if (record.code !== code) {
-    record.attempts += 1;
-    const remaining = 5 - record.attempts;
-    return res.status(400).json({ error: `Code incorrect. Il vous reste ${remaining} tentative(s).` });
-  }
-
-  // Code valide !
-  emailVerifications.delete(email);
   return res.json({
     success: true,
     verified: true,
-    email,
-    message: "Adresse e-mail vérifiée avec succès !"
+    email: user.email,
+    message: "Adresse e-mail confirmée avec succès via Firebase Authentication."
   });
 });
 
 app.post('/api/proformas', async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
+  const user = await requireVerifiedEmailUser(req, res);
   if (!user) return;
   if (!adminDb) return res.status(503).json({ error: 'Firestore Admin indisponible.' });
   const data = req.body?.proforma || {};
@@ -723,9 +754,9 @@ app.post('/api/proformas', async (req, res) => {
   }
 });
 
-// Un prospect peut demander un devis; cette route ne crée aucune proforma officielle et ne change aucun rôle.
+// Un prospect ou client dont l'e-mail est vérifié peut demander un devis
 app.post('/api/proforma-requests', async (req, res) => {
-  const user = await requireFirebaseUser(req, res);
+  const user = await requireVerifiedEmailUser(req, res);
   if (!user) return;
   if (!adminDb) return res.status(503).json({ error: 'Firestore Admin indisponible.' });
   try {

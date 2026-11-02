@@ -5,6 +5,7 @@ import {
   signInWithPopup, 
   signOut, 
   onAuthStateChanged,
+  sendEmailVerification,
   type User 
 } from 'firebase/auth';
 import { 
@@ -118,6 +119,7 @@ export {
   signInWithPopup, 
   signOut, 
   onAuthStateChanged, 
+  sendEmailVerification,
   doc, 
   getDoc, 
   getDocs, 

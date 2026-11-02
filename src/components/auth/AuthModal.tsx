@@ -4,7 +4,7 @@ import { useApp } from '../../context/AppContext';
 
 export const AuthModal: React.FC = () => {
   const { authModalOpen, setAuthModalOpen, authView, setAuthView, showToast, setIsPublicLanding } = useApp();
-  const { loginWithGoogle, loginWithEmail, registerWithEmail } = useAuth();
+  const { loginWithGoogle, loginWithEmail, registerWithEmail, resendVerificationEmail } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -15,8 +15,6 @@ export const AuthModal: React.FC = () => {
   const [societe, setSociete] = useState('');
   const [numeroFiscal, setNumeroFiscal] = useState('');
   const [expandProfileDetails, setExpandProfileDetails] = useState(false);
-  const [verificationCode, setVerificationCode] = useState('');
-  const [generatedCode, setGeneratedCode] = useState('839214');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -98,27 +96,6 @@ export const AuthModal: React.FC = () => {
     setLoading(true);
     setErrorMessage('');
     try {
-      // Step: prompt email verification code
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      setGeneratedCode(code);
-      setAuthView('verify');
-      showToast(`Code de vérification envoyé à ${email}`, 'info');
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Erreur lors de l\'inscription.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (verificationCode !== generatedCode && verificationCode !== '839214') {
-      setErrorMessage('Code incorrect. Veuillez saisir le code affiché.');
-      return;
-    }
-    setLoading(true);
-    setErrorMessage('');
-    try {
       await registerWithEmail({ 
         email, 
         pass: password, 
@@ -129,12 +106,46 @@ export const AuthModal: React.FC = () => {
         societe,
         numeroFiscal
       });
-      const hasFull = Boolean(nom.trim() && telephone.trim() && adresse.trim() && societe.trim() && numeroFiscal.trim());
-      showToast(hasFull ? 'Compte créé et profil client complété avec succès dans Firestore !' : 'Compte créé avec succès !', 'success');
-      setAuthModalOpen(false);
-      setIsPublicLanding(false);
+      setAuthView('verify');
+      showToast(`Compte créé ! Un e-mail de confirmation officiel vous a été envoyé à ${email}.`, 'success');
     } catch (err: any) {
-      setErrorMessage(err.message || 'Erreur lors de la finalisation du compte.');
+      console.warn('[Register Notice]:', err?.code || err?.message || err);
+      setErrorMessage(getAuthErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCheckEmailVerified = async () => {
+    setLoading(true);
+    setErrorMessage('');
+    try {
+      const { auth } = await import('../../lib/firebase');
+      if (auth.currentUser) {
+        await auth.currentUser.reload();
+        if (auth.currentUser.emailVerified) {
+          showToast('Adresse e-mail confirmée avec succès !', 'success');
+          setAuthModalOpen(false);
+          setIsPublicLanding(false);
+          return;
+        }
+      }
+      showToast("L'e-mail n'est pas encore confirmé. Veuillez cliquer sur le lien reçu par e-mail, puis réessayez.", 'info');
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Erreur lors de la vérification de l'e-mail.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendEmail = async () => {
+    setLoading(true);
+    setErrorMessage('');
+    try {
+      await resendVerificationEmail();
+      showToast(`Un nouvel e-mail de confirmation officiel a été envoyé à ${email}.`, 'success');
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Erreur lors de l'envoi de l'e-mail.");
     } finally {
       setLoading(false);
     }
@@ -552,62 +563,58 @@ export const AuthModal: React.FC = () => {
           {authView === 'verify' && (
             <div>
               <div className="auth-form-top">
-                <div className="auth-login-kicker">SÉCURITÉ DU COMPTE</div>
-                <h2 className="auth-login-heading" style={{ margin: '4px 0 6px', color: '#082b70', fontSize: '22px' }}>Vérification</h2>
+                <div className="auth-login-kicker">CONFIRMATION FIREBASE AUTHENTICATION</div>
+                <h2 className="auth-login-heading" style={{ margin: '4px 0 6px', color: '#082b70', fontSize: '22px' }}>Vérification de l'e-mail</h2>
                 <p className="auth-login-sub" style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
-                  Saisissez le code à 6 chiffres envoyé pour certifier votre adresse e-mail.
+                  Un e-mail officiel de confirmation vous a été envoyé par Firebase.
                 </p>
               </div>
 
-              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '12px', margin: '16px 0', fontSize: '12px', color: '#1e3a8a' }}>
-                ✉️ <strong>{email}</strong>
-                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-                  Code de démonstration immédiat : <strong>{generatedCode}</strong>
+              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '16px', margin: '18px 0', fontSize: '13px', color: '#1e3a8a' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '20px' }}>✉️</span>
+                  <strong>{email}</strong>
                 </div>
+                <p style={{ margin: 0, fontSize: '12px', color: '#334155', lineHeight: 1.5 }}>
+                  Veuillez ouvrir votre boîte de réception (et vos spams si nécessaire) et cliquer sur le lien officiel de confirmation pour certifier votre adresse.
+                </p>
               </div>
 
-              <form onSubmit={handleVerifyCode}>
-                <div style={{ marginBottom: '16px' }}>
-                  <label htmlFor="authEmailVerifyCode" style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                    Code de vérification (6 chiffres) :
-                  </label>
-                  <input
-                    id="authEmailVerifyCode"
-                    type="text"
-                    maxLength={6}
-                    value={verificationCode}
-                    onChange={(e) => setVerificationCode(e.target.value)}
-                    placeholder="Ex: 839214"
-                    style={{ width: '100%', padding: '12px', textAlign: 'center', letterSpacing: '4px', fontSize: '20px', fontWeight: 800, borderRadius: '8px', border: '1px solid #cbd5e1' }}
-                    required
-                  />
-                </div>
-
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleCheckEmailVerified}
                   disabled={loading}
                   style={{ width: '100%', padding: '12px', borderRadius: '8px', background: '#082b70', color: '#fff', border: 'none', fontWeight: 700, fontSize: '14px', cursor: 'pointer' }}
                 >
-                  {loading ? 'Validation en cours...' : 'Valider & Activer mon compte'}
+                  {loading ? 'Vérification en cours...' : '✓ J\'ai confirmé mon e-mail'}
                 </button>
-              </form>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '16px', fontSize: '12px' }}>
+                <button
+                  type="button"
+                  onClick={handleResendEmail}
+                  disabled={loading}
+                  style={{ width: '100%', padding: '11px', borderRadius: '8px', background: '#f8fafc', color: '#082b70', border: '1.5px solid #cbd5e1', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
+                >
+                  🔄 Renvoyer l'e-mail de confirmation
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '18px', fontSize: '12px' }}>
                 <button
                   type="button"
                   onClick={() => {
-                    const code = Math.floor(100000 + Math.random() * 900000).toString();
-                    setGeneratedCode(code);
-                    showToast(`Nouveau code généré : ${code}`, 'info');
+                    setAuthModalOpen(false);
+                    setIsPublicLanding(false);
                   }}
-                  style={{ background: 'none', border: 'none', color: '#082b70', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}
                 >
-                  🔄 Renvoyer un code
+                  Continuer et confirmer plus tard
                 </button>
                 <button
                   type="button"
                   onClick={() => setAuthView('register')}
-                  style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}
+                  style={{ background: 'none', border: 'none', color: '#082b70', fontWeight: 700, cursor: 'pointer' }}
                 >
                   Modifier mes infos
                 </button>
