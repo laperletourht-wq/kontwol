@@ -86,7 +86,7 @@ export const PrintSheetModal: React.FC = () => {
         </div>
 
         {/* Scrollable Printable Document Area */}
-        <div className="p-8 overflow-y-auto flex-1 bg-white print:p-0 print:m-0" id="printDocumentArea">
+        <div className="p-4 sm:p-6 md:p-8 overflow-y-auto flex-1 bg-white print:p-0 print:m-0" id="printDocumentArea">
           {/* Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-6 border-b-2 border-[#082b70]">
             <div className="flex items-center gap-4">

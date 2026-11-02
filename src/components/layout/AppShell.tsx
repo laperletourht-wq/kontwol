@@ -904,6 +904,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
                     {headerRole.title}
                   </span>
                   <span 
+                    className="header-role-full-label"
                     style={{
                       fontSize: '10px',
                       fontWeight: 800,
