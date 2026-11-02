@@ -21,7 +21,8 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenModal }) => 
     requestDocumentSend,
     showToast
   } = useApp();
-  const { role } = useAuth();
+  const { role, isSuperAdmin } = useAuth();
+  const isAdmin = role === 'admin' || isSuperAdmin;
   const isClient = role === 'client' || role === 'prospect';
   const isChauffeur = role === 'chauffeur';
 
@@ -358,18 +359,20 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenModal }) => 
                         >
                           ✏️ Modifier
                         </button>
-                        <button
-                          type="button"
-                          className="btn-card-action"
-                          style={{ color: '#dc2626' }}
-                          onClick={() => {
-                            if (window.confirm(`Supprimer la proforma ${p.number} ?`)) {
-                              deleteProforma(p.id);
-                            }
-                          }}
-                        >
-                          🗑️
-                        </button>
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            className="btn-card-action"
+                            style={{ color: '#dc2626' }}
+                            onClick={() => {
+                              if (window.confirm(`Supprimer la proforma ${p.number} ?`)) {
+                                deleteProforma(p.id);
+                              }
+                            }}
+                          >
+                            🗑️
+                          </button>
+                        )}
                       </>
                     )}
                   </div>
@@ -435,7 +438,7 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenModal }) => 
                             icon: '✏️',
                             onClick: () => onOpenModal('proforma', p)
                           },
-                          {
+                          ...(isAdmin ? [{
                             label: 'Supprimer',
                             icon: '🗑️',
                             onClick: () => {
@@ -444,7 +447,7 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenModal }) => 
                               }
                             },
                             variant: 'danger' as const
-                          }
+                          }] : [])
                         ])
                       ];
 

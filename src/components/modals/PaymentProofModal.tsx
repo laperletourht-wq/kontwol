@@ -73,36 +73,43 @@ export const PaymentProofModal: React.FC<PaymentProofModalProps> = ({
         : user?.displayName || facture?.client || 'Client Laperle';
 
       const paiementId = `PAI-${Date.now().toString().slice(-6)}`;
+      const cleanRef = referenceTransaction.trim().toUpperCase();
       const newPaiement: Paiement = {
         id: paiementId,
-        reference: referenceTransaction.trim().toUpperCase(),
+        reference: cleanRef,
         date: new Date().toISOString().slice(0, 10),
         client: clientName,
         clientId: user?.uid || profile?.id || facture?.clientId,
         clientEmail: user?.email || profile?.email || facture?.clientEmail,
         montant: Number(montant),
+        amount: Number(montant),
         devise,
         modePaiement,
         motif: facture ? `Règlement Facture ${facture.number}` : `Règlement par ${modePaiement}`,
         factureAssociee: facture?.number,
+        reservationId: facture?.reservationId,
         statut: 'En attente',
         preuveImage: preuveImage || undefined,
-        referenceTransaction: referenceTransaction.trim().toUpperCase(),
+        referenceTransaction: cleanRef,
         recuPar: 'Soumission Client en ligne'
       };
 
       await savePaiement(newPaiement);
 
-      // If tied to a facture, update facture status
+      // If tied to a facture, attach proof metadata to facture
       if (facture) {
         await saveFacture({
-          ...facture,
-          statut: 'En attente',
-          status: 'En attente',
-          paidAmount: Number(montant),
+          id: facture.id,
+          number: facture.number,
+          client: facture.client,
+          clientId: facture.clientId,
+          amount: facture.amount,
           modePaiement,
-          referenceTransaction: referenceTransaction.trim().toUpperCase(),
-          preuveImage: preuveImage || facture.preuveImage
+          paymentMethod: modePaiement,
+          referenceTransaction: cleanRef,
+          paymentReference: cleanRef,
+          preuveImage: preuveImage || facture.preuveImage,
+          paymentProof: preuveImage || facture.preuveImage
         });
       }
 

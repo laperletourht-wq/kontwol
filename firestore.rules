@@ -312,11 +312,20 @@ service cloud.firestore {
     }
 
     function isValidPaiement(data) {
-      return data.amount is number && data.amount >= 0 &&
+      return (
+        (('amount' in data) && data.amount is number && data.amount >= 0) ||
+        (('montant' in data) && data.montant is number && data.montant >= 0)
+      ) &&
         (!('client' in data) || (data.client is string && data.client.size() <= 150)) &&
         (!('method' in data) || (data.method is string && data.method.size() <= 50)) &&
+        (!('modePaiement' in data) || (data.modePaiement is string && data.modePaiement.size() <= 50)) &&
         (!('status' in data) || (data.status is string && data.status.size() <= 50)) &&
+        (!('statut' in data) || (data.statut is string && data.statut.size() <= 50)) &&
         (!('reference' in data) || (data.reference is string && data.reference.size() <= 100)) &&
+        (!('referenceTransaction' in data) || (data.referenceTransaction is string && data.referenceTransaction.size() <= 100)) &&
+        (!('factureAssociee' in data) || (data.factureAssociee is string && data.factureAssociee.size() <= 100)) &&
+        (!('proformaAssociee' in data) || (data.proformaAssociee is string && data.proformaAssociee.size() <= 100)) &&
+        (!('reservationId' in data) || (data.reservationId is string && data.reservationId.size() <= 128)) &&
         (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000)) &&
         (!('clientId' in data) || (data.clientId is string && data.clientId.size() <= 128)) &&
         (!('uid' in data) || (data.uid is string && data.uid.size() <= 128));
@@ -569,12 +578,18 @@ service cloud.firestore {
         canManageOperations() || isVendeur() || (
           isSignedIn() && (
             isOwnClientIdentity(existing()) ||
-            isOwnClientIdentity(incoming()) ||
             (('clientId' in existing()) && existing().clientId == request.auth.uid) ||
             (('uid' in existing()) && existing().uid == request.auth.uid) ||
             (('clientUid' in existing()) && existing().clientUid == request.auth.uid) ||
             (('createdBy' in existing()) && existing().createdBy == request.auth.uid)
-          )
+          ) &&
+          // Un client ne peut pas modifier une réservation déjà validée par le secrétariat
+          (!('status' in existing()) || existing().status in ['En attente', 'Brouillon']) &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'date', 'time', 'origin', 'destination', 'passengers', 'flightNumber', 
+            'notes', 'service', 'currency', 'amount', 'telephone', 'client', 'email', 'updatedAt', 'updatedBy'
+          ]) &&
+          (!('status' in incoming()) || incoming().status in ['En attente', 'Brouillon'])
         )
       );
       allow delete: if isAdmin() && isValidId(reservationId);
@@ -609,7 +624,7 @@ service cloud.firestore {
       allow update: if isValidId(proformaId) && (
         ((canManageFinances() || isSecretaire() || isVendeur()) && isValidProforma(incoming())) ||
         (isSignedIn() && isClientDoc(existing()) &&
-          incoming().diff(existing()).affectedKeys().hasOnly(['demandeFacture', 'dateDemandeFacture', 'moyenPaiement', 'modalitePaiement', 'referencePaiement', 'noteFacturation', 'status', 'updatedAt', 'updatedBy']))
+          incoming().diff(existing()).affectedKeys().hasOnly(['demandeFacture', 'dateDemandeFacture', 'moyenPaiement', 'modalitePaiement', 'referencePaiement', 'noteFacturation', 'updatedAt', 'updatedBy']))
       );
       allow delete: if isAdmin() && isValidId(proformaId);
     }
@@ -637,7 +652,11 @@ service cloud.firestore {
       allow update: if isValidId(factureId) && (
         ((canManageFinances() || isSecretaire() || isVendeur()) && isValidFacture(incoming())) ||
         (isSignedIn() && isClientDoc(existing()) &&
-          incoming().diff(existing()).affectedKeys().hasOnly(['paymentProof', 'paymentMethod', 'paymentReference', 'status', 'updatedAt', 'updatedBy']))
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'paymentProof', 'paymentMethod', 'paymentReference', 
+            'preuveImage', 'modePaiement', 'referenceTransaction', 
+            'updatedAt', 'updatedBy'
+          ]))
       );
       allow delete: if isAdmin() && isValidId(factureId);
     }
@@ -651,9 +670,9 @@ service cloud.firestore {
     match /utilisateurs/{utilisateurId} {
       allow get: if isSignedIn() && (
         request.auth.uid == utilisateurId || 
-        (isUserActive() && (isAdmin() || isSecretaire()))
+        (isUserActive() && isAdmin())
       );
-      allow list: if isVerified() && isUserActive() && (isAdmin() || isSecretaire());
+      allow list: if isVerified() && isUserActive() && isAdmin();
       // L'Administrateur peut créer des profils utilisateurs pré-configurés, ou l'utilisateur authentifié crée son propre profil
       allow create: if isSignedIn() && isValidId(utilisateurId) && isValidUtilisateur(incoming()) && (
         isAdmin() ||
@@ -668,8 +687,6 @@ service cloud.firestore {
       allow update: if isValidId(utilisateurId) && isValidUtilisateur(incoming()) && (
         isSuperAdmin() ||
         (isAdmin() && (!isSuperAdminDoc(existing()) || isSuperAdmin())) ||
-        (isSecretaire() && utilisateurId != request.auth.uid && !hasRoleFor(existing(), "admin") && !isSuperAdminDoc(existing()) &&
-          incoming().diff(existing()).affectedKeys().hasOnly(['updatedAt', 'updatedBy', 'status', 'statutCompte'])) ||
         (isSignedIn() && request.auth.uid == utilisateurId &&
           (!('uid' in incoming()) || incoming().uid == request.auth.uid) &&
           (!('id' in incoming()) || incoming().id == request.auth.uid) &&
@@ -785,6 +802,7 @@ service cloud.firestore {
         isSignedIn() && (
           resource.data.senderId == request.auth.uid ||
           resource.data.conversationId in ['conv-general-dispatch', 'conv-direction-all'] ||
+          (('channelId' in resource.data) && resource.data.channelId in ['dispatch', 'general', 'support']) ||
           (isChauffeur() && resource.data.conversationId == 'conv-inter-chauffeurs') ||
           (exists(/databases/$(database)/documents/conversations/$(resource.data.conversationId)) &&
            request.auth.uid in get(/databases/$(database)/documents/conversations/$(resource.data.conversationId)).data.participants)

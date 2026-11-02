@@ -21,7 +21,8 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
     completeReservationByDriver,
     settings
   } = useApp();
-  const { role } = useAuth();
+  const { role, isSuperAdmin } = useAuth();
+  const isAdmin = role === 'admin' || isSuperAdmin;
   const isClient = role === 'client' || role === 'prospect';
 
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -573,7 +574,7 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
                           href: `https://wa.me/${r.telephone.replace(/\D/g, '')}?text=${encodeURIComponent(`Bonjour ${r.client}, votre réservation Laperle ${r.id} est bien notée.`)}`,
                           variant: 'success' as const
                         }] : []),
-                        {
+                        ...(isAdmin ? [{
                           label: 'Supprimer',
                           icon: '🗑️',
                           onClick: () => {
@@ -582,7 +583,7 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
                             }
                           },
                           variant: 'danger' as const
-                        }
+                        }] : [])
                       ];
 
                       return (

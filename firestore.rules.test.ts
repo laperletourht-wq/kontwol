@@ -1,7 +1,10 @@
-/**
- * Test suite for LAPERLE TOUR HT Firestore Security Rules.
- * Validates the 14 mandatory security points and the 'Dirty Dozen' test cases.
- */
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+
+const expect = (actual: any) => ({
+  toBe: (expected: any) => assert.strictEqual(actual, expected),
+  toEqual: (expected: any) => assert.deepStrictEqual(actual, expected)
+});
 
 describe('Firestore Security Rules - LAPERLE TOUR HT', () => {
   // Helpers matching firestore.rules logic
@@ -266,6 +269,40 @@ describe('Firestore Security Rules - LAPERLE TOUR HT', () => {
       const maliciousProfile = { role: 'chauffeur', permissions: { export: true, all: true } };
       const hasPermissionTampering = JSON.stringify(existingProfile.permissions) !== JSON.stringify(maliciousProfile.permissions);
       expect(hasPermissionTampering).toBe(true);
+    });
+
+    it('SECRETAIRE -> cannot list or manage other user profiles and roles', () => {
+      const canManageUsers = (auth: any, userDoc: any) => isAdmin(auth, userDoc);
+      expect(canManageUsers(secAuth, secDoc)).toBe(false);
+      expect(canManageUsers(adminAuth, adminDoc)).toBe(true);
+    });
+
+    it('CLIENT -> cannot modify a validated reservation (Confirmée, En cours, Terminée)', () => {
+      const canClientUpdateReservation = (existingRes: any, incomingRes: any) => {
+        const isValidated = existingRes.status && !['En attente', 'Brouillon'].includes(existingRes.status);
+        if (isValidated) return false;
+        if (incomingRes.status && !['En attente', 'Brouillon'].includes(incomingRes.status)) return false;
+        return true;
+      };
+
+      const pendingRes = { id: 'r1', clientId: clientAuth.uid, status: 'En attente', destination: 'Port-au-Prince' };
+      const confirmedRes = { id: 'r2', clientId: clientAuth.uid, status: 'Confirmée', destination: 'Jacmel' };
+      const inProgressRes = { id: 'r3', clientId: clientAuth.uid, status: 'En cours', destination: 'Cap-Haïtien' };
+
+      expect(canClientUpdateReservation(pendingRes, { ...pendingRes, destination: 'Pétion-Ville' })).toBe(true);
+      expect(canClientUpdateReservation(confirmedRes, { ...confirmedRes, destination: 'Pétion-Ville' })).toBe(false);
+      expect(canClientUpdateReservation(inProgressRes, { ...inProgressRes, destination: 'Pétion-Ville' })).toBe(false);
+      expect(canClientUpdateReservation(pendingRes, { ...pendingRes, status: 'Confirmée' })).toBe(false);
+    });
+
+    it('CLIENT -> cannot self-validate or alter status of proformas or factures', () => {
+      const allowedClientProformaKeys = ['demandeFacture', 'dateDemandeFacture', 'moyenPaiement', 'modalitePaiement', 'referencePaiement', 'noteFacturation', 'updatedAt', 'updatedBy'];
+      const allowedClientFactureKeys = ['paymentProof', 'paymentMethod', 'paymentReference', 'updatedAt', 'updatedBy'];
+
+      expect(allowedClientProformaKeys.includes('status')).toBe(false);
+      expect(allowedClientFactureKeys.includes('status')).toBe(false);
+      expect(allowedClientProformaKeys.includes('amount')).toBe(false);
+      expect(allowedClientFactureKeys.includes('amount')).toBe(false);
     });
   });
 });

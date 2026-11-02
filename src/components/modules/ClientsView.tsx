@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import { RowActionMenu, type ActionMenuItem } from '../common/RowActionMenu';
 
 interface ClientsViewProps {
@@ -8,6 +9,8 @@ interface ClientsViewProps {
 
 export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenModal }) => {
   const { clients, deleteClient, globalSearchQuery } = useApp();
+  const { role, isSuperAdmin } = useAuth();
+  const isAdmin = role === 'admin' || isSuperAdmin;
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
 
@@ -96,7 +99,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenModal }) => {
                         icon: '✏️',
                         onClick: () => onOpenModal('client', c)
                       },
-                      {
+                      ...(isAdmin ? [{
                         label: 'Supprimer',
                         icon: '🗑️',
                         onClick: () => {
@@ -105,7 +108,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenModal }) => {
                           }
                         },
                         variant: 'danger' as const
-                      }
+                      }] : [])
                     ];
 
                     return (

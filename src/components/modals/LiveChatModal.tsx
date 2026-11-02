@@ -4,18 +4,21 @@ import { useAuth } from '../../context/AuthContext';
 
 export const LiveChatModal: React.FC = () => {
   const { chatModalOpen, setChatModalOpen, messages, sendChatMessage } = useApp();
-  const { user, profile } = useAuth();
+  const { user, role } = useAuth();
+  const isClient = role === 'client' || role === 'prospect';
+
   const [activeChannel, setActiveChannel] = useState<'dispatch' | 'direction' | 'chauffeurs'>('dispatch');
   const [inputText, setInputText] = useState('');
 
   if (!chatModalOpen) return null;
 
-  const filteredMessages = messages.filter((m) => m.channelId === activeChannel || !m.channelId);
+  const currentChannel = isClient ? 'dispatch' : activeChannel;
+  const filteredMessages = messages.filter((m) => m.channelId === currentChannel || !m.channelId);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
-    await sendChatMessage(inputText, activeChannel);
+    await sendChatMessage(inputText, currentChannel);
     setInputText('');
   };
 
@@ -35,9 +38,13 @@ export const LiveChatModal: React.FC = () => {
       >
         <div className="modal-head" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
           <div>
-            <h2 style={{ fontSize: '18px', color: '#082b70' }}>📻 Messagerie & Live Dispatch (Radio de Bord)</h2>
+            <h2 style={{ fontSize: '18px', color: '#082b70' }}>
+              {isClient ? '💬 Échange Direct avec le Secrétariat & Accueil' : '📻 Messagerie & Live Dispatch (Radio de Bord)'}
+            </h2>
             <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#64748b' }}>
-              Canal direct entre le bureau central de Delmas et les conducteurs en mission.
+              {isClient 
+                ? 'Posez vos questions sur vos réservations ou transmettez une consigne en direct à notre équipe.'
+                : 'Canal direct entre le bureau central de Delmas, les secrétaires et les conducteurs en mission.'}
             </p>
           </div>
           <button type="button" className="close" onClick={() => setChatModalOpen(false)}>
@@ -45,39 +52,43 @@ export const LiveChatModal: React.FC = () => {
           </button>
         </div>
 
-        {/* Channel Switcher */}
-        <div style={{ display: 'flex', gap: '8px', margin: '12px 0', borderBottom: '1px solid #edf2f7', paddingBottom: '8px' }}>
-          <button
-            type="button"
-            className={activeChannel === 'dispatch' ? 'primary' : 'secondary'}
-            onClick={() => setActiveChannel('dispatch')}
-            style={{ fontSize: '12px', padding: '6px 12px' }}
-          >
-            🎧 Dispatch & Secrétariat
-          </button>
-          <button
-            type="button"
-            className={activeChannel === 'chauffeurs' ? 'primary' : 'secondary'}
-            onClick={() => setActiveChannel('chauffeurs')}
-            style={{ fontSize: '12px', padding: '6px 12px' }}
-          >
-            🚌 Radio Flotte Conducteurs
-          </button>
-          <button
-            type="button"
-            className={activeChannel === 'direction' ? 'primary' : 'secondary'}
-            onClick={() => setActiveChannel('direction')}
-            style={{ fontSize: '12px', padding: '6px 12px' }}
-          >
-            👑 Avis Direction
-          </button>
-        </div>
+        {/* Channel Switcher for Staff */}
+        {!isClient && (
+          <div style={{ display: 'flex', gap: '8px', margin: '12px 0', borderBottom: '1px solid #edf2f7', paddingBottom: '8px' }}>
+            <button
+              type="button"
+              className={activeChannel === 'dispatch' ? 'primary' : 'secondary'}
+              onClick={() => setActiveChannel('dispatch')}
+              style={{ fontSize: '12px', padding: '6px 12px' }}
+            >
+              🎧 Dispatch & Secrétariat
+            </button>
+            <button
+              type="button"
+              className={activeChannel === 'chauffeurs' ? 'primary' : 'secondary'}
+              onClick={() => setActiveChannel('chauffeurs')}
+              style={{ fontSize: '12px', padding: '6px 12px' }}
+            >
+              🚌 Radio Flotte Conducteurs
+            </button>
+            <button
+              type="button"
+              className={activeChannel === 'direction' ? 'primary' : 'secondary'}
+              onClick={() => setActiveChannel('direction')}
+              style={{ fontSize: '12px', padding: '6px 12px' }}
+            >
+              👑 Avis Direction
+            </button>
+          </div>
+        )}
 
         {/* Messages Stream */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '10px 4px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {filteredMessages.length === 0 ? (
             <div style={{ textAlign: 'center', margin: 'auto', color: '#94a3b8', fontSize: '12px' }}>
-              Aucun message dans ce canal pour le moment.
+              {isClient 
+                ? 'Aucun message pour le moment. Écrivez ci-dessous pour joindre la secrétaire.'
+                : 'Aucun message dans ce canal pour le moment.'}
             </div>
           ) : (
             filteredMessages.map((m) => {
@@ -112,7 +123,7 @@ export const LiveChatModal: React.FC = () => {
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder="Transmettre une consigne ou un rapport d'axe..."
+            placeholder={isClient ? "Écrivez votre message à notre secrétariat..." : "Transmettre une consigne ou un rapport d'axe..."}
             style={{ flex: 1, padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
           />
           <button type="submit" className="primary" style={{ padding: '10px 18px' }}>

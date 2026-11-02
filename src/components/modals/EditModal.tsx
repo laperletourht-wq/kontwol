@@ -30,8 +30,13 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
     clients,
     vehicules,
     chauffeurs,
-    factures
+    factures,
+    setChatModalOpen
   } = useApp();
+
+  const isReservationLockedForClient = Boolean(
+    isClientUser && data?.id && data.status && data.status !== 'En attente' && data.status !== 'Brouillon'
+  );
 
   const [formData, setFormData] = useState<any>({});
 
@@ -62,34 +67,49 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
         return;
       }
 
+      if (type === 'reservation' && isReservationLockedForClient) {
+        showToast('Ce dossier a été validé par le secrétariat et ne peut plus être modifié par le client. Contactez la secrétaire.', 'error');
+        onClose();
+        return;
+      }
+
       if (type === 'demande-devis' || (type === 'proforma' && isClientUser)) {
         const clientName = formData.client || profile?.nom || profile?.name || user?.displayName || 'Client';
         const clientEmail = formData.email || formData.clientEmail || user?.email || profile?.email || '';
         const clientPhone = formData.telephone || profile?.telephone || profile?.phone || '';
         const service = formData.service || 'Transfert VIP / Course Privée';
-        const devisNumber = `DEV-${Date.now().toString().slice(-6)}`;
+        const resId = `DEM-${Date.now().toString().slice(-6)}`;
         
-        await saveProforma({
+        await saveReservation({
           ...formData,
-          number: devisNumber,
+          id: resId,
           client: clientName,
           clientId: user?.uid || profile?.id || '',
-          clientEmail,
+          email: clientEmail,
           telephone: clientPhone,
           service,
           date: formData.date || new Date().toISOString().slice(0, 10),
-          amount: 0,
-          tva: 0,
-          totalTTC: 0,
+          time: formData.time || '09:00',
+          origin: formData.origin || 'Port-au-Prince',
+          destination: formData.destination || 'À définir',
+          passengers: Number(formData.passengers) || 1,
+          amount: Number(formData.amount) || 0,
+          currency: 'USD',
           status: 'En attente',
-          notes: `Demande de devis client:\n- Prestation : ${service}\n- Trajet : ${formData.origin || 'Port-au-Prince'} ➔ ${formData.destination || 'À définir'}\n- Date & Heure souhaitées : ${formData.date || ''} à ${formData.time || '09:00'}\n- Passagers : ${formData.passengers || 1}\n- Véhicule souhaité : ${formData.vehicleType || 'SUV / Berline VIP'}\n- Remarques particulières : ${formData.specialRequests || 'Aucune'}`
+          demandeDevis: true,
+          notes: formData.specialRequests 
+            ? `Demande de devis client : ${formData.specialRequests}` 
+            : (formData.notes || 'Demande de devis en attente de chiffrage par le secrétariat')
         });
 
         await addNotification({
           title: `Nouvelle demande de devis : ${service}`,
           message: `${clientName} (${clientEmail} / ${clientPhone}) demande un chiffrage pour ${formData.origin || 'Port-au-Prince'} ➔ ${formData.destination || 'Destination'}.`,
           type: 'info',
-          link: 'proformas'
+          link: 'reservations',
+          targetId: resId,
+          targetAudience: 'admin',
+          authorUid: user?.uid
         });
 
         showToast('Votre demande de devis a bien été transmise à notre équipe commerciale !', 'success');
@@ -99,33 +119,57 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
 
       switch (type) {
         case 'reservation':
+          const isNewReservation = !formData.id;
+          const assignedId = formData.id || `RES-${Date.now().toString().slice(-6)}`;
+          const rClientName = isClientUser ? (profile?.nom || profile?.name || user?.displayName || formData.client || 'Client') : (formData.client || 'Client Divers');
+          const rEmail = isClientUser ? (user?.email || profile?.email || formData.email) : formData.email;
+          const rPhone = isClientUser ? (profile?.telephone || profile?.phone || formData.telephone) : formData.telephone;
+
           await saveReservation({
             ...formData,
-            client: isClientUser ? (profile?.nom || profile?.name || user?.displayName || formData.client) : formData.client,
+            id: assignedId,
+            client: rClientName,
             clientId: isClientUser ? (user?.uid || profile?.id) : formData.clientId,
-            telephone: isClientUser ? (profile?.telephone || profile?.phone || formData.telephone) : formData.telephone,
-            email: isClientUser ? (user?.email || profile?.email) : formData.email,
+            telephone: rPhone,
+            email: rEmail,
             status: isClientUser ? 'En attente' : (formData.status || 'En attente'),
             passengers: Number(formData.passengers) || 1,
-            amount: Number(formData.amount) || 0
+            amount: Number(formData.amount) || 0,
+            currency: formData.currency || 'USD'
           });
+
+          if (isNewReservation && isClientUser) {
+            await addNotification({
+              title: `Nouvelle réservation client N° ${assignedId}`,
+              message: `${rClientName} (${rPhone}) a réservé : ${formData.origin || 'Port-au-Prince'} ➔ ${formData.destination || 'Destination'} le ${formData.date || 'date à définir'}.`,
+              type: 'info',
+              link: 'reservations',
+              targetId: assignedId,
+              targetAudience: 'admin',
+              authorUid: user?.uid
+            });
+          }
           break;
         case 'proforma':
-          const amount = Number(formData.amount) || 0;
-          const tva = Math.round(amount * (settings.tvaPourcentage / 100));
+          const pAmount = Number(formData.amount) || 0;
+          const tva = Math.round(pAmount * (settings.tvaPourcentage / 100));
+          const proNum = formData.number || `PRO-${Date.now().toString().slice(-6)}`;
           await saveProforma({
             ...formData,
-            number: formData.number || `PRO-${Date.now().toString().slice(-6)}`,
-            amount,
+            id: proNum,
+            number: proNum,
+            amount: pAmount,
             tva,
-            totalTTC: amount + tva,
+            totalTTC: pAmount + tva,
             status: formData.status || 'En attente'
           });
           break;
         case 'facture':
+          const facNum = formData.number || `FAC-${Date.now().toString().slice(-6)}`;
           await saveFacture({
             ...formData,
-            number: formData.number || `FAC-${Date.now().toString().slice(-6)}`,
+            id: facNum,
+            number: facNum,
             amount: Number(formData.amount) || 0,
             status: formData.status || 'En attente'
           });
@@ -236,28 +280,60 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
           {/* RESERVATION FORM */}
           {type === 'reservation' && (
             <div className="form-grid">
+              {isReservationLockedForClient && (
+                <div className="field full" style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '10px',
+                  padding: '14px 16px',
+                  marginBottom: '10px',
+                  color: '#991b1b',
+                  fontSize: '13px',
+                  lineHeight: 1.5
+                }}>
+                  <div style={{ fontWeight: 800, fontSize: '14px', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>🔒</span> Dossier Validé · Modifications Verrouillées
+                  </div>
+                  <div>
+                    Cette réservation a déjà été validée par notre secrétariat (Statut : <strong>{data?.status}</strong>). Conformément aux règles de sécurité, les documents validés ne peuvent plus être modifiés directement par le client. Pour tout ajustement d&apos;horaire ou d&apos;itinéraire, veuillez contacter directement votre secrétaire via la messagerie ou WhatsApp.
+                  </div>
+                </div>
+              )}
+
               <div className="field">
                 <label>Nom du Client :</label>
-                <input
-                  type="text"
-                  list="clients-list-reservation"
-                  value={formData.client || ''}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    handleChange('client', val);
-                    const match = clients.find(c => c.name.toLowerCase() === val.toLowerCase());
-                    if (match && match.telephone) {
-                      handleChange('telephone', match.telephone);
-                    }
-                  }}
-                  placeholder="Sélectionnez ou tapez le nom du client"
-                  required
-                />
-                <datalist id="clients-list-reservation">
-                  {clients.map(c => (
-                    <option key={c.id} value={c.name}>{c.telephone ? `${c.telephone} - ${c.type || 'Client'}` : ''}</option>
-                  ))}
-                </datalist>
+                {isClientUser ? (
+                  <input
+                    type="text"
+                    value={formData.client || profile?.nom || profile?.name || user?.displayName || 'Client'}
+                    readOnly
+                    disabled={isReservationLockedForClient}
+                    style={{ background: '#f8fafc', color: '#475569', cursor: 'not-allowed' }}
+                  />
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      list="clients-list-reservation"
+                      value={formData.client || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        handleChange('client', val);
+                        const match = clients.find(c => c.name.toLowerCase() === val.toLowerCase());
+                        if (match && match.telephone) {
+                          handleChange('telephone', match.telephone);
+                        }
+                      }}
+                      placeholder="Sélectionnez ou tapez le nom du client"
+                      required
+                    />
+                    <datalist id="clients-list-reservation">
+                      {clients.map(c => (
+                        <option key={c.id} value={c.name}>{c.telephone ? `${c.telephone} - ${c.type || 'Client'}` : ''}</option>
+                      ))}
+                    </datalist>
+                  </>
+                )}
               </div>
 
               <div className="field">
@@ -267,6 +343,7 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
                   value={formData.telephone || ''}
                   onChange={(e) => handleChange('telephone', e.target.value)}
                   placeholder="+509 4440 8687"
+                  disabled={isReservationLockedForClient}
                 />
               </div>
 
@@ -275,6 +352,7 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
                 <select
                   value={formData.service || 'Circuit Touristique & Découverte'}
                   onChange={(e) => handleChange('service', e.target.value)}
+                  disabled={isReservationLockedForClient}
                 >
                   <option value="Circuit Touristique & Découverte">Circuit Touristique & Découverte</option>
                   <option value="Location SUV / Berline VIP avec Chauffeur">Location SUV VIP avec Chauffeur</option>
@@ -292,6 +370,7 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
                   min="1"
                   value={formData.passengers || 1}
                   onChange={(e) => handleChange('passengers', e.target.value)}
+                  disabled={isReservationLockedForClient}
                 />
               </div>
 
@@ -303,6 +382,7 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
                   onChange={(e) => handleChange('origin', e.target.value)}
                   placeholder="Ex: Hôtel Karibe, Pétion-Ville"
                   required
+                  disabled={isReservationLockedForClient}
                 />
               </div>
 
@@ -314,6 +394,7 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
                   onChange={(e) => handleChange('destination', e.target.value)}
                   placeholder="Ex: Côte des Arcadins"
                   required
+                  disabled={isReservationLockedForClient}
                 />
               </div>
 
@@ -324,6 +405,7 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
                   value={formData.date || new Date().toISOString().slice(0, 10)}
                   onChange={(e) => handleChange('date', e.target.value)}
                   required
+                  disabled={isReservationLockedForClient}
                 />
               </div>
 
@@ -334,6 +416,7 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
                   value={formData.time || '09:00'}
                   onChange={(e) => handleChange('time', e.target.value)}
                   required
+                  disabled={isReservationLockedForClient}
                 />
               </div>
 
@@ -1382,14 +1465,33 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
             </div>
           )}
 
-          <div className="form-actions">
-            <button type="button" className="secondary" onClick={onClose}>
-              Annuler
-            </button>
-            <button type="submit" className="primary">
-              Enregistrer
-            </button>
-          </div>
+          {isReservationLockedForClient ? (
+            <div className="form-actions" style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+              <button type="button" className="secondary" onClick={onClose}>
+                Fermer
+              </button>
+              <button
+                type="button"
+                className="primary"
+                style={{ background: '#082b70', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                onClick={() => {
+                  onClose();
+                  setChatModalOpen(true);
+                }}
+              >
+                💬 Contacter la Secrétaire
+              </button>
+            </div>
+          ) : (
+            <div className="form-actions">
+              <button type="button" className="secondary" onClick={onClose}>
+                Annuler
+              </button>
+              <button type="submit" className="primary">
+                Enregistrer
+              </button>
+            </div>
+          )}
         </form>
       </div>
     </div>

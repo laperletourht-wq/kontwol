@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { DualPrice } from '../common/DualPrice';
 import { DocRefBadge } from '../common/DocRefBadge';
+import { AssignDriverModal } from '../modals/AssignDriverModal';
 
 interface SecretaireDashboardProps {
   onOpenModal: (type: string, data?: any) => void;
@@ -18,12 +19,18 @@ export const SecretaireDashboard: React.FC<SecretaireDashboardProps> = ({ onOpen
     factures, 
     plannings,
     setCurrentModule, 
-    setChatModalOpen 
+    setChatModalOpen,
+    convertReservationToProforma,
+    convertProformaToFacture,
+    convertReservationToFacture,
+    convertFactureToPaiement,
+    settings
   } = useApp();
 
   const [period, setPeriod] = useState<'jour' | 'semaine' | 'mois'>('jour');
   const [driverTab, setDriverTab] = useState<'actifs' | 'tous'>('actifs');
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
+  const [assignRes, setAssignRes] = useState<any | null>(null);
 
   const secretaryName = profile?.nom || user?.displayName || 'Secrétariat';
 
@@ -324,6 +331,209 @@ export const SecretaireDashboard: React.FC<SecretaireDashboardProps> = ({ onOpen
               </div>
             </div>
           </div>
+
+          {/* Dossiers Clients & Cycle de Vie Réservation ➔ Proforma ➔ Facture */}
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.04)',
+            padding: '20px',
+            marginTop: '20px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <span style={{ fontSize: '11px', fontWeight: 800, color: '#082b70', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  PILOTAGE DU CYCLE COMMERCIAL & LOGISTIQUE
+                </span>
+                <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#0f172a', margin: '2px 0 0 0' }}>
+                  Dossiers Réservations & Traitement Secrétariat
+                </h3>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setCurrentModule('reservations')}
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#2563eb',
+                    background: '#eff6ff',
+                    border: '1px solid #bfdbfe',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Voir Toutes les Réservations ({reservations.length}) ➔
+                </button>
+              </div>
+            </div>
+
+            {reservations.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '30px', color: '#64748b', background: '#f8fafc', borderRadius: '12px' }}>
+                <span style={{ fontSize: '28px', display: 'block', marginBottom: '6px' }}>📋</span>
+                <div style={{ fontWeight: 600, color: '#334155' }}>Aucune demande client pour le moment</div>
+                <div style={{ fontSize: '12px', marginTop: '4px' }}>Les nouvelles réservations et demandes de devis apparaîtront ici avec actions directes.</div>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#475569', fontSize: '11.5px', textTransform: 'uppercase' }}>
+                      <th style={{ padding: '10px 12px' }}>Dossier</th>
+                      <th style={{ padding: '10px 12px' }}>Client</th>
+                      <th style={{ padding: '10px 12px' }}>Prestation & Trajet</th>
+                      <th style={{ padding: '10px 12px' }}>Date</th>
+                      <th style={{ padding: '10px 12px' }}>Chiffrage</th>
+                      <th style={{ padding: '10px 12px' }}>Documents Liés</th>
+                      <th style={{ padding: '10px 12px' }}>Statut</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'right' }}>Actions Secrétariat</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reservations.slice(0, 6).map((r) => {
+                      const linkedProforma = proformas.find(p => p.number === r.devisRef || p.reservationId === r.id);
+                      return (
+                        <tr key={r.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                            <DocRefBadge reference={r.id} type="reservation" />
+                          </td>
+                          <td style={{ padding: '10px 12px' }}>
+                            <strong style={{ color: '#0f172a' }}>{r.client}</strong>
+                            {r.telephone && <div style={{ fontSize: '11px', color: '#64748b' }}>{r.telephone}</div>}
+                          </td>
+                          <td style={{ padding: '10px 12px' }}>
+                            <div style={{ fontWeight: 600, color: '#1e293b' }}>{r.service || 'Course VIP'}</div>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>
+                              📍 {r.origin || 'Port-au-Prince'} ➔ {r.destination || 'Destination'}
+                            </div>
+                          </td>
+                          <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                            <div>{r.date}</div>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>{r.time || '09:00'}</div>
+                          </td>
+                          <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                            <DualPrice amount={r.amount || 0} currency={r.currency || 'USD'} size="sm" />
+                          </td>
+                          <td style={{ padding: '10px 12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                              {r.devisRef ? (
+                                <DocRefBadge reference={r.devisRef} type="proforma" label={`Devis ${r.devisRef}`} />
+                              ) : r.demandeDevis ? (
+                                <span style={{ fontSize: '10.5px', color: '#b45309', background: '#fef3c7', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>
+                                  ⏳ Devis sollicité
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: '10.5px', color: '#94a3b8' }}>-</span>
+                              )}
+                              {r.factureRef && (
+                                <DocRefBadge reference={r.factureRef} type="facture" label={`Facture ${r.factureRef}`} />
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                            <span style={{
+                              display: 'inline-block',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              fontSize: '11.5px',
+                              fontWeight: 700,
+                              background: r.status === 'Confirmée' || r.status === 'Terminée' ? '#dcfce7' : r.status === 'Facturé' ? '#dbeafe' : r.status === 'Devis émis' ? '#fef3c7' : '#f1f5f9',
+                              color: r.status === 'Confirmée' || r.status === 'Terminée' ? '#166534' : r.status === 'Facturé' ? '#1e40af' : r.status === 'Devis émis' ? '#92400e' : '#475569'
+                            }}>
+                              {r.status || 'En attente'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'inline-flex', gap: '5px' }}>
+                              {!r.devisRef && (
+                                <button
+                                  type="button"
+                                  onClick={() => convertReservationToProforma(r)}
+                                  style={{
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    padding: '4px 8px',
+                                    borderRadius: '6px',
+                                    background: '#fef3c7',
+                                    color: '#92400e',
+                                    border: '1px solid #fde68a',
+                                    cursor: 'pointer'
+                                  }}
+                                  title="Chiffrer et créer le devis proforma"
+                                >
+                                  📋 Devis
+                                </button>
+                              )}
+                              {!r.factureRef && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (linkedProforma) {
+                                      convertProformaToFacture(linkedProforma);
+                                    } else {
+                                      convertReservationToFacture(r);
+                                    }
+                                  }}
+                                  style={{
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    padding: '4px 8px',
+                                    borderRadius: '6px',
+                                    background: '#dbeafe',
+                                    color: '#1e40af',
+                                    border: '1px solid #bfdbfe',
+                                    cursor: 'pointer'
+                                  }}
+                                  title="Émettre la facture officielle"
+                                >
+                                  🧾 Facturer
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setAssignRes(r)}
+                                style={{
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  padding: '4px 8px',
+                                  borderRadius: '6px',
+                                  background: '#f0fdf4',
+                                  color: '#166534',
+                                  border: '1px solid #bbf7d0',
+                                  cursor: 'pointer'
+                                }}
+                                title="Affecter chauffeur & véhicule"
+                              >
+                                🚗 Dispatch
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onOpenModal('reservation', r)}
+                                style={{
+                                  fontSize: '11px',
+                                  padding: '4px 8px',
+                                  borderRadius: '6px',
+                                  background: '#f8fafc',
+                                  color: '#334155',
+                                  border: '1px solid #cbd5e1',
+                                  cursor: 'pointer'
+                                }}
+                                title="Modifier la réservation"
+                              >
+                                ✏️
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right Column: Drivers/Team List + Live Map (Ref 1 right sidebar) */}
@@ -462,6 +672,15 @@ export const SecretaireDashboard: React.FC<SecretaireDashboardProps> = ({ onOpen
           </div>
         </div>
       </div>
+
+      {/* Modal d'assignation Chauffeur & Véhicule */}
+      {assignRes && (
+        <AssignDriverModal
+          reservation={assignRes}
+          onClose={() => setAssignRes(null)}
+          onSuccess={() => setAssignRes(null)}
+        />
+      )}
     </div>
   );
 };

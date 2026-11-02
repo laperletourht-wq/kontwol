@@ -292,12 +292,38 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({ onOpenModal })
                             <h4 className="item-title">
                               {res.circuit || res.service || res.serviceType || 'Transport Personnalisé'}
                             </h4>
-                            <div className="item-ref-row">
+                            <div className="item-ref-row" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                               <DocRefBadge 
                                 type="reservation" 
                                 reference={res.number || res.id} 
                                 inline={true} 
                               />
+                              {res.devisRef && (
+                                <DocRefBadge 
+                                  type="proforma" 
+                                  reference={res.devisRef} 
+                                  label={`Devis ${res.devisRef}`}
+                                  inline={true} 
+                                />
+                              )}
+                              {res.factureRef && (
+                                <DocRefBadge 
+                                  type="facture" 
+                                  reference={res.factureRef} 
+                                  label={`Facture ${res.factureRef}`}
+                                  inline={true} 
+                                />
+                              )}
+                              {res.demandeDevis && !res.devisRef && (
+                                <span style={{ fontSize: '11px', color: '#b45309', background: '#fef3c7', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                                  ⏳ Devis en préparation
+                                </span>
+                              )}
+                              {res.demandeFacture && !res.factureRef && (
+                                <span style={{ fontSize: '11px', color: '#1d4ed8', background: '#dbeafe', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                                  ⏳ Facture demandée
+                                </span>
+                              )}
                               <span className="item-date">
                                 📅 {res.date || res.departureDate || 'Date à confirmer'} 
                                 {res.departureTime ? ` à ${res.departureTime}` : ''}
@@ -305,28 +331,48 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({ onOpenModal })
                             </div>
                           </div>
 
-                          <div className="item-badge-wrap">
+                          <div className="item-badge-wrap" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span className={`status-badge ${isCompleted ? 'completed' : isConfirmed ? 'confirmed' : 'pending'}`}>
-                              {res.status || 'Confirmée'}
+                              {res.status || 'En attente'}
                             </span>
-                            <button 
-                              type="button" 
-                              className="item-arrow-btn"
-                              onClick={() => {
-                                if (requestReservationDoc) {
-                                  requestReservationDoc('proforma', res.id || res.number);
-                                } else {
-                                  setCurrentModule('proformas');
-                                }
-                              }}
-                              title="Voir le devis / détails"
-                              aria-label="Voir les détails"
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                <line x1="7" y1="17" x2="17" y2="7"/>
-                                <polyline points="7 7 17 7 17 17"/>
-                              </svg>
-                            </button>
+                            {!res.devisRef && (
+                              <button
+                                type="button"
+                                style={{
+                                  fontSize: '11px',
+                                  padding: '4px 8px',
+                                  borderRadius: '6px',
+                                  background: '#eff6ff',
+                                  color: '#1d4ed8',
+                                  border: '1px solid #bfdbfe',
+                                  fontWeight: 600,
+                                  cursor: 'pointer'
+                                }}
+                                onClick={() => requestReservationDoc(res, 'devis')}
+                                title="Solliciter un devis chiffré"
+                              >
+                                📋 Demander Devis
+                              </button>
+                            )}
+                            {res.devisRef && !res.factureRef && (
+                              <button
+                                type="button"
+                                style={{
+                                  fontSize: '11px',
+                                  padding: '4px 8px',
+                                  borderRadius: '6px',
+                                  background: '#fef3c7',
+                                  color: '#b45309',
+                                  border: '1px solid #fde68a',
+                                  fontWeight: 600,
+                                  cursor: 'pointer'
+                                }}
+                                onClick={() => requestReservationDoc(res, 'facture')}
+                                title="Demander la facture pour payer"
+                              >
+                                🧾 Demander Facture
+                              </button>
+                            )}
                           </div>
                         </div>
 

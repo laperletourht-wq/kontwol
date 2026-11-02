@@ -143,9 +143,10 @@ interface AppContextType {
     authorUid?: string;
   }) => Promise<void>;
   requestDocumentSend: (docType: 'facture' | 'proforma', docNumber: string, amount: number, method: 'email' | 'whatsapp' | 'both', clientNotes?: string) => Promise<void>;
-  requestReservationDoc: (res: Reservation, docType: 'devis' | 'facture', notes?: string) => Promise<void>;
+  requestReservationDoc: (res: Reservation | string, docType?: 'devis' | 'facture' | 'proforma', notes?: string) => Promise<void>;
   convertProformaToFacture: (proforma: Proforma) => Promise<void>;
   convertReservationToProforma: (res: Reservation) => Promise<void>;
+  convertReservationToFacture: (res: Reservation) => Promise<void>;
   convertReservationToPlanning: (res: Reservation) => Promise<void>;
   convertFactureToPaiement: (facture: Facture, modePaiement?: string, reference?: string) => Promise<void>;
   generateEleveAbonnementEtFacture: (eleve: Eleve) => Promise<void>;
@@ -268,7 +269,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       syncQueryOrCollection('chauffeurs', collection(db, 'chauffeurs'), setRawChauffeurs, []);
       syncQueryOrCollection('plannings', collection(db, 'plannings'), setRawPlannings, []);
       syncQueryOrCollection('paiements', collection(db, 'paiements'), setRawPaiements, []);
-      if (role === 'admin' || role === 'secretaire' || isSuperAdmin) {
+      if (role === 'admin' || isSuperAdmin) {
         syncQueryOrCollection('utilisateurs', collection(db, 'utilisateurs'), setUtilisateurs, []);
       }
     } else if (role === 'chauffeur') {
@@ -283,6 +284,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         syncQueryOrCollection('proformas', query(collection(db, 'proformas'), where('clientId', '==', user.uid)), setRawProformas, []);
         syncQueryOrCollection('factures', query(collection(db, 'factures'), where('clientId', '==', user.uid)), setRawFactures, []);
       }
+    } else if (role === 'client' || role === 'prospect' || (!isStaff && role !== 'chauffeur')) {
+      // Client & Prospect real-time scoped synchronization
+      if (user?.uid) {
+        syncQueryOrCollection('reservations', query(collection(db, 'reservations'), where('clientId', '==', user.uid)), setRawReservations, []);
+        syncQueryOrCollection('proformas', query(collection(db, 'proformas'), where('clientId', '==', user.uid)), setRawProformas, []);
+        syncQueryOrCollection('factures', query(collection(db, 'factures'), where('clientId', '==', user.uid)), setRawFactures, []);
+        syncQueryOrCollection('notifications', query(collection(db, 'notifications'), where('targetUid', '==', user.uid)), setRawNotifications, []);
+        syncQueryOrCollection('vehicules', collection(db, 'vehicules'), setRawVehicules, []);
+      }
+    }
+
+    // Real-time synchronization of chat & dispatch messages for all authenticated users
+    if (user?.uid) {
+      syncQueryOrCollection('messages', collection(db, 'messages'), setMessages, []);
     }
 
     // Real-time synchronization of company settings
@@ -397,13 +412,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   }, [role, isGlobalRole, isSecretaireRole, isOperationsRole, isChauffeurRole, isVendeurRole]);
 
+  // Generic stopwords that should never trigger loose substring cross-client matching
+  const GENERIC_NAMES = useMemo(() => new Set([
+    'client', 'utilisateur', 'user', 'guest', 'admin', 'client laperle', 'test', 'demo', 
+    'passager', 'nouveau', 'client divers', 'inconnu', 'visiteur'
+  ]), []);
+
   // Name & Identity normalization helpers for multi-criteria matching
   const nameVariants = useMemo(() => {
     const list: string[] = [];
     const addNorm = (s?: string | null) => {
       if (!s) return;
       const clean = s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      if (clean && clean.length > 1) list.push(clean);
+      if (clean && clean.length > 2 && !GENERIC_NAMES.has(clean)) list.push(clean);
     };
     addNorm(profile?.nom);
     addNorm(profile?.prenom);
@@ -414,7 +435,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addNorm(profile?.name);
     addNorm(user?.displayName);
     return Array.from(new Set(list));
-  }, [profile?.nom, profile?.prenom, profile?.name, user?.displayName]);
+  }, [profile?.nom, profile?.prenom, profile?.name, user?.displayName, GENERIC_NAMES]);
 
   const userPhone = useMemo(() => {
     const p = profile?.telephone || profile?.phone;
@@ -430,12 +451,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     (targetName?: string | null): boolean => {
       if (!targetName) return false;
       const cleanTarget = targetName.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      if (!cleanTarget) return false;
+      if (!cleanTarget || cleanTarget.length < 3 || GENERIC_NAMES.has(cleanTarget)) return false;
       return nameVariants.some(
         (v) => v === cleanTarget || (v.length >= 4 && (cleanTarget.includes(v) || v.includes(cleanTarget)))
       );
     },
-    [nameVariants]
+    [nameVariants, GENERIC_NAMES]
   );
 
   // Match Phone helper (checks last 8 digits)
@@ -861,8 +882,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: `MSG-${Date.now()}`,
       channelId,
       senderId: user?.uid || auth.currentUser.uid,
-      senderName: profile?.name || profile?.nom || user?.displayName || 'Opérateur',
-      senderRole: profile?.role || 'admin',
+      senderName: profile?.name || profile?.nom || user?.displayName || 'Utilisateur',
+      senderRole: (role as string) || profile?.role || 'client',
       text: text.trim(),
       createdAt: new Date().toISOString()
     };
@@ -954,25 +975,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Client requests a quote (Devis) or Invoice (Facture) on a reservation
   const requestReservationDoc = async (
-    res: Reservation,
-    docType: 'devis' | 'facture',
+    target: Reservation | string,
+    docType: 'devis' | 'facture' | 'proforma' = 'devis',
     notes?: string
   ) => {
+    const res: Reservation | undefined = typeof target === 'string'
+      ? rawReservations.find(r => r.id === target) || (target ? { id: target, client: 'Client' } as Reservation : undefined)
+      : target;
+
+    if (!res || !res.id) {
+      showToast('Dossier de réservation introuvable.', 'error');
+      return;
+    }
+
+    const normalizedDocType = docType === 'proforma' ? 'devis' : docType;
     const clientName = profile?.nom ? `${profile.prenom || ''} ${profile.nom}`.trim() : user?.displayName || res.client || 'Client';
-    const typeLabel = docType === 'facture' ? 'Facture' : 'Devis';
+    const typeLabel = normalizedDocType === 'facture' ? 'Facture' : 'Devis';
 
     // 1. Mark the reservation
     const updatedRes: Reservation = {
       ...res,
-      demandeDevis: docType === 'devis' ? true : res.demandeDevis,
-      demandeFacture: docType === 'facture' ? true : res.demandeFacture,
+      demandeDevis: normalizedDocType === 'devis' ? true : res.demandeDevis,
+      demandeFacture: normalizedDocType === 'facture' ? true : res.demandeFacture,
       updatedAt: new Date().toISOString()
     };
     await saveReservation(updatedRes);
 
     // 2. Alert administration ONLY (the client will not receive their own request in their bell!)
     await addNotification({
-      title: `Demande de ${typeLabel} sur Réservation ${res.id}`,
+      title: `Demande de ${typeLabel} sur Dossier ${res.id}`,
       message: `${clientName} sollicite l'émission d'un ${typeLabel.toLowerCase()} officiel pour sa réservation (${res.origin || 'Départ'} ➔ ${res.destination || 'Arrivée'}).${notes ? `\nPrécisions : ${notes}` : ''}`,
       type: 'info',
       link: 'reservations',
@@ -981,7 +1012,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       authorUid: user?.uid
     });
 
-    showToast(`Votre demande de ${typeLabel.toLowerCase()} pour la réservation ${res.id} a été envoyée avec succès à notre équipe !`, 'success');
+    showToast(`Votre demande de ${typeLabel.toLowerCase()} pour le dossier ${res.id} a été envoyée avec succès à notre équipe !`, 'success');
   };
 
   const convertProformaToFacture = async (proforma: Proforma) => {
@@ -990,6 +1021,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: factureNumber,
       number: factureNumber,
       proformaNumber: proforma.number,
+      reservationId: proforma.reservationId,
       client: proforma.client,
       clientId: proforma.clientId,
       clientEmail: proforma.clientEmail,
@@ -1007,10 +1039,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     await saveFacture(newFacture);
-    await saveProforma({ ...proforma, status: 'Convertie en facture' });
+    await saveProforma({ 
+      ...proforma, 
+      status: 'Convertie en facture',
+      factureNumber: factureNumber
+    });
 
     // Link back to original reservation if found
-    const linkedRes = rawReservations.find(r => r.devisRef === proforma.number || r.id === proforma.id);
+    const linkedRes = rawReservations.find(r => 
+      (proforma.reservationId && r.id === proforma.reservationId) || 
+      r.devisRef === proforma.number || 
+      r.id === proforma.id
+    );
     if (linkedRes) {
       await saveReservation({
         ...linkedRes,
@@ -1035,6 +1075,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     showToast(`Proforma ${proforma.number} convertie en facture ${factureNumber} avec succès !`, 'success');
+    setCurrentModule('factures');
   };
 
   // Passerelle 1 : Réservation ➔ Devis Proforma
@@ -1045,6 +1086,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newProforma: Proforma = {
       id: number,
       number,
+      reservationId: res.id,
       client: res.client,
       clientId: res.clientId,
       clientEmail: res.email,
@@ -1065,7 +1107,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           total: amount
         }
       ],
-      notes: res.notes ? `Issu de la réservation ${res.id}. Note : ${res.notes}` : `Généré depuis la réservation ${res.id}`,
+      notes: res.notes ? `Issu du dossier ${res.id}. Note : ${res.notes}` : `Généré depuis la réservation ${res.id}`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -1093,8 +1135,71 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
 
-    showToast(`Devis Proforma ${number} généré avec succès pour ${res.client} !`, 'success');
+    showToast(`Devis Proforma ${number} généré avec succès pour le dossier ${res.id} !`, 'success');
     setCurrentModule('proformas');
+  };
+
+  // Passerelle 1b : Réservation ➔ Facture Directe
+  const convertReservationToFacture = async (res: Reservation) => {
+    const factureNumber = `FAC-${Date.now().toString().slice(-6)}`;
+    const amount = Number(res.amount) || 250;
+    const tva = Math.round(amount * (settings.tvaPourcentage / 100));
+    const totalTTC = amount + tva;
+
+    const newFacture: Facture = {
+      id: factureNumber,
+      number: factureNumber,
+      reservationId: res.id,
+      proformaNumber: res.devisRef,
+      client: res.client,
+      clientId: res.clientId,
+      clientEmail: res.email,
+      telephone: res.telephone,
+      service: res.service || 'Transfert & Course VIP',
+      date: new Date().toISOString().slice(0, 10),
+      dueDate: new Date(Date.now() + 86400000 * 15).toISOString().slice(0, 10),
+      amount: totalTTC,
+      totalTTC,
+      currency: res.currency || 'USD',
+      paidAmount: 0,
+      status: 'En attente',
+      items: [
+        {
+          description: `${res.service || 'Transport VIP'} : ${res.origin || 'Port-au-Prince'} ➔ ${res.destination || 'Destination'} (${res.passengers || 1} passager(s))`,
+          quantity: 1,
+          unitPrice: amount,
+          total: amount
+        }
+      ],
+      notes: res.notes ? `Facture émise depuis la réservation ${res.id}. ${res.notes}` : `Facture émise depuis la réservation ${res.id}`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    await saveFacture(newFacture);
+
+    await saveReservation({
+      ...res,
+      factureRef: factureNumber,
+      status: 'Facturé',
+      updatedAt: new Date().toISOString()
+    });
+
+    if (res.clientId || res.email) {
+      await addNotification({
+        title: `Votre Facture ${factureNumber} a été émise`,
+        message: `Bonjour ${res.client}, votre facture officielle N° ${factureNumber} ($${totalTTC} USD) a été générée et est disponible dans votre espace.`,
+        type: 'success',
+        link: 'factures',
+        targetId: factureNumber,
+        targetAudience: 'client',
+        targetUid: res.clientId,
+        authorUid: user?.uid
+      });
+    }
+
+    showToast(`Facture ${factureNumber} générée pour le dossier ${res.id} !`, 'success');
+    setCurrentModule('factures');
   };
 
   // Passerelle 2 : Réservation ➔ Planning Dispatch Flotte
@@ -1198,10 +1303,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       clientId: facture.clientId,
       clientEmail: facture.clientEmail,
       montant: montantPaye,
+      amount: montantPaye,
       devise: facture.currency || 'USD',
       modePaiement,
       motif: `Règlement Facture ${facture.number} - ${facture.service || 'Prestation VIP'}`,
       factureAssociee: facture.number,
+      proformaAssociee: facture.proformaNumber,
+      reservationId: facture.reservationId,
       statut: 'Validé',
       recuPar: profile?.nom || profile?.name || user?.displayName || 'Caisse Centrale Laperle'
     };
@@ -1213,12 +1321,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...facture,
       paidAmount: Number(facture.amount) || montantPaye,
       status: 'Payée',
+      statut: 'Payée',
+      modePaiement,
+      paymentMethod: modePaiement,
+      referenceTransaction: refPaiement,
       updatedAt: new Date().toISOString()
     });
 
     // Mettre à jour la réservation associée si existante
     const linkedRes = rawReservations.find(
-      r => r.factureRef === facture.number || r.devisRef === facture.proformaNumber || (facture.reservationId && r.id === facture.reservationId)
+      r => (facture.reservationId && r.id === facture.reservationId) ||
+           r.factureRef === facture.number || 
+           (facture.proformaNumber && r.devisRef === facture.proformaNumber)
     );
     if (linkedRes) {
       await saveReservation({
@@ -1231,11 +1345,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Notification à l'équipe régulation pour assigner le chauffeur
       await addNotification({
         title: '✅ Course Payée · Prête pour assignation',
-        message: `La facture ${facture.number} pour ${facture.client} a été payée ($${montantPaye} ${facture.currency || 'USD'}). Vous pouvez assigner le chauffeur et le véhicule.`,
+        message: `La facture ${facture.number} pour ${facture.client} a été payée ($${montantPaye} ${facture.currency || 'USD'}). Vous pouvez assigner le chauffeur et le véhicule pour le dossier ${linkedRes.id}.`,
         type: 'success',
         link: 'reservations',
         targetId: linkedRes.id,
         targetAudience: 'all'
+      });
+    }
+
+    if (facture.clientId) {
+      await addNotification({
+        title: `Paiement validé pour la Facture ${facture.number}`,
+        message: `Bonjour ${facture.client}, votre règlement de $${montantPaye} ${facture.currency || 'USD'} a été validé par la comptabilité. Votre réservation est confirmée !`,
+        type: 'success',
+        link: 'factures',
+        targetId: facture.number,
+        targetAudience: 'client',
+        targetUid: facture.clientId,
+        authorUid: user?.uid
       });
     }
 
@@ -1502,6 +1629,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         requestReservationDoc,
         convertProformaToFacture,
         convertReservationToProforma,
+        convertReservationToFacture,
         convertReservationToPlanning,
         convertFactureToPaiement,
         generateEleveAbonnementEtFacture,

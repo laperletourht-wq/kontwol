@@ -20,7 +20,8 @@ export const FacturesView: React.FC<FacturesViewProps> = ({ onOpenModal }) => {
     convertFactureToPaiement,
     settings
   } = useApp();
-  const { role } = useAuth();
+  const { role, isSuperAdmin } = useAuth();
+  const isAdmin = role === 'admin' || isSuperAdmin;
   const isClient = role === 'client' || role === 'prospect';
   const isChauffeur = role === 'chauffeur';
 
@@ -400,18 +401,20 @@ export const FacturesView: React.FC<FacturesViewProps> = ({ onOpenModal }) => {
                         >
                           ✏️ Modifier
                         </button>
-                        <button
-                          type="button"
-                          className="btn-card-action"
-                          style={{ color: '#dc2626' }}
-                          onClick={() => {
-                            if (window.confirm(`Supprimer la facture ${f.number} ?`)) {
-                              deleteFacture(f.id);
-                            }
-                          }}
-                        >
-                          🗑️
-                        </button>
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            className="btn-card-action"
+                            style={{ color: '#dc2626' }}
+                            onClick={() => {
+                              if (window.confirm(`Supprimer la facture ${f.number} ?`)) {
+                                deleteFacture(f.id);
+                              }
+                            }}
+                          >
+                            🗑️
+                          </button>
+                        )}
                       </>
                     )}
                   </div>
@@ -478,7 +481,7 @@ export const FacturesView: React.FC<FacturesViewProps> = ({ onOpenModal }) => {
                             icon: '✏️',
                             onClick: () => onOpenModal('facture', f)
                           },
-                          {
+                          ...(isAdmin ? [{
                             label: 'Supprimer',
                             icon: '🗑️',
                             onClick: () => {
@@ -487,7 +490,7 @@ export const FacturesView: React.FC<FacturesViewProps> = ({ onOpenModal }) => {
                               }
                             },
                             variant: 'danger' as const
-                          }
+                          }] : [])
                         ])
                       ];
 

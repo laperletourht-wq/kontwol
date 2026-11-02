@@ -8,6 +8,7 @@
     "build": "vite build",
     "start": "node server.ts",
     "lint": "eslint firestore.rules",
+    "test": "tsx --test firestore.rules.test.ts",
     "init:admin": "node scripts/init-first-admin.js"
   },
   "dependencies": {
