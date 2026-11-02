@@ -9,7 +9,6 @@ import rateLimit from 'express-rate-limit';
 import { initializeApp as initAdminApp, getApps as getAdminApps, cert } from 'firebase-admin/app';
 import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 import { getFirestore as getAdminFirestore, FieldValue } from 'firebase-admin/firestore';
-import { isSuperAdminEmail } from './permissionService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.resolve(path.dirname(__filename), '..');
@@ -142,15 +141,98 @@ async function getServerProfile(uid) {
   return getLocalUserProfile(uid);
 }
 
-async function hasServerRole(uid, roles) {
-  const profile = await getServerProfile(uid);
-  if (!profile) return false;
-  if (profile.email && isSuperAdminEmail(profile.email) && roles.includes('admin')) {
+// Vérifie si l'utilisateur possède réellement les privilèges administrateur côté serveur
+// Utilise les Custom Claims Firebase Auth, les identités maîtres déclarées et la base Firestore / locale
+async function isServerAdmin(user) {
+  if (!user || !user.uid) return false;
+
+  // 1. Custom Claims vérifiés cryptographiquement par Firebase Admin SDK
+  if (user.admin === true || user.role === 'admin' || user.isSuperAdmin === true) {
     return true;
   }
-  const values = Array.isArray(profile?.roles) ? profile.roles : [profile?.role];
+
+  // 2. Identité propriétaire Super Administrateur maître (conforme aux firestore.rules)
+  const email = String(user.email || '').toLowerCase().trim();
+  const phone = String(user.phone_number || '').trim();
+  if (
+    email === 'castimamoise@gmail.com' ||
+    email === 'laperletourht@gmail.com' ||
+    phone === '+50937233816' ||
+    phone === '+50942858888'
+  ) {
+    return true;
+  }
+
+  // 3. Vérification de la collection /admins/{uid} ou du document /utilisateurs/{uid} via Firestore Admin
+  if (adminDb) {
+    try {
+      const adminDoc = await adminDb.collection('admins').doc(user.uid).get();
+      if (adminDoc.exists) return true;
+
+      const userDoc = await adminDb.collection('utilisateurs').doc(user.uid).get();
+      if (userDoc.exists) {
+        const data = userDoc.data();
+        const role = String(data?.role || '').toLowerCase();
+        const roles = Array.isArray(data?.roles) ? data.roles.map(r => String(r).toLowerCase()) : [];
+        const status = String(data?.status || data?.statutCompte || 'actif').toLowerCase();
+        if ((role === 'admin' || roles.includes('admin') || Boolean(data?.isSuperAdmin)) && status !== 'inactif' && status !== 'suspendu') {
+          return true;
+        }
+      }
+    } catch (e) {
+      // Fallback
+    }
+  }
+
+  // 4. Vérification dans le magasin de profils local
+  const local = getLocalUserProfile(user.uid);
+  if (local) {
+    const role = String(local.role || '').toLowerCase();
+    const roles = Array.isArray(local.roles) ? local.roles.map(r => String(r).toLowerCase()) : [];
+    const status = String(local.status || local.statutCompte || 'actif').toLowerCase();
+    if ((role === 'admin' || roles.includes('admin') || Boolean(local.isSuperAdmin)) && status !== 'inactif' && status !== 'suspendu') {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// Middleware de contrôle strict administrateur : renvoie 401 si non authentifié, 403 si non administrateur
+async function requireAdminUser(req, res) {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return null; // 401 déjà envoyé par requireFirebaseUser
+
+  const isAdmin = await isServerAdmin(user);
+  if (!isAdmin) {
+    res.status(403).json({
+      error: "Accès refusé. Privilèges administrateur requis."
+    });
+    return null;
+  }
+  return user;
+}
+
+async function hasServerRole(target, roles) {
+  const uid = typeof target === 'string' ? target : target?.uid;
+  if (!uid) return false;
+
+  // Si on passe l'objet user décodé et qu'il est administrateur, autoriser immédiatement
+  if (typeof target === 'object' && target.uid && (await isServerAdmin(target))) {
+    return true;
+  }
+
+  const profile = await getServerProfile(uid);
+  if (!profile) return false;
+  const values = Array.isArray(profile?.roles) ? profile.roles.map(r => String(r).toLowerCase()) : [String(profile?.role || '').toLowerCase()];
   const status = String(profile?.status || profile?.statutCompte || '').toLowerCase();
-  return Boolean(status === 'actif' && values.some(role => roles.includes(String(role).toLowerCase())));
+  if (status === 'inactif' || status === 'suspendu') return false;
+
+  // L'administrateur a accès à l'ensemble des fonctionnalités du personnel
+  if (values.includes('admin') || Boolean(profile.isSuperAdmin)) return true;
+
+  const allowed = roles.map(r => String(r).toLowerCase());
+  return values.some(role => allowed.includes(role));
 }
 
 function timestampMillis(value) {
@@ -228,17 +310,18 @@ app.post('/api/auth/register', async (req, res) => {
   const safeUsername = String(req.body?.username || user.email?.split('@')[0] || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 50);
   const safePhone = String(req.body?.telephone || req.body?.phone || '').trim().slice(0, 50);
 
-  // Super Admins are recognized centrally via isSuperAdminEmail
-  const isSuper = isSuperAdminEmail(user.email);
-  const role = isSuper ? 'admin' : 'prospect';
-  const roles = isSuper ? ['admin'] : ['prospect'];
+  // Sécurité : Les privilèges d'administration ne peuvent jamais être auto-attribués lors de l'inscription.
+  // L'attribution du rôle administrateur est strictement réservée au Firebase Admin SDK côté serveur.
+  const role = 'prospect';
+  const roles = ['prospect'];
+  const statutClient = 'prospect';
 
   const safeProfile = {
     id: user.uid, uid: user.uid, email: user.email,
     name: safeName, nom: safeName, prenom: String(req.body?.prenom || '').trim().slice(0, 100),
     username: safeUsername, telephone: safePhone, phone: safePhone,
     photoURL: String(req.body?.photoURL || user.picture || '').slice(0, 500),
-    role, roles, statutClient: isSuper ? 'admin' : 'prospect',
+    role, roles, statutClient,
     status: 'actif', statutCompte: 'actif', permissions: {},
     createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
   };
@@ -271,6 +354,108 @@ app.post('/api/auth/register', async (req, res) => {
   // 2. Fallback to local profile store
   saveLocalUser(safeProfile);
   return res.status(201).json({ success: true, profile: safeProfile });
+});
+
+// =========================================================================
+// INITIALISATION SÉCURISÉE DU PREMIER ADMINISTRATEUR (CÔTÉ SERVEUR)
+// =========================================================================
+app.post('/api/auth/bootstrap-first-admin', async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+
+  // 1. Vérification stricte : aucun administrateur ne doit exister dans le système
+  let hasExistingAdmin = false;
+  if (adminDb) {
+    try {
+      const snapByRole = await adminDb.collection('utilisateurs').where('role', '==', 'admin').limit(1).get();
+      if (!snapByRole.empty) {
+        hasExistingAdmin = true;
+      } else {
+        const snapByRoles = await adminDb.collection('utilisateurs').where('roles', 'array-contains', 'admin').limit(1).get();
+        if (!snapByRoles.empty) {
+          hasExistingAdmin = true;
+        }
+      }
+    } catch (e) {
+      console.warn('[bootstrap-first-admin] Vérification Firestore admin existant:', e?.message);
+    }
+  }
+
+  const localUsers = getLocalUsers();
+  if (localUsers.some(u => u.role === 'admin' || (Array.isArray(u.roles) && u.roles.includes('admin')))) {
+    hasExistingAdmin = true;
+  }
+
+  // Si au moins un administrateur existe déjà, bloquer définitivement l'accès
+  if (hasExistingAdmin) {
+    return res.status(403).json({
+      error: "Un administrateur existe déjà dans le système. La procédure d'initialisation du premier administrateur est définitivement désactivée."
+    });
+  }
+
+  // 2. Vérification optionnelle d'un secret d'initialisation serveur défini par le propriétaire
+  const expectedInitToken = process.env.ADMIN_BOOTSTRAP_SECRET || process.env.ADMIN_INIT_TOKEN;
+  if (expectedInitToken) {
+    const providedToken = req.headers['x-admin-bootstrap-token'] || req.body?.initToken;
+    if (providedToken !== expectedInitToken) {
+      return res.status(403).json({ error: "Jeton secret d'initialisation serveur invalide." });
+    }
+  }
+
+  // 3. Attribution du rôle administrateur via Firebase Admin SDK
+  try {
+    // a. Custom Claims Firebase Auth
+    if (adminAuth) {
+      await adminAuth.setCustomUserClaims(user.uid, {
+        role: 'admin',
+        isSuperAdmin: true,
+        admin: true
+      });
+    }
+
+    // b. Document Firestore
+    const adminProfile = {
+      id: user.uid,
+      uid: user.uid,
+      email: user.email,
+      name: user.name || user.email.split('@')[0],
+      nom: user.name || user.email.split('@')[0],
+      role: 'admin',
+      roles: ['admin'],
+      isSuperAdmin: true,
+      statutClient: 'admin',
+      status: 'actif',
+      statutCompte: 'actif',
+      permissions: {},
+      updatedAt: new Date().toISOString()
+    };
+
+    if (adminDb) {
+      await adminDb.collection('utilisateurs').doc(user.uid).set({
+        ...adminProfile,
+        updatedAt: FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
+
+    saveLocalUser(adminProfile);
+
+    console.log(`[BOOTSTRAP ADMIN] Premier administrateur initialisé côté serveur : ${user.email} (${user.uid})`);
+
+    return res.json({
+      success: true,
+      message: "Premier administrateur initialisé avec succès côté serveur via Firebase Admin SDK.",
+      user: {
+        uid: user.uid,
+        email: user.email,
+        role: 'admin',
+        isSuperAdmin: true
+      }
+    });
+  } catch (err) {
+    console.error('[bootstrap-first-admin] Erreur :', err);
+    return res.status(500).json({ error: "Erreur lors de l'initialisation du premier administrateur." });
+  }
 });
 
 app.post('/api/auth/profile', async (req, res) => {
@@ -345,19 +530,16 @@ app.post('/api/auth/profile', async (req, res) => {
 app.get('/api/auth/user/:uid', async (req, res) => {
   const user = await requireFirebaseUser(req, res);
   if (!user) return;
-  if (req.params.uid !== user.uid && !(await hasServerRole(user.uid, ['admin', 'secretaire']))) return res.sendStatus(403);
+  const isSelf = req.params.uid === user.uid;
+  const isAuthorized = isSelf || (await isServerAdmin(user)) || (await hasServerRole(user, ['secretaire', 'direction']));
+  if (!isAuthorized) {
+    return res.status(403).json({ error: "Accès refusé. Privilèges administrateur ou personnel requis." });
+  }
   let profile = await getServerProfile(req.params.uid);
   if (profile) {
-    if ((profile.email && isSuperAdminEmail(profile.email)) || (user.email && isSuperAdminEmail(user.email))) {
-      profile.role = 'admin';
-      profile.roles = ['admin'];
-      profile.statutClient = 'admin';
-      profile.status = 'actif';
-      profile.statutCompte = 'actif';
-    }
     return res.json({ user: { ...profile, id: req.params.uid, uid: req.params.uid } });
   }
-  return res.sendStatus(404);
+  return res.status(404).json({ error: "Utilisateur introuvable." });
 });
 
 // =========================================================================
@@ -486,8 +668,10 @@ app.post('/api/proformas', async (req, res) => {
   if (!user) return;
   if (!adminDb) return res.status(503).json({ error: 'Firestore Admin indisponible.' });
   const data = req.body?.proforma || {};
-  const manager = await hasServerRole(user.uid, ['admin', 'direction', 'comptabilite', 'secretaire']);
-  if (!manager) return res.sendStatus(403);
+  const manager = await hasServerRole(user, ['admin', 'direction', 'comptabilite', 'secretaire']);
+  if (!manager) {
+    return res.status(403).json({ error: "Accès refusé. Privilèges de gestion ou administrateur requis." });
+  }
   const targetUid = String(data.clientId || data.uid || data.clientUid || '');
   const clientEmail = String(data.email || '').toLowerCase().trim();
   const amount = Number(data.amount);
@@ -565,8 +749,243 @@ app.post('/api/proforma-requests', async (req, res) => {
   }
 });
 
-// Upload direct et exact du logo officiel (sans aucune retouche ni compression déformante)
-app.post('/api/upload-logo', express.json({ limit: '20mb' }), (req, res) => {
+// =========================================================================
+// ROUTES ADMINISTRATEUR PROTÉGÉES (VÉRIFICATION SERVEUR PAR LE FIREBASE ADMIN SDK)
+// RÈGLE : Ne JAMAIS faire confiance aux rôles transmis par le client.
+// TOUTE tentative d'accès non autorisé est rejetée avec un code HTTP 403.
+// =========================================================================
+
+// 1. Vérification côté serveur de l'état administrateur
+app.get('/api/admin/verify', async (req, res) => {
+  const admin = await requireAdminUser(req, res);
+  if (!admin) return; // 401 ou 403 renvoyé
+
+  return res.json({
+    success: true,
+    isAdmin: true,
+    uid: admin.uid,
+    email: admin.email
+  });
+});
+
+// 2. Consultation sécurisée de la liste des utilisateurs (réservée à l'administrateur)
+app.get(['/api/users', '/api/admin/users'], async (req, res) => {
+  const admin = await requireAdminUser(req, res);
+  if (!admin) return; // 401 ou 403 renvoyé
+
+  let users = [];
+  if (adminDb) {
+    try {
+      const snap = await adminDb.collection('utilisateurs').get();
+      users = snap.docs.map(d => ({ ...d.data(), id: d.id, uid: d.id }));
+    } catch (e) {
+      users = getLocalUsers();
+    }
+  } else {
+    users = getLocalUsers();
+  }
+
+  // Filtrer les éventuels champs internes sensibles
+  const safeUsers = users.map(u => {
+    const { password, motDePasse, ...rest } = u;
+    return rest;
+  });
+
+  return res.json({ success: true, users: safeUsers });
+});
+
+// 3. Modification de rôle par un administrateur vérifié (côté serveur via Firebase Admin SDK)
+app.put(['/api/users/:uid/role', '/api/admin/users/:uid/role'], async (req, res) => {
+  const admin = await requireAdminUser(req, res);
+  if (!admin) return; // 401 ou 403 renvoyé
+
+  const targetUid = String(req.params.uid || '').trim();
+  if (!targetUid) {
+    return res.status(400).json({ error: "Identifiant utilisateur requis." });
+  }
+
+  // Empêcher un administrateur de modifier son propre rôle via l'API pour éviter tout blocage accidentel
+  if (targetUid === admin.uid) {
+    return res.status(403).json({ error: "Un administrateur ne peut pas modifier son propre rôle." });
+  }
+
+  const targetProfile = await getServerProfile(targetUid);
+  if (!targetProfile) {
+    return res.status(404).json({ error: "Utilisateur cible introuvable." });
+  }
+
+  // Protection stricte du Super Administrateur maître
+  const targetEmail = String(targetProfile.email || '').toLowerCase().trim();
+  const isTargetSuperAdmin = Boolean(targetProfile.isSuperAdmin) ||
+    targetEmail === 'castimamoise@gmail.com' ||
+    targetEmail === 'laperletourht@gmail.com';
+
+  const callerEmail = String(admin.email || '').toLowerCase().trim();
+  const isCallerSuperAdmin = callerEmail === 'castimamoise@gmail.com' ||
+    callerEmail === 'laperletourht@gmail.com' ||
+    Boolean(admin.isSuperAdmin);
+
+  if (isTargetSuperAdmin && !isCallerSuperAdmin) {
+    return res.status(403).json({ error: "Seul un Super Administrateur peut modifier le compte d'un autre Super Administrateur." });
+  }
+
+  const allowedRoles = [
+    'admin', 'direction', 'comptabilite', 'secretaire',
+    'operations', 'chauffeur', 'client', 'prospect', 'lecture_seule', 'vendeur'
+  ];
+
+  const rawRole = String(req.body?.role || '').toLowerCase().trim();
+  const rawRoles = Array.isArray(req.body?.roles)
+    ? req.body.roles.map(r => String(r).toLowerCase().trim())
+    : (rawRole ? [rawRole] : []);
+  const validRoles = rawRoles.filter(r => allowedRoles.includes(r));
+
+  if (validRoles.length === 0) {
+    return res.status(400).json({ error: "Rôle invalide spécifié." });
+  }
+
+  const primaryRole = validRoles[0];
+  const allowedModules = Array.isArray(req.body?.allowedModules) ? req.body.allowedModules : (targetProfile.allowedModules || []);
+  const status = req.body?.status === 'inactif' ? 'inactif' : 'actif';
+
+  const updates = {
+    role: primaryRole,
+    roles: validRoles,
+    allowedModules,
+    status,
+    statutCompte: status,
+    updatedAt: new Date().toISOString(),
+    updatedBy: admin.email || admin.uid
+  };
+
+  // Synchronisation Firebase Auth Custom Claims
+  if (adminAuth) {
+    try {
+      if (primaryRole === 'admin' || validRoles.includes('admin')) {
+        await adminAuth.setCustomUserClaims(targetUid, { role: 'admin', admin: true });
+      } else {
+        await adminAuth.setCustomUserClaims(targetUid, { role: primaryRole });
+      }
+    } catch (authErr) {
+      console.warn('[UpdateRole CustomClaims Warning]:', authErr?.message);
+    }
+  }
+
+  // Synchronisation Firestore
+  if (adminDb) {
+    try {
+      await adminDb.collection('utilisateurs').doc(targetUid).set({
+        ...updates,
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      if (primaryRole === 'admin' || validRoles.includes('admin')) {
+        await adminDb.collection('admins').doc(targetUid).set({
+          uid: targetUid,
+          email: targetProfile.email || '',
+          assignedBy: admin.email || admin.uid,
+          updatedAt: FieldValue.serverTimestamp()
+        }, { merge: true });
+      } else {
+        await adminDb.collection('admins').doc(targetUid).delete().catch(() => {});
+      }
+    } catch (dbErr) {
+      console.warn('[UpdateRole AdminDB Warning]:', dbErr?.message);
+    }
+  }
+
+  saveLocalUser({ ...targetProfile, ...updates, id: targetUid, uid: targetUid });
+
+  return res.json({
+    success: true,
+    message: `Rôle mis à jour avec succès : ${primaryRole}`,
+    user: { ...targetProfile, ...updates, id: targetUid, uid: targetUid }
+  });
+});
+
+// 4. Modification de statut utilisateur (actif / inactif) par un administrateur
+app.put(['/api/users/:uid/status', '/api/admin/users/:uid/status'], async (req, res) => {
+  const admin = await requireAdminUser(req, res);
+  if (!admin) return; // 401 ou 403 renvoyé
+
+  const targetUid = String(req.params.uid || '').trim();
+  if (targetUid === admin.uid) {
+    return res.status(403).json({ error: "Vous ne pouvez pas modifier le statut de votre propre compte." });
+  }
+
+  const targetProfile = await getServerProfile(targetUid);
+  if (!targetProfile) {
+    return res.status(404).json({ error: "Utilisateur introuvable." });
+  }
+
+  const targetEmail = String(targetProfile.email || '').toLowerCase().trim();
+  if (targetProfile.isSuperAdmin || targetEmail === 'castimamoise@gmail.com' || targetEmail === 'laperletourht@gmail.com') {
+    return res.status(403).json({ error: "Le compte Super Administrateur ne peut jamais être désactivé." });
+  }
+
+  const newStatus = req.body?.status === 'inactif' ? 'inactif' : 'actif';
+  const updates = {
+    status: newStatus,
+    statutCompte: newStatus,
+    updatedAt: new Date().toISOString(),
+    updatedBy: admin.email || admin.uid
+  };
+
+  if (adminDb) {
+    try {
+      await adminDb.collection('utilisateurs').doc(targetUid).set({
+        ...updates,
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+    } catch (e) {}
+  }
+
+  saveLocalUser({ ...targetProfile, ...updates, id: targetUid, uid: targetUid });
+
+  return res.json({ success: true, status: newStatus, uid: targetUid });
+});
+
+// 5. Suppression de compte par un administrateur
+app.delete(['/api/users/:uid', '/api/admin/users/:uid'], async (req, res) => {
+  const admin = await requireAdminUser(req, res);
+  if (!admin) return; // 401 ou 403 renvoyé
+
+  const targetUid = String(req.params.uid || '').trim();
+  if (targetUid === admin.uid) {
+    return res.status(403).json({ error: "Vous ne pouvez pas supprimer votre propre compte administrateur." });
+  }
+
+  const targetProfile = await getServerProfile(targetUid);
+  if (!targetProfile) {
+    return res.status(404).json({ error: "Utilisateur introuvable." });
+  }
+
+  const targetEmail = String(targetProfile.email || '').toLowerCase().trim();
+  if (targetProfile.isSuperAdmin || targetEmail === 'castimamoise@gmail.com' || targetEmail === 'laperletourht@gmail.com') {
+    return res.status(403).json({ error: "Le compte Super Administrateur ne peut jamais être supprimé." });
+  }
+
+  if (adminDb) {
+    try {
+      await adminDb.collection('utilisateurs').doc(targetUid).delete();
+      await adminDb.collection('admins').doc(targetUid).delete().catch(() => {});
+    } catch (e) {}
+  }
+
+  try {
+    const p = path.join(__dirname, 'data', 'utilisateurs.json');
+    const list = getLocalUsers().filter(u => u.id !== targetUid && u.uid !== targetUid);
+    fs.writeFileSync(p, JSON.stringify(list, null, 2), 'utf8');
+  } catch (e) {}
+
+  return res.json({ success: true, message: "Utilisateur supprimé avec succès." });
+});
+
+// 6. Remplacement du logo officiel (STRICTEMENT réservé aux administrateurs vérifiés)
+app.post('/api/upload-logo', express.json({ limit: '20mb' }), async (req, res) => {
+  const admin = await requireAdminUser(req, res);
+  if (!admin) return; // 401 ou 403 renvoyé si non administrateur
+
   try {
     const { dataUrl } = req.body || {};
     if (!dataUrl || !dataUrl.includes('base64,')) {
@@ -583,7 +1002,7 @@ app.post('/api/upload-logo', express.json({ limit: '20mb' }), (req, res) => {
   }
 });
 
-// Retired endpoints: credentials, fabricated profiles and client-supplied role changes are not accepted.
+// Endpoints obsolètes et révoqués
 app.post(['/api/auth/login', '/api/auth/google', '/api/auth/reset-users', '/api/auth/user/:uid/upgrade-client'], (_req, res) => res.sendStatus(410));
 // Vercel serves the frontend files from its static output. Keep this Express
 // file server only for local/self-hosted runs, never expose the repository from

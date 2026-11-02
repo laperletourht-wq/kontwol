@@ -13,15 +13,10 @@ import {
 } from '../lib/firebase';
 import { UserProfile, UserRole } from '../types';
 
-export const SUPER_ADMIN_EMAILS = [
-  'castimamoise@gmail.com', 
-  'laperletourht@gmail.com'
-];
-export const INITIAL_ADMIN_PASSWORD = 'Admin2026';
+export const SUPER_ADMIN_EMAILS: string[] = [];
 
-export function isSuperAdminEmail(email?: string | null): boolean {
-  if (!email) return false;
-  return SUPER_ADMIN_EMAILS.includes(email.trim().toLowerCase());
+export function isSuperAdminEmail(_email?: string | null): boolean {
+  return false;
 }
 
 interface AuthContextType {
@@ -94,14 +89,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const userRef = doc(db, 'utilisateurs', firebaseUser.uid);
       const snap = await getDoc(userRef);
-      const isSuper = isSuperAdminEmail(firebaseUser.email);
 
       if (snap.exists()) {
         const data = snap.data() as UserProfile;
-        const assignedRole: UserRole = isSuper ? 'admin' : (data.role || 'client');
-        const assignedRoles: UserRole[] = isSuper 
-          ? ['admin'] 
-          : (Array.isArray(data.roles) && data.roles.length ? data.roles : [assignedRole]);
+        const assignedRole: UserRole = data.role || 'client';
+        const assignedRoles: UserRole[] = Array.isArray(data.roles) && data.roles.length 
+          ? data.roles 
+          : [assignedRole];
         const assignedAllowedModules = Array.isArray(data.allowedModules) && data.allowedModules.length > 0
           ? data.allowedModules
           : (ROLE_PERMISSIONS[assignedRole] || []);
@@ -114,6 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           name: data.nom || data.name || firebaseUser.displayName || 'Utilisateur',
           role: assignedRole,
           roles: assignedRoles,
+          isSuperAdmin: Boolean(data.isSuperAdmin || (data.role === 'admin' && data.isSuperAdmin)),
           allowedModules: assignedAllowedModules,
           status: data.status || 'actif'
         };
@@ -121,8 +116,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      // Automatically initialize default profile for new user
-      const defaultRole: UserRole = isSuper ? 'admin' : 'client';
+      // Automatically initialize default profile for new user as standard client
+      const defaultRole: UserRole = 'client';
       const newProfile: UserProfile = {
         id: firebaseUser.uid,
         uid: firebaseUser.uid,
@@ -131,6 +126,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         name: firebaseUser.displayName || 'Utilisateur',
         role: defaultRole,
         roles: [defaultRole],
+        isSuperAdmin: false,
         status: 'actif',
         photoURL: firebaseUser.photoURL || '',
         createdAt: new Date().toISOString(),
@@ -146,12 +142,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err: any) {
       console.warn('Notice fetching user profile (using memory fallback):', err?.message || err);
       // Fallback
-      const isSuper = isSuperAdminEmail(firebaseUser.email);
       setProfile({
         id: firebaseUser.uid,
         email: firebaseUser.email || '',
-        role: isSuper ? 'admin' : 'client',
-        roles: isSuper ? ['admin'] : ['client'],
+        role: 'client',
+        roles: ['client'],
+        isSuperAdmin: false,
         status: 'actif',
         name: firebaseUser.displayName || 'Utilisateur'
       });
@@ -173,18 +169,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const isSuperAdmin = useMemo(() => {
-    return isSuperAdminEmail(user?.email || profile?.email);
-  }, [user?.email, profile?.email]);
+    return Boolean(profile?.isSuperAdmin || (profile?.role === 'admin' && profile?.isSuperAdmin));
+  }, [profile?.isSuperAdmin, profile?.role]);
 
   const role: UserRole = useMemo(() => {
-    if (isSuperAdmin) return 'admin';
     return profile?.role || 'lecture_seule';
-  }, [isSuperAdmin, profile?.role]);
+  }, [profile?.role]);
 
   const roles: UserRole[] = useMemo(() => {
-    if (isSuperAdmin) return ['admin'];
-    return profile?.roles || [role];
-  }, [isSuperAdmin, profile?.roles, role]);
+    return profile?.roles || (profile?.role ? [profile.role] : ['lecture_seule']);
+  }, [profile?.roles, profile?.role]);
 
   const canAccess = (moduleKey: string): boolean => {
     if (isSuperAdmin || role === 'admin') return true;
@@ -213,31 +207,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithEmail = async (email: string, pass: string) => {
     const cleanEmail = email.trim().toLowerCase();
-    const { signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import('firebase/auth');
-    try {
-      const cred = await signInWithEmailAndPassword(auth, cleanEmail, pass);
-      if (cred.user) {
-        await fetchProfile(cred.user);
-      }
-    } catch (err: any) {
-      const errCode = String(err?.code || '');
-      // If super admin attempts initial login with the configured default initial password and account doesn't exist yet, auto-provision
-      if (
-        (errCode === 'auth/invalid-credential' || errCode === 'auth/user-not-found') &&
-        isSuperAdminEmail(cleanEmail) &&
-        pass === INITIAL_ADMIN_PASSWORD
-      ) {
-        try {
-          const newCred = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
-          if (newCred.user) {
-            await fetchProfile(newCred.user);
-            return;
-          }
-        } catch (createErr) {
-          // If creation fails, proceed to throw original err
-        }
-      }
-      throw err;
+    const { signInWithEmailAndPassword } = await import('firebase/auth');
+    const cred = await signInWithEmailAndPassword(auth, cleanEmail, pass);
+    if (cred.user) {
+      await fetchProfile(cred.user);
     }
   };
 
@@ -259,8 +232,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await updateProfile(cred.user, { displayName: nom });
       } catch (e) {}
 
-      const isSuper = isSuperAdminEmail(email);
-      const defaultRole: UserRole = isSuper ? 'admin' : 'client';
+      const defaultRole: UserRole = 'client';
       const nomVal = (nom || '').trim();
       const phoneVal = (telephone || '').trim();
       const adresseVal = (adresse || '').trim();
@@ -285,9 +257,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         profileComplete: isComplete,
         role: defaultRole,
         roles: [defaultRole],
+        isSuperAdmin: false,
         status: 'actif',
         statutCompte: 'actif',
-        statutClient: defaultRole === 'admin' ? 'admin' : 'client',
+        statutClient: 'client',
         createdAt: nowIso,
         updatedAt: nowIso
       };

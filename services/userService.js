@@ -14,7 +14,7 @@ import {
   handleFirestoreError, 
   OperationType 
 } from '../src/lib/firebase.js';
-import { ROLES, SUPER_ADMIN_EMAIL, isSuperAdminEmail, normalizeRole, normalizeRoles, normalizeStatus } from './permissionService.js';
+import { ROLES, normalizeRole, normalizeRoles, normalizeStatus } from './permissionService.js';
 import { safeFetchJson } from './authService.js';
 
 const COLLECTION_NAME = 'utilisateurs';
@@ -138,7 +138,7 @@ export async function toggleUserStatus(userId) {
   const currentDoc = await getUserById(userId);
   if (!currentDoc) throw new Error('Utilisateur introuvable.');
 
-  if (isSuperAdminEmail(currentDoc.email)) {
+  if (currentDoc.role === 'admin' && currentDoc.isSuperAdmin) {
     throw new Error('Le compte Super Admin maître ne peut jamais être désactivé.');
   }
 

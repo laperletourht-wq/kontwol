@@ -21,9 +21,7 @@ import {
   setDoc,
 } from '../src/lib/firebase.js';
 import { 
-  normalizeStatus,
-  isSuperAdminEmail,
-  INITIAL_ADMIN_PASSWORD
+  normalizeStatus
 } from './permissionService.js';
 
 const USERS_COLLECTION = 'utilisateurs';
@@ -278,9 +276,9 @@ export async function signUpWithEmailAndPasswordMethod({ nom, prenom, nomComplet
 
 /**
  * CONNEXION CONFORME :
- * - Identifiant : Email OU Nom de profil / Nom complet
+ * - Identifiant : Email du compte
  * - Mot de passe
- * - Les administrateurs se connectent exclusivement avec e-mail et mot de passe (Mot de passe initial : Admin2026)
+ * - Authentification sécurisée Firebase Authentication
  */
 export async function signInWithEmailAndPasswordMethod(identifier, password) {
   const cleanEmail = String(identifier || '').trim().toLowerCase();
@@ -289,40 +287,7 @@ export async function signInWithEmailAndPasswordMethod(identifier, password) {
   if (!cleanPass) throw new Error('Veuillez saisir votre mot de passe.');
   clearExplicitLogout();
 
-  let credential = null;
-  const isSuper = isSuperAdminEmail(cleanEmail);
-
-  try {
-    credential = await signInWithEmailAndPassword(auth, cleanEmail, cleanPass);
-  } catch (err) {
-    console.warn("Échec signInWithEmailAndPassword:", err?.code || err?.message);
-
-    // Le mot de passe initial 'Admin2026' est STRICTEMENT réservé aux comptes Super Administrateurs autorisés
-    if (isSuper && cleanPass === INITIAL_ADMIN_PASSWORD) {
-      try {
-        console.log(`[Admin2026] Initialisation du compte Super Admin dans Firebase Auth pour ${cleanEmail}...`);
-        credential = await createUserWithEmailAndPassword(auth, cleanEmail, INITIAL_ADMIN_PASSWORD);
-      } catch (createErr) {
-        if (createErr?.code === 'auth/email-already-in-use') {
-          // Le compte Super Admin existe déjà dans Firebase (ex: créé initialement avec Google sans mot de passe).
-          // Déclencher le mécanisme Firebase officiel de réinitialisation/définition du mot de passe
-          try {
-            await sendPasswordResetEmail(auth, cleanEmail);
-            console.log(`[Admin2026] E-mail officiel Firebase de définition de mot de passe transmis à ${cleanEmail}`);
-          } catch (resetErr) {
-            console.warn("[Admin2026] sendPasswordResetEmail:", resetErr?.message);
-          }
-          const customErr = new Error(`Ce compte Super Admin (${cleanEmail}) a été initialement créé avec Google dans Firebase. Pour activer votre mot de passe Admin2026, cliquez sur « Continuer avec Google » ou utilisez le lien officiel de configuration envoyé à votre adresse e-mail.`);
-          customErr.code = 'auth/admin-needs-google-sync';
-          throw customErr;
-        }
-        throw err;
-      }
-    } else {
-      throw err;
-    }
-  }
-
+  const credential = await signInWithEmailAndPassword(auth, cleanEmail, cleanPass);
   return processAuthenticatedUser(credential.user, cleanEmail, '', 'login');
 }
 
@@ -510,17 +475,7 @@ export async function processAuthenticatedUser(user, email = '', customName = ''
     profile = await createUserProfile(user, { name: customName, telephone: phone, email });
   }
 
-  const userEmail = String(user.email || email || profile?.email || '').trim().toLowerCase();
-  const isSuper = isSuperAdminEmail(userEmail);
-  if (isSuper && profile) {
-    profile.role = 'admin';
-    profile.roles = ['admin'];
-    profile.statutClient = 'admin';
-    profile.status = 'actif';
-    profile.statutCompte = 'actif';
-  }
-
-  if (!isSuper && normalizeStatus(profile.status || profile.statutCompte) === 'inactif') {
+  if (profile && normalizeStatus(profile.status || profile.statutCompte) === 'inactif') {
     try { await signOut(auth); } catch {}
     clearUserSession();
     throw new Error('Ce compte est désactivé.');
@@ -572,42 +527,6 @@ export async function getUserProfile(uid) {
 
   if (!profile) return null;
 
-  // AUTO-HEALING & SYNCHRONISATION SUPER ADMIN :
-  // Si le compte correspond à une adresse Super Admin officielle (laperletourht@gmail.com, castimamoise@gmail.com),
-  // garantir immédiatement le rôle admin et synchroniser le document Firestore
-  const cleanEmail = String(user.email || profile.email || '').trim().toLowerCase();
-  if (isSuperAdminEmail(cleanEmail)) {
-    const needsElevation = !Array.isArray(profile.roles) ||
-                           !profile.roles.includes('admin') ||
-                           profile.role !== 'admin' ||
-                           profile.statutClient !== 'admin' ||
-                           profile.status !== 'actif';
-    profile.role = 'admin';
-    profile.roles = ['admin'];
-    profile.statutClient = 'admin';
-    profile.status = 'actif';
-    profile.statutCompte = 'actif';
-
-    if (needsElevation) {
-      try {
-        const userDocRef = doc(db, USERS_COLLECTION, user.uid);
-        await setDoc(userDocRef, {
-          role: 'admin',
-          roles: ['admin'],
-          statutClient: 'admin',
-          status: 'actif',
-          statutCompte: 'actif',
-          email: cleanEmail,
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
-        console.log(`[SuperAdmin] Profil élevé automatiquement au rôle admin pour ${cleanEmail}`);
-      } catch (errElevate) {
-        console.warn("[SuperAdmin] Erreur auto-élévation Firestore:", errElevate?.message);
-      }
-      saveUserSession(user, profile);
-    }
-  }
-
   return profile;
 }
 /**
@@ -618,23 +537,13 @@ export async function createUserProfile(user, customData = {}) {
 
   const uid = user.uid;
   const email = (user.email || customData.email || '').toLowerCase().trim();
-  const isMasterAdmin = isSuperAdminEmail(email);
-
   const existing = await getUserProfile(uid);
   if (existing) {
-    if (isMasterAdmin) {
-      existing.role = 'admin';
-      existing.roles = ['admin'];
-      existing.statutClient = 'admin';
-      existing.status = 'actif';
-      existing.statutCompte = 'actif';
-      saveUserSession(user, existing);
-    }
     return existing;
   }
 
-  const role = isMasterAdmin ? 'admin' : (customData.role || 'prospect');
-  const roles = isMasterAdmin ? ['admin'] : (customData.roles || (customData.role ? [customData.role] : ['prospect']));
+  const role = customData.role || 'prospect';
+  const roles = customData.roles || (customData.role ? [customData.role] : ['prospect']);
   const cleanNom = customData.nom || (user.displayName ? user.displayName.split(' ')[0] : (email ? email.split('@')[0] : 'Utilisateur'));
   const cleanPrenom = customData.prenom || (user.displayName ? user.displayName.split(' ').slice(1).join(' ') : '');
   const displayName = customData.name || user.displayName || `${cleanNom} ${cleanPrenom}`.trim() || (email ? email.split('@')[0] : 'Utilisateur');
@@ -655,7 +564,7 @@ export async function createUserProfile(user, customData = {}) {
     photoURL: customData.photoURL || user.photoURL || '',
     role: role,
     roles: roles,
-    statutClient: isMasterAdmin ? 'admin' : 'prospect',
+    statutClient: customData.statutClient || (role === 'admin' ? 'admin' : 'prospect'),
     status: 'actif',
     statutCompte: 'actif',
     permissions: {},
@@ -712,20 +621,11 @@ export async function updateUserLastLogin(uid) {
 
 export async function ensureUserProfile(user, mode = 'register') {
   if (!user || !user.uid) return null;
-  const cleanEmail = String(user.email || '').trim().toLowerCase();
-  const isSuper = isSuperAdminEmail(cleanEmail);
   const existing = await getUserProfile(user.uid);
 
   if (existing) {
-    if (isSuper) {
-      existing.role = 'admin';
-      existing.roles = ['admin'];
-      existing.statutClient = 'admin';
-      existing.status = 'actif';
-      existing.statutCompte = 'actif';
-    }
     const isDeactivated = normalizeStatus(existing.status || existing.statutCompte) === 'inactif';
-    if (!isSuper && isDeactivated) {
+    if (isDeactivated) {
       try { await signOut(auth); } catch (e) {}
       clearUserSession();
       throw new Error("Ce compte a été désactivé ou suspendu par l'administration LAPERLE TOUR HT.");
@@ -745,29 +645,7 @@ export async function loginWithGoogle(mode = 'login') {
     throw new Error("Session Google introuvable.");
   }
 
-  const cleanEmail = String(user.email || '').trim().toLowerCase();
-
-  // Si c'est un compte administrateur, synchroniser automatiquement le mot de passe Admin2026
-  // pour que la connexion par e-mail et mot de passe fonctionne immédiatement
-  if (isSuperAdminEmail(cleanEmail)) {
-    try {
-      await updatePassword(user, INITIAL_ADMIN_PASSWORD);
-      console.log(`[Admin] Mot de passe initial Admin2026 synchronisé avec succès pour ${cleanEmail}`);
-    } catch (syncErr) {
-      console.log("[Admin] Info synchronisation mot de passe:", syncErr?.message);
-    }
-  }
-
   const profile = await ensureUserProfile(user, mode);
-
-  // Synchroniser également si le profil a le rôle admin
-  const userRoles = Array.isArray(profile?.roles) ? profile.roles : [profile?.role];
-  if (userRoles.some(r => String(r).toLowerCase() === 'admin')) {
-    try {
-      await updatePassword(user, INITIAL_ADMIN_PASSWORD);
-      console.log(`[Admin] Mot de passe initial Admin2026 synchronisé pour rôle admin`);
-    } catch (syncErr2) {}
-  }
 
   saveUserSession(user, profile);
   return { user, profile };
@@ -793,8 +671,7 @@ export async function quickOneClickRegister(input = '') {
   const nom = parts[0] ? parts[0].charAt(0).toUpperCase() + parts[0].slice(1) : 'Utilisateur';
   const prenom = parts[1] ? parts[1].charAt(0).toUpperCase() + parts[1].slice(1) : '';
 
-  // Pour les administrateurs, mot de passe initial Admin2026
-  const autoPassword = isSuperAdminEmail(email) ? INITIAL_ADMIN_PASSWORD : `Laperle_${Date.now().toString(36)}!X9`;
+  const autoPassword = `Laperle_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}!X9`;
 
   const result = await signUpWithEmailAndPasswordMethod({
     nom,

@@ -1,5 +1,3 @@
-import { isSuperAdminEmail } from '../../services/permissionService.js';
-
 const PROJECT_ID = 'laperletourht-28ad8';
 const DATABASE_ID = 'ai-studio-centredecontrole-27e8ff4b-e91d-4923-8cc6-6265fb193fe7';
 
@@ -91,23 +89,21 @@ export default async function handler(req, res) {
         const profilePredatesAuthAccount = authCreatedAt !== null && profileCreatedAt !== null && profileCreatedAt < authCreatedAt;
         const identityVerified = existing.uid === user.uid && existing.id === user.uid &&
           String(existing.email || '').trim().toLowerCase() === email;
-        const isSuper = isSuperAdminEmail(email);
-        const existingHasAdmin = existing.role === 'admin' && Array.isArray(existing.roles) && existing.roles.includes('admin');
-        if (identityVerified && !profilePredatesAuthAccount && authCreatedAt !== null && profileCreatedAt !== null && (!isSuper || existingHasAdmin)) return;
+        if (identityVerified && !profilePredatesAuthAccount && authCreatedAt !== null && profileCreatedAt !== null) return;
 
         const safeName = String(body.name || body.nom || user.name || '').trim().slice(0, 150);
         const safeUsername = String(body.username || email.split('@')[0] || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 50);
         const safePhone = String(body.telephone || body.phone || '').trim().slice(0, 50);
-        const role = isSuper ? 'admin' : 'prospect';
-        const roles = isSuper ? ['admin'] : ['prospect'];
-        const statutClient = isSuper ? 'admin' : 'prospect';
+        const role = existing.role || 'prospect';
+        const roles = Array.isArray(existing.roles) && existing.roles.length ? existing.roles : [role];
+        const statutClient = existing.statutClient || (role === 'admin' ? 'admin' : 'prospect');
         tx.set(ref, {
           id: user.uid, uid: user.uid, email,
           name: safeName, nom: safeName, prenom: String(body.prenom || '').trim().slice(0, 100),
           username: safeUsername, telephone: safePhone, phone: safePhone,
           photoURL: String(body.photoURL || user.picture || '').slice(0, 500),
           role, roles, statutClient,
-          status: 'actif', statutCompte: 'actif', permissions: {},
+          status: existing.status || 'actif', statutCompte: existing.statutCompte || 'actif', permissions: existing.permissions || {},
           createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()
         });
         return;
@@ -116,10 +112,9 @@ export default async function handler(req, res) {
       const name = String(body.name || body.nom || user.name || '').trim().slice(0, 150);
       const username = String(body.username || email.split('@')[0] || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 50);
       const phone = String(body.telephone || body.phone || '').trim().slice(0, 50);
-      const isSuper = isSuperAdminEmail(email);
-      const role = isSuper ? 'admin' : 'prospect';
-      const roles = isSuper ? ['admin'] : ['prospect'];
-      const statutClient = isSuper ? 'admin' : 'prospect';
+      const role = 'prospect';
+      const roles = ['prospect'];
+      const statutClient = 'prospect';
       tx.create(ref, {
         id: user.uid, uid: user.uid, email,
         name, nom: name, prenom: String(body.prenom || '').trim().slice(0, 100),

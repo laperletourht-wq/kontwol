@@ -22,6 +22,7 @@ export interface UserProfile {
   phone?: string;
   role: UserRole;
   roles?: UserRole[];
+  isSuperAdmin?: boolean;
   allowedModules?: string[]; // Modules/zones d'accès spécifiquement accordés par l'Admin
   permissions?: Record<string, boolean>;
   status?: 'actif' | 'inactif';

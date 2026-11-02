@@ -14,7 +14,7 @@ import {
   handleFirestoreError, 
   OperationType 
 } from '../src/lib/firebase.js';
-import { ROLES, SUPER_ADMIN_EMAIL, isSuperAdminEmail, normalizeRole } from './permissionService.js';
+import { ROLES, normalizeRole } from './permissionService.js';
 
 const COLLECTION_NAME = 'utilisateurs';
 
@@ -29,7 +29,7 @@ export async function provisionUserInFirestore(profileData) {
   const now = new Date().toISOString();
   const email = (profileData.email || '').toLowerCase().trim();
   const displayName = profileData.name || profileData.nom || (email ? email.split('@')[0] : 'Utilisateur');
-  const role = profileData.role || (email === SUPER_ADMIN_EMAIL ? 'admin' : 'prospect');
+  const role = profileData.role || 'prospect';
   const roles = Array.isArray(profileData.roles) && profileData.roles.length ? profileData.roles : [role];
 
   const payload = {

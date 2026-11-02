@@ -21,8 +21,8 @@ export const UtilisateursView: React.FC<UtilisateursViewProps> = ({ onOpenModal 
   const displayUsers: UserProfile[] = utilisateurs.length > 0 ? utilisateurs : [
     {
       id: 'usr-admin-1',
-      email: 'castimamoise@gmail.com',
-      nom: 'Castima Moïse (Super Administrateur)',
+      email: 'admin@laperletour.ht',
+      nom: 'Administrateur Système',
       role: 'admin',
       roles: ['admin'],
       allowedModules: ALL_SYSTEM_ZONES.map(z => z.key),
@@ -30,7 +30,7 @@ export const UtilisateursView: React.FC<UtilisateursViewProps> = ({ onOpenModal 
     },
     {
       id: 'usr-admin-2',
-      email: 'laperletourht@gmail.com',
+      email: 'direction@laperletour.ht',
       nom: 'Direction Générale Laperle',
       role: 'admin',
       roles: ['admin'],
