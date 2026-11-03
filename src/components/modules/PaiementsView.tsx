@@ -11,7 +11,7 @@ interface PaiementsViewProps {
 }
 
 export const PaiementsView: React.FC<PaiementsViewProps> = ({ onOpenModal }) => {
-  const { paiements, deletePaiement, setPrintSheetData, globalSearchQuery } = useApp();
+  const { paiements, deletePaiement, validatePaiement, setPrintSheetData, globalSearchQuery } = useApp();
   const { role } = useAuth();
   const isClient = role === 'client' || role === 'prospect';
   const isChauffeur = role === 'chauffeur';
@@ -301,6 +301,17 @@ export const PaiementsView: React.FC<PaiementsViewProps> = ({ onOpenModal }) => 
 
                     {canManagePayments && (
                       <>
+                        {p.statut !== 'Validé' && (
+                          <button
+                            type="button"
+                            className="btn-card-action success-subtle"
+                            style={{ background: '#dcfce7', borderColor: '#86efac', color: '#166534', fontWeight: 700 }}
+                            onClick={() => validatePaiement(p)}
+                            title="Confirmer l'encaissement et valider la course liée"
+                          >
+                            ✅ Valider l'encaissement
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="btn-card-action"
@@ -372,6 +383,12 @@ export const PaiementsView: React.FC<PaiementsViewProps> = ({ onOpenModal }) => 
                           }),
                           variant: 'primary'
                         },
+                        ...(canManagePayments && p.statut !== 'Validé' ? [{
+                          label: 'Valider ce règlement',
+                          icon: '✅',
+                          onClick: () => validatePaiement(p),
+                          variant: 'success' as const
+                        }] : []),
                         ...(p.preuveImage ? [{
                           label: 'Agrandir Preuve Photo',
                           icon: '🖼️',
@@ -400,6 +417,11 @@ export const PaiementsView: React.FC<PaiementsViewProps> = ({ onOpenModal }) => 
                         <tr key={p.id}>
                           <td>
                             <DocRefBadge reference={p.reference || p.id} type="paiement" />
+                            {p.dossierId && (
+                              <div style={{ marginTop: '3px' }}>
+                                <DocRefBadge reference={p.dossierId} type="reservation" label={`Dossier ${p.dossierId}`} />
+                              </div>
+                            )}
                           </td>
                           <td>{p.date}</td>
                           <td>
@@ -436,6 +458,27 @@ export const PaiementsView: React.FC<PaiementsViewProps> = ({ onOpenModal }) => 
                             <span className={`badge ${p.statut === 'Validé' ? 'green' : 'orange'}`}>
                               {p.statut}
                             </span>
+                            {canManagePayments && p.statut !== 'Validé' && (
+                              <div style={{ marginTop: '4px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => validatePaiement(p)}
+                                  style={{
+                                    fontSize: '10px',
+                                    fontWeight: 700,
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    background: '#dcfce7',
+                                    color: '#166534',
+                                    border: '1px solid #86efac',
+                                    cursor: 'pointer'
+                                  }}
+                                  title="Valider immédiatement ce paiement"
+                                >
+                                  ✓ Valider
+                                </button>
+                              </div>
+                            )}
                           </td>
                           <td style={{ textAlign: 'right', paddingRight: '20px' }}>
                             <RowActionMenu items={actionItems} title={`Actions pour le paiement ${p.reference}`} />

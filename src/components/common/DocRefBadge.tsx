@@ -33,8 +33,8 @@ export const DocRefBadge: React.FC<DocRefBadgeProps> = ({
   if (resolvedType === 'auto') {
     if (cleanRef.startsWith('FAC-') || cleanRef.includes('FAC')) resolvedType = 'facture';
     else if (cleanRef.startsWith('PRO-') || cleanRef.startsWith('DEV-') || cleanRef.includes('PRO')) resolvedType = 'proforma';
-    else if (cleanRef.startsWith('RES-') || cleanRef.includes('RES')) resolvedType = 'reservation';
-    else if (cleanRef.startsWith('PAI-') || cleanRef.startsWith('MONCASH') || cleanRef.includes('PAI')) resolvedType = 'paiement';
+    else if (cleanRef.startsWith('RES-') || cleanRef.startsWith('DOS-') || cleanRef.startsWith('DEM-') || cleanRef.includes('RES') || cleanRef.includes('DOS')) resolvedType = 'reservation';
+    else if (cleanRef.startsWith('PAI-') || cleanRef.startsWith('REC-') || cleanRef.startsWith('MONCASH') || cleanRef.includes('PAI')) resolvedType = 'paiement';
     else resolvedType = 'facture';
   }
 
@@ -85,10 +85,10 @@ export const DocRefBadge: React.FC<DocRefBadgeProps> = ({
     }
 
     if (resolvedType === 'reservation') {
-      const match = reservations.find((r) => r.id === cleanRef);
+      const match = reservations.find((r) => r.id === cleanRef || r.dossierId === cleanRef);
       if (match) {
         setPrintSheetData({ type: 'reservation', data: match });
-        showToast(`Fiche de réservation ${match.id} ouverte`, 'info');
+        showToast(`Fiche de réservation ${match.dossierId || match.id} ouverte`, 'info');
       } else {
         setCurrentModule('reservations');
         setGlobalSearchQuery(cleanRef);

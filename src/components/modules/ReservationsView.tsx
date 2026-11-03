@@ -258,6 +258,11 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
                   <div className="item-detail-card-head">
                     <div className="card-id-cluster" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <DocRefBadge reference={r.id} type="reservation" />
+                      {r.dossierId && r.dossierId !== r.id && (
+                        <span style={{ fontSize: '11px', color: '#082b70', background: '#eff6ff', padding: '1px 6px', borderRadius: '4px', fontWeight: 700, border: '1px solid #bfdbfe' }}>
+                          📁 {r.dossierId}
+                        </span>
+                      )}
                       <span className={`badge ${getStatusBadgeClass(r.status)}`}>
                         {r.status || 'En attente'}
                       </span>
@@ -590,6 +595,11 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
                         <tr key={r.id}>
                           <td>
                             <DocRefBadge reference={r.id} type="reservation" />
+                            {r.dossierId && r.dossierId !== r.id && (
+                              <div style={{ marginTop: '4px' }}>
+                                <DocRefBadge reference={r.dossierId} type="reservation" label={`📁 ${r.dossierId}`} />
+                              </div>
+                            )}
                             {r.devisRef && (
                               <div style={{ marginTop: '4px' }}>
                                 <DocRefBadge reference={r.devisRef} type="proforma" label={`Devis ${r.devisRef}`} />

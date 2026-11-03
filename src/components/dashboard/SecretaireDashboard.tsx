@@ -398,6 +398,11 @@ export const SecretaireDashboard: React.FC<SecretaireDashboardProps> = ({ onOpen
                         <tr key={r.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
                             <DocRefBadge reference={r.id} type="reservation" />
+                            {r.dossierId && r.dossierId !== r.id && (
+                              <div style={{ marginTop: '3px' }}>
+                                <DocRefBadge reference={r.dossierId} type="reservation" label={`📁 ${r.dossierId}`} />
+                              </div>
+                            )}
                           </td>
                           <td style={{ padding: '10px 12px' }}>
                             <strong style={{ color: '#0f172a' }}>{r.client}</strong>

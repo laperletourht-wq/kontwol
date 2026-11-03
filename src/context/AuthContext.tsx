@@ -66,7 +66,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   ],
   secretaire: [
     'dashboard', 'reservations', 'proformas', 'factures', 'clients', 
-    'eleves', 'abonnements', 'plannings'
+    'eleves', 'abonnements', 'plannings', 'paiements'
   ],
   operations: [
     'dashboard', 'reservations', 'vehicules', 'chauffeurs', 'plannings'

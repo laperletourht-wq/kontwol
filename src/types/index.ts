@@ -69,6 +69,7 @@ export const ALL_SYSTEM_ZONES: SystemZoneDefinition[] = [
 
 export interface Reservation {
   id: string;
+  dossierId?: string;
   client: string;
   clientId?: string;
   service?: string;
@@ -93,6 +94,7 @@ export interface Reservation {
   demandeDevis?: boolean;
   demandeFacture?: boolean;
   devisRef?: string;
+  proformaRef?: string;
   factureRef?: string;
   paiementRef?: string;
   archived?: boolean;
@@ -111,6 +113,7 @@ export interface ProformaItem {
 export interface Proforma {
   id: string;
   number: string;
+  dossierId?: string;
   client: string;
   clientId?: string;
   clientEmail?: string;
@@ -126,6 +129,9 @@ export interface Proforma {
   status: 'En attente' | 'Acceptée' | 'Refusée' | 'Convertie en facture';
   statut?: string;
   reservationId?: string;
+  demandeFacture?: boolean;
+  factureNumber?: string;
+  factureRef?: string;
   notes?: string;
   archived?: boolean;
   createdAt?: string;
@@ -135,7 +141,9 @@ export interface Proforma {
 export interface Facture {
   id: string;
   number: string;
+  dossierId?: string;
   proformaNumber?: string;
+  proformaRef?: string;
   client: string;
   clientId?: string;
   clientEmail?: string;
@@ -154,6 +162,7 @@ export interface Facture {
   modePaiement?: string;
   items?: ProformaItem[];
   reservationId?: string;
+  paiementRef?: string;
   preuveImage?: string;
   referenceTransaction?: string;
   notes?: string;
@@ -289,17 +298,22 @@ export interface Planning {
 export interface Paiement {
   id: string;
   reference: string;
+  dossierId?: string;
+  reservationId?: string;
   date: string;
   client: string;
   clientId?: string;
   clientEmail?: string;
   montant: number;
+  amount?: number;
   devise: 'USD' | 'HTG';
+  currency?: string;
   modePaiement: 'MonCash' | 'Natcash' | 'Virement Bancaire' | 'Espèces' | 'Carte de Crédit' | 'Chèque' | string;
   motif: string;
   factureAssociee?: string;
   proformaAssociee?: string;
-  statut: 'Validé' | 'En attente' | 'Rejeté';
+  statut: 'Validé' | 'En attente' | 'Rejeté' | string;
+  status?: string;
   recuPar?: string;
   preuveImage?: string;
   referenceTransaction?: string;

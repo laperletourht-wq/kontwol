@@ -88,6 +88,7 @@ export const PaymentProofModal: React.FC<PaymentProofModalProps> = ({
         motif: facture ? `Règlement Facture ${facture.number}` : `Règlement par ${modePaiement}`,
         factureAssociee: facture?.number,
         reservationId: facture?.reservationId,
+        dossierId: facture?.dossierId,
         statut: 'En attente',
         preuveImage: preuveImage || undefined,
         referenceTransaction: cleanRef,

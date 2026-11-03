@@ -35,11 +35,11 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({ onOpenModal })
 
   // Unpaid invoices calculation
   const unpaidInvoices = useMemo(() => {
-    return factures.filter(f => f.statut !== 'Payée');
+    return factures.filter(f => (f.status || f.statut) !== 'Payée');
   }, [factures]);
 
   const unpaidTotal = useMemo(() => {
-    return unpaidInvoices.reduce((sum, f) => sum + (f.totalTTC || f.montantTotal || 0), 0);
+    return unpaidInvoices.reduce((sum, f) => sum + (Number(f.amount || f.totalTTC || f.montantTotal || 0)), 0);
   }, [unpaidInvoices]);
 
   // Filter reservations based on active tab
@@ -181,7 +181,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({ onOpenModal })
           <div className="payment-balance-box">
             <span className="balance-label">Solde en attente de règlement</span>
             <div className="balance-amount tabular-nums">
-              <DualPrice usdAmount={unpaidTotal} showBoth={true} />
+              <DualPrice amount={unpaidTotal} currency="USD" />
             </div>
             <span className="balance-sub">
               {unpaidInvoices.length > 0 
@@ -298,6 +298,14 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({ onOpenModal })
                                 reference={res.number || res.id} 
                                 inline={true} 
                               />
+                              {res.dossierId && res.dossierId !== (res.number || res.id) && (
+                                <DocRefBadge 
+                                  type="reservation" 
+                                  reference={res.dossierId} 
+                                  label={`📁 ${res.dossierId}`}
+                                  inline={true} 
+                                />
+                              )}
                               {res.devisRef && (
                                 <DocRefBadge 
                                   type="proforma" 

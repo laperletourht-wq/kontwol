@@ -267,6 +267,15 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenModal }) => 
                   <div className="item-detail-card-head">
                     <div className="card-id-cluster" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <DocRefBadge reference={p.number} type="proforma" />
+                      {p.dossierId && (
+                        <DocRefBadge reference={p.dossierId} type="reservation" label={`📁 ${p.dossierId}`} />
+                      )}
+                      {p.reservationId && p.reservationId !== p.dossierId && (
+                        <DocRefBadge reference={p.reservationId} type="reservation" label={`Résa ${p.reservationId}`} />
+                      )}
+                      {p.factureNumber && (
+                        <DocRefBadge reference={p.factureNumber} type="facture" label={`Facture ${p.factureNumber}`} />
+                      )}
                       <span className={`badge ${getStatusBadge(p.status)}`}>
                         {p.status || 'En attente'}
                       </span>
@@ -455,6 +464,21 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenModal }) => 
                         <tr key={p.id}>
                           <td>
                             <DocRefBadge reference={p.number} type="proforma" />
+                            {p.dossierId && (
+                              <div style={{ marginTop: '4px' }}>
+                                <DocRefBadge reference={p.dossierId} type="reservation" label={`📁 ${p.dossierId}`} />
+                              </div>
+                            )}
+                            {p.reservationId && p.reservationId !== p.dossierId && (
+                              <div style={{ marginTop: '4px' }}>
+                                <DocRefBadge reference={p.reservationId} type="reservation" label={`Résa ${p.reservationId}`} />
+                              </div>
+                            )}
+                            {p.factureNumber && (
+                              <div style={{ marginTop: '4px' }}>
+                                <DocRefBadge reference={p.factureNumber} type="facture" label={`Facture ${p.factureNumber}`} />
+                              </div>
+                            )}
                           </td>
                           {!isClient && (
                             <td>

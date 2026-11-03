@@ -30,6 +30,8 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
     clients,
     vehicules,
     chauffeurs,
+    reservations,
+    proformas,
     factures,
     setChatModalOpen
   } = useApp();
@@ -121,6 +123,7 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
         case 'reservation':
           const isNewReservation = !formData.id;
           const assignedId = formData.id || `RES-${Date.now().toString().slice(-6)}`;
+          const assignedDossierId = formData.dossierId || (formData.id ? formData.dossierId || formData.id : `DOS-${assignedId.slice(4)}`);
           const rClientName = isClientUser ? (profile?.nom || profile?.name || user?.displayName || formData.client || 'Client') : (formData.client || 'Client Divers');
           const rEmail = isClientUser ? (user?.email || profile?.email || formData.email) : formData.email;
           const rPhone = isClientUser ? (profile?.telephone || profile?.phone || formData.telephone) : formData.telephone;
@@ -128,6 +131,7 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
           await saveReservation({
             ...formData,
             id: assignedId,
+            dossierId: assignedDossierId,
             client: rClientName,
             clientId: isClientUser ? (user?.uid || profile?.id) : formData.clientId,
             telephone: rPhone,
@@ -150,30 +154,79 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
             });
           }
           break;
-        case 'proforma':
+        case 'proforma': {
           const pAmount = Number(formData.amount) || 0;
           const tva = Math.round(pAmount * (settings.tvaPourcentage / 100));
           const proNum = formData.number || `PRO-${Date.now().toString().slice(-6)}`;
+          const pDossierId = formData.dossierId || (formData.reservationId ? reservations.find(r => r.id === formData.reservationId)?.dossierId || formData.reservationId : undefined) || proNum;
+          
           await saveProforma({
             ...formData,
             id: proNum,
             number: proNum,
+            dossierId: pDossierId,
             amount: pAmount,
             tva,
             totalTTC: pAmount + tva,
             status: formData.status || 'En attente'
           });
+
+          if (formData.reservationId) {
+            const linkedRes = reservations.find(r => r.id === formData.reservationId);
+            if (linkedRes) {
+              await saveReservation({
+                ...linkedRes,
+                devisRef: proNum,
+                proformaRef: proNum,
+                status: 'Devis émis',
+                updatedAt: new Date().toISOString()
+              });
+            }
+          }
           break;
-        case 'facture':
+        }
+        case 'facture': {
           const facNum = formData.number || `FAC-${Date.now().toString().slice(-6)}`;
+          const fDossierId = formData.dossierId || 
+            (formData.reservationId ? reservations.find(r => r.id === formData.reservationId)?.dossierId : undefined) ||
+            (formData.proformaNumber ? proformas.find(p => p.number === formData.proformaNumber)?.dossierId : undefined) ||
+            facNum;
+
           await saveFacture({
             ...formData,
             id: facNum,
             number: facNum,
+            dossierId: fDossierId,
             amount: Number(formData.amount) || 0,
             status: formData.status || 'En attente'
           });
+
+          if (formData.proformaNumber) {
+            const linkedPro = proformas.find(p => p.number === formData.proformaNumber);
+            if (linkedPro) {
+              await saveProforma({
+                ...linkedPro,
+                status: 'Convertie en facture',
+                factureNumber: facNum,
+                updatedAt: new Date().toISOString()
+              });
+            }
+          }
+
+          if (formData.reservationId) {
+            const linkedRes = reservations.find(r => r.id === formData.reservationId);
+            if (linkedRes) {
+              await saveReservation({
+                ...linkedRes,
+                factureRef: facNum,
+                status: 'Facturé',
+                demandeFacture: false,
+                updatedAt: new Date().toISOString()
+              });
+            }
+          }
           break;
+        }
         case 'client':
           await saveClient(formData);
           break;
@@ -223,7 +276,9 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
             date: formData.date || new Date().toISOString().slice(0, 10),
             devise: formData.devise || 'USD',
             modePaiement: formData.modePaiement || 'MonCash',
-            statut: formData.statut || 'Validé'
+            statut: formData.statut || 'Validé',
+            dossierId: formData.dossierId,
+            clientId: formData.clientId
           });
           break;
         case 'utilisateur': {
@@ -320,8 +375,10 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
                         const val = e.target.value;
                         handleChange('client', val);
                         const match = clients.find(c => c.name.toLowerCase() === val.toLowerCase());
-                        if (match && match.telephone) {
-                          handleChange('telephone', match.telephone);
+                        if (match) {
+                          if (match.id) handleChange('clientId', match.id);
+                          if (match.telephone) handleChange('telephone', match.telephone);
+                          if (match.email) handleChange('email', match.email);
                         }
                       }}
                       placeholder="Sélectionnez ou tapez le nom du client"
@@ -335,6 +392,18 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
                   </>
                 )}
               </div>
+
+              {!isClientUser && (
+                <div className="field">
+                  <label>Numéro de Dossier Unique :</label>
+                  <input
+                    type="text"
+                    value={formData.dossierId || (formData.id ? formData.dossierId || formData.id : 'Attribution automatique (DOS-...)')}
+                    readOnly
+                    style={{ background: '#f8fafc', color: '#082b70', cursor: 'not-allowed', fontFamily: 'monospace', fontWeight: 700 }}
+                  />
+                </div>
+              )}
 
               <div className="field">
                 <label>Téléphone Client :</label>
@@ -467,10 +536,12 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
                       value={formData.status || 'En attente'}
                       onChange={(e) => handleChange('status', e.target.value)}
                     >
-                      <option value="En attente">En attente</option>
-                      <option value="Confirmée">Confirmée</option>
-                      <option value="En cours">En cours</option>
-                      <option value="Terminée">Terminée</option>
+                      <option value="En attente">En attente (Demande client)</option>
+                      <option value="Devis émis">Devis émis</option>
+                      <option value="Facturé">Facturé (En attente de paiement)</option>
+                      <option value="Confirmée">Confirmée (Validée & Payée)</option>
+                      <option value="En cours">En cours (Mission active)</option>
+                      <option value="Terminée">Terminée (Clôturée)</option>
                       <option value="Annulée">Annulée</option>
                     </select>
                   </div>
@@ -628,14 +699,69 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
               </div>
 
               <div className="field">
+                <label>Dossier / Réservation Liée (Optionnel) :</label>
+                <select
+                  value={formData.reservationId || ''}
+                  onChange={(e) => {
+                    const chosenResId = e.target.value;
+                    handleChange('reservationId', chosenResId);
+                    const chosenRes = reservations.find(r => r.id === chosenResId);
+                    if (chosenRes) {
+                      handleChange('dossierId', chosenRes.dossierId || chosenRes.id);
+                      handleChange('client', chosenRes.client);
+                      if (chosenRes.clientId) handleChange('clientId', chosenRes.clientId);
+                      if (chosenRes.telephone) handleChange('telephone', chosenRes.telephone);
+                      if (chosenRes.email) handleChange('clientEmail', chosenRes.email);
+                      if (chosenRes.service) handleChange('service', chosenRes.service);
+                      if (chosenRes.amount) handleChange('amount', chosenRes.amount);
+                    }
+                  }}
+                >
+                  <option value="">-- Devis direct (sans dossier lié) --</option>
+                  {reservations.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.dossierId || r.id} • {r.client} • {r.service || 'Course'} ({r.date}) [{r.status}]
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {formData.dossierId && (
+                <div className="field">
+                  <label>Numéro de Dossier Associé :</label>
+                  <input
+                    type="text"
+                    value={formData.dossierId}
+                    readOnly
+                    style={{ background: '#f8fafc', color: '#082b70', cursor: 'not-allowed', fontFamily: 'monospace', fontWeight: 700 }}
+                  />
+                </div>
+              )}
+
+              <div className="field">
                 <label>Client Destinataire :</label>
                 <input
                   type="text"
+                  list="clients-list-proforma"
                   value={formData.client || ''}
-                  onChange={(e) => handleChange('client', e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    handleChange('client', val);
+                    const match = clients.find(c => c.name.toLowerCase() === val.toLowerCase());
+                    if (match) {
+                      if (match.id) handleChange('clientId', match.id);
+                      if (match.telephone) handleChange('telephone', match.telephone);
+                      if (match.email) handleChange('clientEmail', match.email);
+                    }
+                  }}
                   placeholder="Nom du client ou entreprise"
                   required
                 />
+                <datalist id="clients-list-proforma">
+                  {clients.map(c => (
+                    <option key={c.id} value={c.name}>{c.telephone ? `${c.telephone} - ${c.type || 'Client'}` : ''}</option>
+                  ))}
+                </datalist>
               </div>
 
               <div className="field full">
@@ -698,23 +824,69 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
               </div>
 
               <div className="field">
-                <label>Réf. Proforma liée (Optionnel) :</label>
-                <input
-                  type="text"
+                <label>Devis Proforma Lié (Optionnel) :</label>
+                <select
                   value={formData.proformaNumber || ''}
-                  onChange={(e) => handleChange('proformaNumber', e.target.value)}
-                  placeholder="Ex: PRO-2026-001"
-                />
+                  onChange={(e) => {
+                    const chosen = e.target.value;
+                    handleChange('proformaNumber', chosen);
+                    const matchingPro = proformas.find(p => p.number === chosen);
+                    if (matchingPro) {
+                      handleChange('client', matchingPro.client);
+                      if (matchingPro.clientId) handleChange('clientId', matchingPro.clientId);
+                      if (matchingPro.clientEmail) handleChange('clientEmail', matchingPro.clientEmail);
+                      if (matchingPro.telephone) handleChange('telephone', matchingPro.telephone);
+                      if (matchingPro.reservationId) handleChange('reservationId', matchingPro.reservationId);
+                      if (matchingPro.dossierId) handleChange('dossierId', matchingPro.dossierId);
+                      if (matchingPro.service) handleChange('service', matchingPro.service);
+                      handleChange('amount', matchingPro.totalTTC || matchingPro.amount || 0);
+                    }
+                  }}
+                >
+                  <option value="">-- Facture directe (sans devis lié) --</option>
+                  {proformas.map((p) => (
+                    <option key={p.id} value={p.number}>
+                      {p.number} • {p.client} • ${p.totalTTC || p.amount} USD [{p.status}]
+                    </option>
+                  ))}
+                </select>
               </div>
+
+              {formData.dossierId && (
+                <div className="field">
+                  <label>Numéro de Dossier Associé :</label>
+                  <input
+                    type="text"
+                    value={formData.dossierId}
+                    readOnly
+                    style={{ background: '#f8fafc', color: '#082b70', cursor: 'not-allowed', fontFamily: 'monospace', fontWeight: 700 }}
+                  />
+                </div>
+              )}
 
               <div className="field">
                 <label>Client Facturé :</label>
                 <input
                   type="text"
+                  list="clients-list-facture"
                   value={formData.client || ''}
-                  onChange={(e) => handleChange('client', e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    handleChange('client', val);
+                    const match = clients.find(c => c.name.toLowerCase() === val.toLowerCase());
+                    if (match) {
+                      if (match.id) handleChange('clientId', match.id);
+                      if (match.telephone) handleChange('telephone', match.telephone);
+                      if (match.email) handleChange('clientEmail', match.email);
+                    }
+                  }}
                   required
                 />
+                <datalist id="clients-list-facture">
+                  {clients.map(c => (
+                    <option key={c.id} value={c.name}>{c.telephone ? `${c.telephone} - ${c.type || 'Client'}` : ''}</option>
+                  ))}
+                </datalist>
               </div>
 
               <div className="field">
@@ -1315,10 +1487,24 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
                 <label>Client :</label>
                 <input
                   type="text"
+                  list="clients-list-paiement"
                   value={formData.client || ''}
-                  onChange={(e) => handleChange('client', e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    handleChange('client', val);
+                    const match = clients.find(c => c.name.toLowerCase() === val.toLowerCase());
+                    if (match) {
+                      if (match.id) handleChange('clientId', match.id);
+                      if (match.email) handleChange('clientEmail', match.email);
+                    }
+                  }}
                   required
                 />
+                <datalist id="clients-list-paiement">
+                  {clients.map(c => (
+                    <option key={c.id} value={c.name}>{c.telephone ? `${c.telephone} - ${c.type || 'Client'}` : ''}</option>
+                  ))}
+                </datalist>
               </div>
 
               <div className="field">
@@ -1367,6 +1553,10 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
                     const matchingFacture = factures.find(f => f.number === chosen || f.id === chosen);
                     if (matchingFacture) {
                       handleChange('client', matchingFacture.client);
+                      if (matchingFacture.clientId) handleChange('clientId', matchingFacture.clientId);
+                      if (matchingFacture.clientEmail) handleChange('clientEmail', matchingFacture.clientEmail);
+                      if (matchingFacture.reservationId) handleChange('reservationId', matchingFacture.reservationId);
+                      if (matchingFacture.dossierId) handleChange('dossierId', matchingFacture.dossierId);
                       const rest = Math.max(0, matchingFacture.amount - (matchingFacture.paidAmount || 0));
                       handleChange('montant', rest > 0 ? rest : matchingFacture.amount);
                       handleChange('devise', matchingFacture.currency || 'USD');
@@ -1385,6 +1575,18 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
                   })}
                 </select>
               </div>
+
+              {formData.dossierId && (
+                <div className="field">
+                  <label>Numéro de Dossier Associé :</label>
+                  <input
+                    type="text"
+                    value={formData.dossierId}
+                    readOnly
+                    style={{ background: '#f8fafc', color: '#082b70', cursor: 'not-allowed', fontFamily: 'monospace', fontWeight: 700 }}
+                  />
+                </div>
+              )}
 
               <div className="field full">
                 <label>Motif de Paiement :</label>

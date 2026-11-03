@@ -149,6 +149,7 @@ interface AppContextType {
   convertReservationToFacture: (res: Reservation) => Promise<void>;
   convertReservationToPlanning: (res: Reservation) => Promise<void>;
   convertFactureToPaiement: (facture: Facture, modePaiement?: string, reference?: string) => Promise<void>;
+  validatePaiement: (paiement: Paiement) => Promise<void>;
   generateEleveAbonnementEtFacture: (eleve: Eleve) => Promise<void>;
   assignDriverAndDispatch: (
     reservationId: string, 
@@ -290,6 +291,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         syncQueryOrCollection('reservations', query(collection(db, 'reservations'), where('clientId', '==', user.uid)), setRawReservations, []);
         syncQueryOrCollection('proformas', query(collection(db, 'proformas'), where('clientId', '==', user.uid)), setRawProformas, []);
         syncQueryOrCollection('factures', query(collection(db, 'factures'), where('clientId', '==', user.uid)), setRawFactures, []);
+        syncQueryOrCollection('paiements', query(collection(db, 'paiements'), where('clientId', '==', user.uid)), setRawPaiements, []);
         syncQueryOrCollection('notifications', query(collection(db, 'notifications'), where('targetUid', '==', user.uid)), setRawNotifications, []);
         syncQueryOrCollection('vehicules', collection(db, 'vehicules'), setRawVehicules, []);
       }
@@ -683,12 +685,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // --------------------------------------------------------------------------
   const saveReservation = async (item: Partial<Reservation>) => {
     const isRestricted = isClientRole && user;
+    const dossierId = item.dossierId || item.id || `DOS-${Date.now().toString().slice(-6)}`;
+    
+    let resolvedClientId = item.clientId || (isRestricted ? user.uid : undefined);
+    let resolvedEmail = item.email || (isRestricted && user.email ? user.email : undefined);
+    let resolvedTelephone = item.telephone || (isRestricted ? (profile?.telephone || profile?.phone) : undefined);
+    let resolvedClient = item.client || (isRestricted ? (profile?.nom || profile?.name || user.displayName || 'Client') : 'Client Divers');
+
+    if (!resolvedClientId && item.client) {
+      const match = rawClients.find(c => c.name.toLowerCase() === item.client?.toLowerCase());
+      if (match) {
+        resolvedClientId = match.id;
+        if (!resolvedEmail && match.email) resolvedEmail = match.email;
+        if (!resolvedTelephone && match.telephone) resolvedTelephone = match.telephone;
+      }
+    }
+
     const enriched: Partial<Reservation> = {
       ...item,
-      clientId: item.clientId || (isRestricted ? user.uid : undefined),
-      email: item.email || (isRestricted && user.email ? user.email : undefined),
-      telephone: item.telephone || (isRestricted ? (profile?.telephone || profile?.phone) : undefined),
-      client: item.client || (isRestricted ? (profile?.nom || profile?.name || user.displayName || 'Client') : 'Client Divers')
+      dossierId,
+      clientId: resolvedClientId,
+      email: resolvedEmail,
+      telephone: resolvedTelephone,
+      client: resolvedClient
     };
     await saveItemToCollection('reservations', enriched, setRawReservations, 'Réservation enregistrée avec succès');
   };
@@ -698,12 +717,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const saveProforma = async (item: Partial<Proforma>) => {
     const isRestricted = isClientRole && user;
+    let dossierId = item.dossierId;
+    if (!dossierId && item.reservationId) {
+      const linkedRes = rawReservations.find(r => r.id === item.reservationId);
+      if (linkedRes) dossierId = linkedRes.dossierId || linkedRes.id;
+    }
+    if (!dossierId) {
+      dossierId = item.number || item.id || `DOS-${Date.now().toString().slice(-6)}`;
+    }
+
+    let resolvedClientId = item.clientId || (isRestricted ? user.uid : undefined);
+    let resolvedEmail = item.clientEmail || (isRestricted && user.email ? user.email : undefined);
+    let resolvedTelephone = item.telephone || (isRestricted ? (profile?.telephone || profile?.phone) : undefined);
+    let resolvedClient = item.client || (isRestricted ? (profile?.nom || profile?.name || user.displayName || 'Client') : 'Client Divers');
+
+    if (!resolvedClientId && item.client) {
+      const match = rawClients.find(c => c.name.toLowerCase() === item.client?.toLowerCase());
+      if (match) {
+        resolvedClientId = match.id;
+        if (!resolvedEmail && match.email) resolvedEmail = match.email;
+        if (!resolvedTelephone && match.telephone) resolvedTelephone = match.telephone;
+      }
+    }
+
     const enriched: Partial<Proforma> = {
       ...item,
-      clientId: item.clientId || (isRestricted ? user.uid : undefined),
-      clientEmail: item.clientEmail || (isRestricted && user.email ? user.email : undefined),
-      telephone: item.telephone || (isRestricted ? (profile?.telephone || profile?.phone) : undefined),
-      client: item.client || (isRestricted ? (profile?.nom || profile?.name || user.displayName || 'Client') : 'Client Divers')
+      dossierId,
+      clientId: resolvedClientId,
+      clientEmail: resolvedEmail,
+      telephone: resolvedTelephone,
+      client: resolvedClient
     };
     await saveItemToCollection('proformas', enriched, setRawProformas, 'Devis proforma enregistré');
   };
@@ -713,12 +756,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const saveFacture = async (item: Partial<Facture>) => {
     const isRestricted = isClientRole && user;
+    let dossierId = item.dossierId;
+    if (!dossierId && item.reservationId) {
+      const linkedRes = rawReservations.find(r => r.id === item.reservationId);
+      if (linkedRes) dossierId = linkedRes.dossierId || linkedRes.id;
+    }
+    if (!dossierId && item.proformaNumber) {
+      const linkedPro = rawProformas.find(p => p.number === item.proformaNumber);
+      if (linkedPro) dossierId = linkedPro.dossierId;
+    }
+    if (!dossierId) {
+      dossierId = item.number || item.id || `DOS-${Date.now().toString().slice(-6)}`;
+    }
+
+    let resolvedClientId = item.clientId || (isRestricted ? user.uid : undefined);
+    let resolvedEmail = item.clientEmail || (isRestricted && user.email ? user.email : undefined);
+    let resolvedTelephone = item.telephone || (isRestricted ? (profile?.telephone || profile?.phone) : undefined);
+    let resolvedClient = item.client || (isRestricted ? (profile?.nom || profile?.name || user.displayName || 'Client') : 'Client');
+
+    if (!resolvedClientId && item.client) {
+      const match = rawClients.find(c => c.name.toLowerCase() === item.client?.toLowerCase());
+      if (match) {
+        resolvedClientId = match.id;
+        if (!resolvedEmail && match.email) resolvedEmail = match.email;
+        if (!resolvedTelephone && match.telephone) resolvedTelephone = match.telephone;
+      }
+    }
+
     const enriched: Partial<Facture> = {
       ...item,
-      clientId: item.clientId || (isRestricted ? user.uid : undefined),
-      clientEmail: item.clientEmail || (isRestricted && user.email ? user.email : undefined),
-      telephone: item.telephone || (isRestricted ? (profile?.telephone || profile?.phone) : undefined),
-      client: item.client || (isRestricted ? (profile?.nom || profile?.name || user.displayName || 'Client') : 'Client')
+      dossierId,
+      clientId: resolvedClientId,
+      clientEmail: resolvedEmail,
+      telephone: resolvedTelephone,
+      client: resolvedClient
     };
     await saveItemToCollection('factures', enriched, setRawFactures, 'Facture enregistrée');
   };
@@ -1022,6 +1093,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       number: factureNumber,
       proformaNumber: proforma.number,
       reservationId: proforma.reservationId,
+      dossierId: proforma.dossierId || proforma.reservationId,
       client: proforma.client,
       clientId: proforma.clientId,
       clientEmail: proforma.clientEmail,
@@ -1049,6 +1121,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const linkedRes = rawReservations.find(r => 
       (proforma.reservationId && r.id === proforma.reservationId) || 
       r.devisRef === proforma.number || 
+      (proforma.dossierId && r.dossierId === proforma.dossierId) ||
       r.id === proforma.id
     );
     if (linkedRes) {
@@ -1056,6 +1129,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...linkedRes,
         factureRef: factureNumber,
         status: 'Facturé',
+        demandeFacture: false,
         updatedAt: new Date().toISOString()
       });
     }
@@ -1087,6 +1161,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: number,
       number,
       reservationId: res.id,
+      dossierId: res.dossierId || res.id,
       client: res.client,
       clientId: res.clientId,
       clientEmail: res.email,
@@ -1107,16 +1182,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           total: amount
         }
       ],
-      notes: res.notes ? `Issu du dossier ${res.id}. Note : ${res.notes}` : `Généré depuis la réservation ${res.id}`,
+      notes: res.notes ? `Issu du dossier ${res.dossierId || res.id}. Note : ${res.notes}` : `Généré depuis la réservation ${res.id}`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
     await saveProforma(newProforma);
 
-    // Update reservation with devisRef and status Devis émis
+    // Update reservation with devisRef, proformaRef and status Devis émis
     await saveReservation({
       ...res,
       devisRef: number,
+      proformaRef: number,
       status: 'Devis émis',
       updatedAt: new Date().toISOString()
     });
@@ -1150,6 +1226,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: factureNumber,
       number: factureNumber,
       reservationId: res.id,
+      dossierId: res.dossierId || res.id,
       proformaNumber: res.devisRef,
       client: res.client,
       clientId: res.clientId,
@@ -1182,6 +1259,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...res,
       factureRef: factureNumber,
       status: 'Facturé',
+      demandeFacture: false,
       updatedAt: new Date().toISOString()
     });
 
@@ -1310,6 +1388,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       factureAssociee: facture.number,
       proformaAssociee: facture.proformaNumber,
       reservationId: facture.reservationId,
+      dossierId: facture.dossierId,
       statut: 'Validé',
       recuPar: profile?.nom || profile?.name || user?.displayName || 'Caisse Centrale Laperle'
     };
@@ -1331,6 +1410,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Mettre à jour la réservation associée si existante
     const linkedRes = rawReservations.find(
       r => (facture.reservationId && r.id === facture.reservationId) ||
+           (facture.dossierId && r.dossierId === facture.dossierId) ||
            r.factureRef === facture.number || 
            (facture.proformaNumber && r.devisRef === facture.proformaNumber)
     );
@@ -1368,6 +1448,82 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     showToast(`Paiement de $${montantPaye} ${facture.currency || 'USD'} validé avec succès pour la facture ${facture.number} !`, 'success');
     setCurrentModule('paiements');
+  };
+
+  // Validation d'un paiement (ex: justificatif transmis par le client)
+  const validatePaiement = async (paiement: Paiement) => {
+    const updatedPayment: Paiement = {
+      ...paiement,
+      statut: 'Validé',
+      status: 'Validé',
+      recuPar: profile?.nom || profile?.name || user?.displayName || 'Secrétariat Laperle',
+      updatedAt: new Date().toISOString()
+    };
+    await savePaiement(updatedPayment);
+
+    // Mettre à jour la facture associée
+    if (paiement.factureAssociee) {
+      const targetFacture = rawFactures.find(
+        (f) => f.number === paiement.factureAssociee || f.id === paiement.factureAssociee
+      );
+      if (targetFacture) {
+        const priorPaid = Number(targetFacture.paidAmount) || 0;
+        const currentPay = Number(paiement.montant || paiement.amount) || 0;
+        const newPaid = Math.min(targetFacture.amount, priorPaid + currentPay);
+        const newStatus: Facture['status'] = newPaid >= targetFacture.amount ? 'Payée' : 'Partiellement payée';
+
+        await saveFacture({
+          ...targetFacture,
+          paidAmount: newPaid,
+          status: newStatus,
+          statut: newStatus,
+          referenceTransaction: paiement.referenceTransaction || paiement.reference || targetFacture.referenceTransaction,
+          updatedAt: new Date().toISOString()
+        });
+      }
+    }
+
+    // Mettre à jour la réservation liée
+    const targetReservation = rawReservations.find(
+      (r) =>
+        (paiement.reservationId && (r.id === paiement.reservationId || r.dossierId === paiement.reservationId)) ||
+        (paiement.dossierId && r.dossierId === paiement.dossierId) ||
+        (paiement.factureAssociee && r.factureRef === paiement.factureAssociee) ||
+        (paiement.proformaAssociee && r.devisRef === paiement.proformaAssociee)
+    );
+
+    if (targetReservation) {
+      await saveReservation({
+        ...targetReservation,
+        status: 'Confirmée',
+        paiementRef: paiement.reference || paiement.id,
+        updatedAt: new Date().toISOString()
+      });
+
+      await addNotification({
+        title: '✅ Course Payée & Confirmée · Prête pour assignation',
+        message: `Le règlement de ${paiement.client} (${paiement.montant} ${paiement.devise || 'USD'}) a été validé. Dossier ${targetReservation.id} prêt pour assignation chauffeur & véhicule.`,
+        type: 'success',
+        link: 'reservations',
+        targetId: targetReservation.id,
+        targetAudience: 'all'
+      });
+    }
+
+    if (paiement.clientId) {
+      await addNotification({
+        title: `Paiement Validé - Reçu ${paiement.reference || paiement.id}`,
+        message: `Bonjour ${paiement.client}, votre versement de ${paiement.montant} ${paiement.devise || 'USD'} a été validé avec succès par notre service comptabilité. Votre réservation est confirmée !`,
+        type: 'success',
+        link: 'paiements',
+        targetId: paiement.id,
+        targetAudience: 'client',
+        targetUid: paiement.clientId,
+        authorUid: user?.uid
+      });
+    }
+
+    showToast(`Paiement ${paiement.reference || paiement.id} validé avec succès !`, 'success');
   };
 
   // Passerelle 5 : Assignation Manuelle Chauffeur & Véhicule avec Ordre de Mission
@@ -1632,6 +1788,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         convertReservationToFacture,
         convertReservationToPlanning,
         convertFactureToPaiement,
+        validatePaiement,
         generateEleveAbonnementEtFacture,
         assignDriverAndDispatch,
         completeReservationByDriver,

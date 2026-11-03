@@ -269,8 +269,14 @@ export const FacturesView: React.FC<FacturesViewProps> = ({ onOpenModal }) => {
                   <div className="item-detail-card-head">
                     <div className="card-id-cluster" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <DocRefBadge reference={f.number} type="facture" />
+                      {f.dossierId && (
+                        <DocRefBadge reference={f.dossierId} type="reservation" label={`📁 ${f.dossierId}`} />
+                      )}
                       {f.proformaNumber && (
                         <DocRefBadge reference={f.proformaNumber} type="proforma" label={`Devis ${f.proformaNumber}`} />
+                      )}
+                      {f.reservationId && f.reservationId !== f.dossierId && (
+                        <DocRefBadge reference={f.reservationId} type="reservation" label={`Résa ${f.reservationId}`} />
                       )}
                       <span className={`badge ${getStatusBadge(f.status)}`}>
                         {f.status || 'En attente'}
@@ -498,10 +504,17 @@ export const FacturesView: React.FC<FacturesViewProps> = ({ onOpenModal }) => {
                         <tr key={f.id}>
                           <td>
                             <DocRefBadge reference={f.number} type="facture" />
+                            {f.dossierId && (
+                              <div style={{ marginTop: '4px' }}>
+                                <DocRefBadge reference={f.dossierId} type="reservation" label={`📁 ${f.dossierId}`} />
+                              </div>
+                            )}
                           </td>
                           <td>
                             {f.proformaNumber ? (
                               <DocRefBadge reference={f.proformaNumber} type="proforma" label={f.proformaNumber} />
+                            ) : f.reservationId ? (
+                              <DocRefBadge reference={f.reservationId} type="reservation" label={`Résa ${f.reservationId}`} />
                             ) : (
                               <span style={{ color: '#94a3b8', fontSize: '11px' }}>Direct</span>
                             )}

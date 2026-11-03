@@ -326,6 +326,7 @@ service cloud.firestore {
         (!('factureAssociee' in data) || (data.factureAssociee is string && data.factureAssociee.size() <= 100)) &&
         (!('proformaAssociee' in data) || (data.proformaAssociee is string && data.proformaAssociee.size() <= 100)) &&
         (!('reservationId' in data) || (data.reservationId is string && data.reservationId.size() <= 128)) &&
+        (!('dossierId' in data) || (data.dossierId is string && data.dossierId.size() <= 128)) &&
         (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000)) &&
         (!('clientId' in data) || (data.clientId is string && data.clientId.size() <= 128)) &&
         (!('uid' in data) || (data.uid is string && data.uid.size() <= 128));
@@ -348,6 +349,13 @@ service cloud.firestore {
         (!('clientId' in data) || (data.clientId is string && data.clientId.size() <= 128)) &&
         (!('chauffeurId' in data) || (data.chauffeurId is string && data.chauffeurId.size() <= 128)) &&
         (!('driverId' in data) || (data.driverId is string && data.driverId.size() <= 128)) &&
+        (!('dossierId' in data) || (data.dossierId is string && data.dossierId.size() <= 128)) &&
+        (!('devisRef' in data) || (data.devisRef is string && data.devisRef.size() <= 100)) &&
+        (!('proformaRef' in data) || (data.proformaRef is string && data.proformaRef.size() <= 100)) &&
+        (!('factureRef' in data) || (data.factureRef is string && data.factureRef.size() <= 100)) &&
+        (!('paiementRef' in data) || (data.paiementRef is string && data.paiementRef.size() <= 100)) &&
+        (!('demandeDevis' in data) || data.demandeDevis is bool) &&
+        (!('demandeFacture' in data) || data.demandeFacture is bool) &&
         (!('uid' in data) || (data.uid is string && data.uid.size() <= 128));
     }
 
@@ -369,6 +377,9 @@ service cloud.firestore {
         (!('status' in data) || (data.status is string && data.status.size() <= 50)) &&
         (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000)) &&
         (!('clientId' in data) || (data.clientId is string && data.clientId.size() <= 128)) &&
+        (!('dossierId' in data) || (data.dossierId is string && data.dossierId.size() <= 128)) &&
+        (!('reservationId' in data) || (data.reservationId is string && data.reservationId.size() <= 128)) &&
+        (!('factureNumber' in data) || (data.factureNumber is string && data.factureNumber.size() <= 100)) &&
         (!('uid' in data) || (data.uid is string && data.uid.size() <= 128));
     }
 
@@ -380,6 +391,9 @@ service cloud.firestore {
         (!('status' in data) || (data.status is string && data.status.size() <= 50)) &&
         (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000)) &&
         (!('clientId' in data) || (data.clientId is string && data.clientId.size() <= 128)) &&
+        (!('dossierId' in data) || (data.dossierId is string && data.dossierId.size() <= 128)) &&
+        (!('reservationId' in data) || (data.reservationId is string && data.reservationId.size() <= 128)) &&
+        (!('proformaNumber' in data) || (data.proformaNumber is string && data.proformaNumber.size() <= 100)) &&
         (!('uid' in data) || (data.uid is string && data.uid.size() <= 128));
     }
 
@@ -587,7 +601,8 @@ service cloud.firestore {
           (!('status' in existing()) || existing().status in ['En attente', 'Brouillon']) &&
           incoming().diff(existing()).affectedKeys().hasOnly([
             'date', 'time', 'origin', 'destination', 'passengers', 'flightNumber', 
-            'notes', 'service', 'currency', 'amount', 'telephone', 'client', 'email', 'updatedAt', 'updatedBy'
+            'notes', 'service', 'currency', 'amount', 'telephone', 'client', 'email', 'updatedAt', 'updatedBy',
+            'demandeDevis', 'demandeFacture', 'dossierId'
           ]) &&
           (!('status' in incoming()) || incoming().status in ['En attente', 'Brouillon'])
         )
