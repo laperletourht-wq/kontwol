@@ -5,6 +5,7 @@ import { DualPrice } from '../common/DualPrice';
 import { DocRefBadge } from '../common/DocRefBadge';
 import { RowActionMenu, type ActionMenuItem } from '../common/RowActionMenu';
 import { AssignDriverModal } from '../modals/AssignDriverModal';
+import { ClientReservationsView } from './ClientReservationsView';
 
 interface ReservationsViewProps {
   onOpenModal: (type: string, data?: any) => void;
@@ -24,6 +25,11 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
   const { role, isSuperAdmin } = useAuth();
   const isAdmin = role === 'admin' || isSuperAdmin;
   const isClient = role === 'client' || role === 'prospect';
+
+  // Strict Client-specific View matching screenshots
+  if (isClient) {
+    return <ClientReservationsView onOpenModal={onOpenModal} />;
+  }
 
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');

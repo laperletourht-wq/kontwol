@@ -137,6 +137,7 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
             telephone: rPhone,
             email: rEmail,
             status: isClientUser ? 'En attente' : (formData.status || 'En attente'),
+            trajet: formData.trajet || 'Aller simple',
             passengers: Number(formData.passengers) || 1,
             amount: Number(formData.amount) || 0,
             currency: formData.currency || 'USD'
@@ -429,6 +430,18 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
                   <option value="Transfert Aéroport Toussaint Louverture">Transfert Aéroport</option>
                   <option value="Transport Corporate & Missions d'Entreprise">Transport Corporate</option>
                   <option value="Course Privée Urbaine & Taxi VIP">Course Privée Taxi VIP</option>
+                </select>
+              </div>
+
+              <div className="field">
+                <label>Type de Trajet :</label>
+                <select
+                  value={formData.trajet || 'Aller simple'}
+                  onChange={(e) => handleChange('trajet', e.target.value)}
+                  disabled={isReservationLockedForClient}
+                >
+                  <option value="Aller simple">Aller simple</option>
+                  <option value="Aller-retour">Aller-retour</option>
                 </select>
               </div>
 

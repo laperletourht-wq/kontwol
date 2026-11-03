@@ -73,6 +73,7 @@ export interface Reservation {
   client: string;
   clientId?: string;
   service?: string;
+  trajet?: string;
   origin?: string;
   destination?: string;
   date: string;

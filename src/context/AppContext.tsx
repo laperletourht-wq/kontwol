@@ -67,6 +67,8 @@ interface AppContextType {
   // Navigation & UI
   currentModule: string;
   setCurrentModule: (mod: string) => void;
+  clientReservationViewMode: 'list' | 'new';
+  setClientReservationViewMode: (mode: 'list' | 'new') => void;
   isPublicLanding: boolean;
   setIsPublicLanding: (val: boolean) => void;
   authModalOpen: boolean;
@@ -171,6 +173,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Navigation states
   const [currentModule, setCurrentModule] = useState<string>('dashboard');
+  const [clientReservationViewMode, setClientReservationViewMode] = useState<'list' | 'new'>('list');
   const [isPublicLanding, setIsPublicLanding] = useState<boolean>(true);
   const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
   const [authView, setAuthView] = useState<'login' | 'register' | 'verify' | 'forgot'>('login');
@@ -1719,6 +1722,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       value={{
         currentModule,
         setCurrentModule,
+        clientReservationViewMode,
+        setClientReservationViewMode,
         isPublicLanding,
         setIsPublicLanding,
         authModalOpen,
