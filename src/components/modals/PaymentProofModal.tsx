@@ -130,7 +130,7 @@ export const PaymentProofModal: React.FC<PaymentProofModalProps> = ({
       onClose();
     } catch (err) {
       console.error('Error submitting payment proof', err);
-      showToast('Une erreur est survenue lors de l\'enregistrement.', 'danger');
+      showToast('Une erreur est survenue lors de l\'enregistrement.', 'error');
     } finally {
       setIsSubmitting(false);
     }

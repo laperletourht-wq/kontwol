@@ -8,6 +8,8 @@ import { SecretaireDashboard } from '../dashboard/SecretaireDashboard';
 import { ClientDashboard } from '../dashboard/ClientDashboard';
 import { DashboardVendeur } from '../dashboard/DashboardVendeur';
 
+import { ClientReservationsView } from './ClientReservationsView';
+
 interface DashboardViewProps {
   onOpenModal: (type: string, data?: any) => void;
 }
@@ -53,9 +55,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenModal }) => 
   }
 
   // =========================================================================
-  // 3. CLIENTS, PROSPECTS, CHAUFFEURS & AUTRES NON-ADMINS (MAQUETTE 2 : PROFIL, TIMELINE & PAIEMENTS)
+  // 3. CLIENTS & PROSPECTS (MAQUETTE EXACTE : TABLEAU DE BORD DES RÉSERVATIONS AUTOMOBILES)
   // =========================================================================
-  if (isClient || isChauffeur || role === 'lecture_seule') {
+  if (isClient) {
+    return <ClientReservationsView onOpenModal={onOpenModal} />;
+  }
+
+  // =========================================================================
+  // 4. CHAUFFEURS & AUTRES NON-ADMINS (ESPACE MISSIONS & FEUILLES DE ROUTE)
+  // =========================================================================
+  if (isChauffeur || role === 'lecture_seule') {
     return <ClientDashboard onOpenModal={onOpenModal} />;
   }
 

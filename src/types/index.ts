@@ -29,6 +29,7 @@ export interface UserProfile {
   statutCompte?: string;
   statutClient?: string;
   photoURL?: string;
+  avatar?: string;
   adresse?: string;
   ville?: string;
   societe?: string;
@@ -90,8 +91,20 @@ export interface Reservation {
   vehicule?: string;
   notes?: string;
   status: 'En attente' | 'Devis émis' | 'Facturé' | 'Confirmée' | 'En cours' | 'Terminée' | 'Annulée' | string;
+  number?: string;
   telephone?: string;
   email?: string;
+  uid?: string;
+  montant?: number;
+  totalAmount?: number;
+  dateDepart?: string;
+  heureDepart?: string;
+  departureDate?: string;
+  departureTime?: string;
+  lieuPriseEnCharge?: string;
+  serviceType?: string;
+  circuit?: string;
+  vehicleType?: string;
   demandeDevis?: boolean;
   demandeFacture?: boolean;
   devisRef?: string;
@@ -127,8 +140,9 @@ export interface Proforma {
   items?: ProformaItem[];
   tva?: number;
   totalTTC?: number;
-  status: 'En attente' | 'Acceptée' | 'Refusée' | 'Convertie en facture';
+  status: 'En attente' | 'Acceptée' | 'Refusée' | 'Convertie en facture' | 'Brouillon' | 'Validée' | 'Demande de facture' | 'Envoyée' | 'Annulée' | string;
   statut?: string;
+  moyenPaiement?: string;
   reservationId?: string;
   demandeFacture?: boolean;
   factureNumber?: string;
@@ -160,6 +174,8 @@ export interface Facture {
   montantTotal?: number;
   totalTTC?: number;
   paymentMethod?: string;
+  paymentReference?: string;
+  paymentProof?: string;
   modePaiement?: string;
   items?: ProformaItem[];
   reservationId?: string;
@@ -188,6 +204,7 @@ export interface Client {
   city?: string;
   ville?: string;
   societe?: string;
+  company?: string;
   numeroFiscal?: string;
   notes?: string;
   totalOrders?: number;
@@ -246,6 +263,7 @@ export interface Vehicule {
   categorie: 'SUV VIP' | 'Minibus HiAce' | 'Autocar / Coaster' | 'Berline VIP' | '4x4 Tout-Terrain';
   capacitePassagers: number;
   statut: 'Disponible' | 'En mission' | 'En maintenance' | 'Réservé' | 'Hors service';
+  status?: string;
   chauffeurAttitre?: string;
   kilometrage?: number;
   assuranceExpiration?: string;
@@ -266,7 +284,8 @@ export interface Chauffeur {
   permisNumero: string;
   permisCategorie?: string;
   dateEmbauche?: string;
-  statut: 'En service' | 'En course' | 'En pause' | 'Congé' | 'Indisponible';
+  statut: 'En service' | 'En course' | 'En pause' | 'Congé' | 'Indisponible' | 'Disponible' | string;
+  status?: string;
   vehiculeActuel?: string;
   noteService?: number;
   zonesHabituelles?: string;
@@ -289,7 +308,7 @@ export interface Planning {
   chauffeur: string;
   chauffeurId?: string;
   vehicule: string;
-  statut: 'Programmé' | 'En cours' | 'Achevé' | 'Retardé' | 'Annulé';
+  statut: 'Programmé' | 'En cours' | 'Achevé' | 'Retardé' | 'Annulé' | 'En mission' | 'Terminé' | string;
   notes?: string;
   archived?: boolean;
   createdAt?: string;
@@ -307,6 +326,7 @@ export interface Paiement {
   clientEmail?: string;
   montant: number;
   amount?: number;
+  amountUSD?: number;
   devise: 'USD' | 'HTG';
   currency?: string;
   modePaiement: 'MonCash' | 'Natcash' | 'Virement Bancaire' | 'Espèces' | 'Carte de Crédit' | 'Chèque' | string;
@@ -365,6 +385,7 @@ export interface CompanySettings {
   email: string;
   adresse: string;
   tauxChangeUSD_HTG: number;
+  tauxChange?: number;
   tvaPourcentage: number;
   numeroFiscal?: string;
   bannierePromoActive?: boolean;

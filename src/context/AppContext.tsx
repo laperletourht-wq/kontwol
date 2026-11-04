@@ -79,8 +79,8 @@ interface AppContextType {
   setChatModalOpen: (val: boolean) => void;
   clientProfileModalOpen: boolean;
   setClientProfileModalOpen: (val: boolean) => void;
-  printSheetData: { type: 'proforma' | 'facture' | 'reservation' | 'paiement'; data: any } | null;
-  setPrintSheetData: (data: { type: 'proforma' | 'facture' | 'reservation' | 'paiement'; data: any } | null) => void;
+  printSheetData: { type: 'proforma' | 'facture' | 'reservation' | 'paiement'; data: any; title?: string } | null;
+  setPrintSheetData: (data: { type: 'proforma' | 'facture' | 'reservation' | 'paiement'; data: any; title?: string } | null) => void;
   toast: { message: string; type?: 'info' | 'success' | 'warning' | 'error' } | null;
   showToast: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
   globalSearchQuery: string;
@@ -146,7 +146,7 @@ interface AppContextType {
   }) => Promise<void>;
   requestDocumentSend: (docType: 'facture' | 'proforma', docNumber: string, amount: number, method: 'email' | 'whatsapp' | 'both', clientNotes?: string) => Promise<void>;
   requestReservationDoc: (res: Reservation | string, docType?: 'devis' | 'facture' | 'proforma', notes?: string) => Promise<void>;
-  convertProformaToFacture: (proforma: Proforma) => Promise<void>;
+  convertProformaToFacture: (proforma: Proforma) => Promise<Facture | void>;
   convertReservationToProforma: (res: Reservation) => Promise<void>;
   convertReservationToFacture: (res: Reservation) => Promise<void>;
   convertReservationToPlanning: (res: Reservation) => Promise<void>;
@@ -179,7 +179,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [authView, setAuthView] = useState<'login' | 'register' | 'verify' | 'forgot'>('login');
   const [chatModalOpen, setChatModalOpen] = useState<boolean>(false);
   const [clientProfileModalOpen, setClientProfileModalOpen] = useState<boolean>(false);
-  const [printSheetData, setPrintSheetData] = useState<{ type: 'proforma' | 'facture'; data: any } | null>(null);
+  const [printSheetData, setPrintSheetData] = useState<{ type: 'proforma' | 'facture' | 'reservation' | 'paiement'; data: any; title?: string } | null>(null);
   const [toast, setToast] = useState<{ message: string; type?: 'info' | 'success' | 'warning' | 'error' } | null>(null);
   const [globalSearchQuery, setGlobalSearchQuery] = useState<string>('');
   const [firebaseOnline, setFirebaseOnline] = useState<boolean>(true);
@@ -288,7 +288,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         syncQueryOrCollection('proformas', query(collection(db, 'proformas'), where('clientId', '==', user.uid)), setRawProformas, []);
         syncQueryOrCollection('factures', query(collection(db, 'factures'), where('clientId', '==', user.uid)), setRawFactures, []);
       }
-    } else if (role === 'client' || role === 'prospect' || (!isStaff && role !== 'chauffeur')) {
+    } else if (role === 'client' || role === 'prospect' || (!isStaff && (role as string) !== 'chauffeur')) {
       // Client & Prospect real-time scoped synchronization
       if (user?.uid) {
         syncQueryOrCollection('reservations', query(collection(db, 'reservations'), where('clientId', '==', user.uid)), setRawReservations, []);
@@ -1153,6 +1153,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     showToast(`Proforma ${proforma.number} convertie en facture ${factureNumber} avec succès !`, 'success');
     setCurrentModule('factures');
+    return newFacture;
   };
 
   // Passerelle 1 : Réservation ➔ Devis Proforma

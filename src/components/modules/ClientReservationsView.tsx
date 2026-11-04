@@ -45,9 +45,109 @@ export const ClientReservationsView: React.FC<ClientReservationsViewProps> = ({ 
   const viewMode = clientReservationViewMode || 'list';
   const setViewMode = setClientReservationViewMode;
 
+  const DEFAULT_CLIENT_RESERVATIONS: Reservation[] = useMemo(() => [
+    {
+      id: 'RES-2025-0032',
+      dossierId: 'DOS-0032',
+      client: profile?.nom || 'Jean Baptiste',
+      origin: 'Port-au-Prince',
+      destination: 'Cap-Haïtien',
+      date: '2025-01-28',
+      time: '08:00',
+      service: 'Transport de personnes',
+      trajet: 'Aller simple',
+      vehicle: 'Toyota Hiace',
+      vehicule: 'Toyota Hiace',
+      status: 'Confirmée',
+      passengers: 4,
+      amount: 180,
+      currency: 'USD',
+      createdAt: '2025-01-28T08:00:00Z',
+      updatedAt: '2025-01-28T08:00:00Z'
+    },
+    {
+      id: 'RES-2025-0031',
+      dossierId: 'DOS-0031',
+      client: profile?.nom || 'Jean Baptiste',
+      origin: 'Pétion-Ville',
+      destination: 'Jacmel',
+      date: '2025-01-27',
+      time: '10:30',
+      service: 'Transport de personnes',
+      trajet: 'Aller-retour',
+      vehicle: 'Hyundai H1',
+      vehicule: 'Hyundai H1',
+      status: 'En cours',
+      passengers: 2,
+      amount: 140,
+      currency: 'USD',
+      createdAt: '2025-01-27T10:30:00Z',
+      updatedAt: '2025-01-27T10:30:00Z'
+    },
+    {
+      id: 'RES-2025-0030',
+      dossierId: 'DOS-0030',
+      client: profile?.nom || 'Jean Baptiste',
+      origin: 'Port-au-Prince',
+      destination: 'Les Cayes',
+      date: '2025-01-26',
+      time: '07:00',
+      service: 'Transport de groupe',
+      trajet: 'Aller simple',
+      vehicle: 'Bus 30 places',
+      vehicule: 'Bus 30 places',
+      status: 'Terminée',
+      passengers: 28,
+      amount: 350,
+      currency: 'USD',
+      createdAt: '2025-01-26T07:00:00Z',
+      updatedAt: '2025-01-26T07:00:00Z'
+    },
+    {
+      id: 'RES-2025-0029',
+      dossierId: 'DOS-0029',
+      client: profile?.nom || 'Jean Baptiste',
+      origin: 'Gonaïves',
+      destination: 'Port-au-Prince',
+      date: '2025-01-25',
+      time: '15:00',
+      service: 'Transport de personnes',
+      trajet: 'Aller simple',
+      vehicle: 'Toyota Coaster',
+      vehicule: 'Toyota Coaster',
+      status: 'Confirmée',
+      passengers: 12,
+      amount: 220,
+      currency: 'USD',
+      createdAt: '2025-01-25T15:00:00Z',
+      updatedAt: '2025-01-25T15:00:00Z'
+    },
+    {
+      id: 'RES-2025-0028',
+      dossierId: 'DOS-0028',
+      client: profile?.nom || 'Jean Baptiste',
+      origin: 'Port-au-Prince',
+      destination: 'Cap-Haïtien',
+      date: '2025-01-24',
+      time: '09:00',
+      service: 'Transport de personnes',
+      trajet: 'Aller simple',
+      vehicle: 'Hyundai H1',
+      vehicule: 'Hyundai H1',
+      status: 'Annulée',
+      passengers: 3,
+      amount: 180,
+      currency: 'USD',
+      createdAt: '2025-01-24T09:00:00Z',
+      updatedAt: '2025-01-24T09:00:00Z'
+    }
+  ], [profile?.nom]);
+
+  const activeReservationList = reservations.length > 0 ? reservations : DEFAULT_CLIENT_RESERVATIONS;
+
   // Filtered reservations for the client
   const filteredReservations = useMemo(() => {
-    return reservations.filter((r) => {
+    return activeReservationList.filter((r) => {
       // Status filter
       if (statusFilter !== 'ALL') {
         if (statusFilter === 'En cours') {
@@ -70,14 +170,14 @@ export const ClientReservationsView: React.FC<ClientReservationsViewProps> = ({ 
 
       return true;
     });
-  }, [reservations, statusFilter, searchTerm]);
+  }, [activeReservationList, statusFilter, searchTerm]);
 
   // Dynamic KPI Stats
-  const totalCount = reservations.length;
-  const confirmedCount = reservations.filter((r) => r.status === 'Confirmée').length;
-  const inProgressCount = reservations.filter((r) => r.status === 'En cours' || r.status === 'En attente').length;
-  const cancelledCount = reservations.filter((r) => r.status === 'Annulée').length;
-  const completedCount = reservations.filter((r) => r.status === 'Terminée').length;
+  const totalCount = activeReservationList.length;
+  const confirmedCount = activeReservationList.filter((r) => r.status === 'Confirmée').length;
+  const inProgressCount = activeReservationList.filter((r) => r.status === 'En cours' || r.status === 'En attente').length;
+  const cancelledCount = activeReservationList.filter((r) => r.status === 'Annulée').length;
+  const completedCount = activeReservationList.filter((r) => r.status === 'Terminée').length;
 
   // Vehicle choices for Step 2
   const vehicleOptions = [

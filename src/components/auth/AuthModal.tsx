@@ -97,8 +97,8 @@ export const AuthModal: React.FC = () => {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password || !nom) {
-      setErrorMessage('Veuillez renseigner tous les champs obligatoires.');
+    if (!email.trim() || !password || !nom.trim() || !telephone.trim() || !adresse.trim() || !ville.trim() || !societe.trim() || !numeroFiscal.trim()) {
+      setErrorMessage('Tous les champs marqués d\'un astérisque (*) sont obligatoires pour l\'inscription.');
       return;
     }
     if (password.length < 6) {
@@ -109,14 +109,14 @@ export const AuthModal: React.FC = () => {
     setErrorMessage('');
     try {
       await registerWithEmail({ 
-        email, 
+        email: email.trim(), 
         pass: password, 
-        nom, 
-        telephone,
-        adresse,
-        ville,
-        societe,
-        numeroFiscal
+        nom: nom.trim(), 
+        telephone: telephone.trim(),
+        adresse: adresse.trim(),
+        ville: ville.trim(),
+        societe: societe.trim(),
+        numeroFiscal: numeroFiscal.trim()
       });
       setAuthView('verify');
       showToast(`Compte créé ! Un e-mail de confirmation officiel vous a été envoyé à ${email}.`, 'success');
@@ -378,8 +378,11 @@ export const AuthModal: React.FC = () => {
               </div>
 
               <form onSubmit={handleRegister} style={{ marginTop: '20px' }}>
+                {/* 1. Nom complet */}
                 <div style={{ marginBottom: '12px' }}>
-                  <label htmlFor="authRegNom" style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>Nom complet :</label>
+                  <label htmlFor="authRegNom" style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                    Nom complet <span style={{ color: '#dc2626' }}>*</span> :
+                  </label>
                   <input
                     id="authRegNom"
                     type="text"
@@ -391,33 +394,143 @@ export const AuthModal: React.FC = () => {
                   />
                 </div>
 
+                {/* 2. Email & Téléphone */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                  <div>
+                    <label htmlFor="authRegEmail" style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                      Adresse e-mail <span style={{ color: '#dc2626' }}>*</span> :
+                    </label>
+                    <input
+                      id="authRegEmail"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="nom@domaine.com"
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="authRegTel" style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                      Téléphone <span style={{ color: '#dc2626' }}>*</span> :
+                    </label>
+                    <input
+                      id="authRegTel"
+                      type="tel"
+                      value={telephone}
+                      onChange={(e) => setTelephone(e.target.value)}
+                      placeholder="+509 4440 8687"
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* 3. Adresse & Ville */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                  <div>
+                    <label htmlFor="authRegAdresse" style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                      Adresse de résidence / siège <span style={{ color: '#dc2626' }}>*</span> :
+                    </label>
+                    <input
+                      id="authRegAdresse"
+                      type="text"
+                      value={adresse}
+                      onChange={(e) => setAdresse(e.target.value)}
+                      placeholder="Ex : 24, Rue Rebecca, Delmas 75"
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="authRegVille" style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                      Ville <span style={{ color: '#dc2626' }}>*</span> :
+                    </label>
+                    <select
+                      id="authRegVille"
+                      value={ville}
+                      onChange={(e) => setVille(e.target.value)}
+                      style={{ width: '100%', padding: '9px 8px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', background: '#fff' }}
+                      required
+                    >
+                      <option value="Port-au-Prince">Port-au-Prince</option>
+                      <option value="Pétion-Ville">Pétion-Ville</option>
+                      <option value="Delmas">Delmas</option>
+                      <option value="Tabarre">Tabarre</option>
+                      <option value="Carrefour">Carrefour</option>
+                      <option value="Cap-Haïtien">Cap-Haïtien</option>
+                      <option value="Jacmel">Jacmel</option>
+                      <option value="Saint-Marc">Saint-Marc</option>
+                      <option value="Gonaïves">Gonaïves</option>
+                      <option value="Les Cayes">Les Cayes</option>
+                      <option value="Autre">Autre</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* 4. Société / Entreprise / Particulier */}
                 <div style={{ marginBottom: '12px' }}>
-                  <label htmlFor="authRegEmail" style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>Adresse e-mail :</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <label htmlFor="authRegSociete" style={{ fontSize: '12px', fontWeight: 700, color: '#334155', margin: 0 }}>
+                      Société / Organisation <span style={{ color: '#dc2626' }}>*</span> :
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSociete('Particulier');
+                        if (!numeroFiscal.trim()) setNumeroFiscal('N/A - Particulier');
+                      }}
+                      style={{
+                        border: '1px solid #bfdbfe',
+                        background: '#eff6ff',
+                        color: '#1d4ed8',
+                        borderRadius: '4px',
+                        padding: '1px 8px',
+                        fontSize: '11px',
+                        cursor: 'pointer',
+                        fontWeight: 600
+                      }}
+                    >
+                      Cliquer si « Particulier »
+                    </button>
+                  </div>
                   <input
-                    id="authRegEmail"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="nom@domaine.com"
+                    id="authRegSociete"
+                    type="text"
+                    value={societe}
+                    onChange={(e) => setSociete(e.target.value)}
+                    placeholder="Ex : Particulier ou Ambassade / Entreprise"
                     style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
                     required
                   />
                 </div>
 
-                <div style={{ marginBottom: '12px' }}>
-                  <label htmlFor="authRegTel" style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>Téléphone (avec indicatif) :</label>
+                {/* 5. Numéro fiscal NIF/CIF */}
+                <div style={{ marginBottom: '14px' }}>
+                  <label htmlFor="authRegNif" style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                    Numéro fiscal (NIF / CIF / Matricule) <span style={{ color: '#dc2626' }}>*</span> :
+                  </label>
                   <input
-                    id="authRegTel"
-                    type="tel"
-                    value={telephone}
-                    onChange={(e) => setTelephone(e.target.value)}
-                    placeholder="+509 4440 8687"
+                    id="authRegNif"
+                    type="text"
+                    value={numeroFiscal}
+                    onChange={(e) => setNumeroFiscal(e.target.value)}
+                    placeholder="Ex : 001-234-567-8 ou N/A"
                     style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                    required
                   />
+                  <span style={{ fontSize: '10.5px', color: '#64748b', marginTop: '3px', display: 'block' }}>
+                    Obligatoire pour l'émission des factures et contrats conformes aux normes DGI.
+                  </span>
                 </div>
 
-                <div style={{ marginBottom: '16px' }}>
-                  <label htmlFor="authRegPass" style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>Mot de passe :</label>
+                {/* 6. Mot de passe */}
+                <div style={{ marginBottom: '18px' }}>
+                  <label htmlFor="authRegPass" style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                    Mot de passe <span style={{ color: '#dc2626' }}>*</span> :
+                  </label>
                   <input
                     id="authRegPass"
                     type="password"
@@ -429,136 +542,12 @@ export const AuthModal: React.FC = () => {
                   />
                 </div>
 
-                {/* Section optionnelle pour compléter le profil dès l'inscription */}
-                <div style={{ marginBottom: '18px', border: '1px solid #e2e8f0', borderRadius: '10px', background: '#f8fafc', padding: '12px 14px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '18px' }}>📝</span>
-                      <div>
-                        <div style={{ fontSize: '12px', fontWeight: 750, color: '#082b70' }}>
-                          Compléter mon profil dès maintenant
-                        </div>
-                        <div style={{ fontSize: '10.5px', color: '#64748b' }}>
-                          Adresse, Ville, Entreprise, NIF (ou plus tard)
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setExpandProfileDetails(!expandProfileDetails)}
-                      style={{
-                        background: expandProfileDetails ? '#082b70' : '#e2e8f0',
-                        color: expandProfileDetails ? '#fff' : '#1e293b',
-                        border: 'none',
-                        borderRadius: '6px',
-                        padding: '4px 10px',
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {expandProfileDetails ? 'Masquer' : 'Remplir +'}
-                    </button>
-                  </div>
-
-                  {expandProfileDetails && (
-                    <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
-                      {/* Adresse & Ville */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
-                            Adresse de résidence / livraison :
-                          </label>
-                          <input
-                            type="text"
-                            value={adresse}
-                            onChange={(e) => setAdresse(e.target.value)}
-                            placeholder="Ex : 24, Rue Rebecca, Delmas 75"
-                            style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px' }}
-                          />
-                        </div>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
-                            Ville :
-                          </label>
-                          <select
-                            value={ville}
-                            onChange={(e) => setVille(e.target.value)}
-                            style={{ width: '100%', padding: '8px 6px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', background: '#fff' }}
-                          >
-                            <option value="Port-au-Prince">Port-au-Prince</option>
-                            <option value="Pétion-Ville">Pétion-Ville</option>
-                            <option value="Delmas">Delmas</option>
-                            <option value="Tabarre">Tabarre</option>
-                            <option value="Carrefour">Carrefour</option>
-                            <option value="Cap-Haïtien">Cap-Haïtien</option>
-                            <option value="Jacmel">Jacmel</option>
-                            <option value="Saint-Marc">Saint-Marc</option>
-                            <option value="Gonaïves">Gonaïves</option>
-                            <option value="Les Cayes">Les Cayes</option>
-                            <option value="Autre">Autre</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* Société / Entreprise */}
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
-                          <label style={{ fontSize: '11px', fontWeight: 700, color: '#334155', margin: 0 }}>
-                            Société / Entreprise :
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => setSociete('Particulier')}
-                            style={{
-                              border: '1px solid #bfdbfe',
-                              background: '#eff6ff',
-                              color: '#1d4ed8',
-                              borderRadius: '4px',
-                              padding: '1px 6px',
-                              fontSize: '10px',
-                              cursor: 'pointer',
-                              fontWeight: 600
-                            }}
-                          >
-                            Cliquer si « Particulier »
-                          </button>
-                        </div>
-                        <input
-                          type="text"
-                          value={societe}
-                          onChange={(e) => setSociete(e.target.value)}
-                          placeholder="Ex : Particulier ou Ambassade / Entreprise"
-                          style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px' }}
-                        />
-                      </div>
-
-                      {/* Numéro fiscal NIF/CIF */}
-                      <div>
-                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
-                          Numéro fiscal (NIF / CIF / Matricule) :
-                        </label>
-                        <input
-                          type="text"
-                          value={numeroFiscal}
-                          onChange={(e) => setNumeroFiscal(e.target.value)}
-                          placeholder="Ex : 001-234-567-8"
-                          style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px' }}
-                        />
-                        <span style={{ fontSize: '10px', color: '#64748b', marginTop: '2px', display: 'block' }}>
-                          Requis par la DGI pour l'émission des factures officielles.
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
                 <button
                   type="submit"
                   disabled={loading}
                   style={{ width: '100%', padding: '12px', borderRadius: '8px', background: '#f7941d', color: '#fff', border: 'none', fontWeight: 700, fontSize: '14px', cursor: 'pointer' }}
                 >
-                  {loading ? 'Validation en cours...' : 'Continuer ➔'}
+                  {loading ? 'Création de votre compte...' : 'Créer mon compte ➔'}
                 </button>
               </form>
 

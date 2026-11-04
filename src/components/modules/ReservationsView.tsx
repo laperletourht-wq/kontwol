@@ -20,7 +20,8 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
     convertReservationToProforma,
     convertReservationToPlanning,
     completeReservationByDriver,
-    settings
+    settings,
+    setCurrentModule
   } = useApp();
   const { role, isSuperAdmin } = useAuth();
   const isAdmin = role === 'admin' || isSuperAdmin;

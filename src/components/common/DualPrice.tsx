@@ -3,24 +3,31 @@ import { useApp } from '../../context/AppContext';
 
 interface DualPriceProps {
   amount?: number;
+  amountUSD?: number;
+  usdAmount?: number;
   currency?: 'USD' | 'HTG' | string;
   className?: string;
   showDual?: boolean;
+  inline?: boolean;
   size?: 'xs' | 'sm' | 'md' | 'lg';
 }
 
 export const DualPrice: React.FC<DualPriceProps> = ({
-  amount = 0,
+  amount,
+  amountUSD,
+  usdAmount,
   currency = 'USD',
   className = '',
   showDual = true,
+  inline = false,
   size = 'md',
 }) => {
+  const actualAmount = amount !== undefined ? amount : (amountUSD !== undefined ? amountUSD : (usdAmount !== undefined ? usdAmount : 0));
   const { settings } = useApp();
   const rate = settings?.tauxChangeUSD_HTG || 132.0;
 
   const isUSD = currency?.toUpperCase() === 'USD' || !currency;
-  const numAmount = Number(amount) || 0;
+  const numAmount = Number(actualAmount) || 0;
 
   let primaryText = '';
   let secondaryText = '';

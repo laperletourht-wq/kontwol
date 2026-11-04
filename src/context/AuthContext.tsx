@@ -366,7 +366,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         // 2. Création automatique de la fiche client pour le cycle commercial
-        if (defaultRole !== 'admin') {
+        if ((defaultRole as string) !== 'admin') {
           const clientDoc = {
             id: cred.user.uid,
             clientId: cred.user.uid,

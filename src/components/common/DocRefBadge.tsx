@@ -2,18 +2,25 @@ import React from 'react';
 import { useApp } from '../../context/AppContext';
 
 interface DocRefBadgeProps {
-  reference: string;
+  reference?: string;
+  id?: string;
   type?: 'auto' | 'facture' | 'proforma' | 'reservation' | 'paiement';
   label?: string;
   className?: string;
+  inline?: boolean;
+  onClick?: (e: React.MouseEvent) => void;
 }
 
 export const DocRefBadge: React.FC<DocRefBadgeProps> = ({
   reference,
+  id,
   type = 'auto',
   label,
   className = '',
+  inline = false,
+  onClick,
 }) => {
+  const actualRef = reference || id || '';
   const { 
     factures, 
     proformas, 
@@ -25,10 +32,10 @@ export const DocRefBadge: React.FC<DocRefBadgeProps> = ({
     showToast 
   } = useApp();
 
-  if (!reference) return null;
+  if (!actualRef) return null;
 
   // Determine doc type from prefix if auto
-  const cleanRef = reference.trim();
+  const cleanRef = actualRef.trim();
   let resolvedType = type;
   if (resolvedType === 'auto') {
     if (cleanRef.startsWith('FAC-') || cleanRef.includes('FAC')) resolvedType = 'facture';
@@ -40,6 +47,10 @@ export const DocRefBadge: React.FC<DocRefBadgeProps> = ({
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (onClick) {
+      onClick(e);
+      return;
+    }
 
     if (resolvedType === 'facture') {
       const match = factures.find((f) => f.number === cleanRef || f.id === cleanRef);
