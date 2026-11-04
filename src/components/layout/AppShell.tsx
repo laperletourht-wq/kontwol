@@ -185,12 +185,12 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const pendingProformasCount = proformas.filter((p) => p.statut === 'En attente' || p.statut === 'Brouillon').length;
   const pendingFacturesCount = factures.filter((f) => f.statut !== 'Payée').length;
 
-  // Guard current module: if user is on a module they are not permitted to see, redirect to dashboard
+  // Guard current module: if user is on a module they are not permitted to see, redirect to default
   useEffect(() => {
     if (isClient) {
-      const allowedClientModules = ['dashboard', 'reservations', 'proformas', 'factures'];
+      const allowedClientModules = ['reservations', 'proformas', 'factures'];
       if (!allowedClientModules.includes(currentModule)) {
-        setCurrentModule('dashboard');
+        setCurrentModule('reservations');
       }
     } else if (isChauffeur) {
       const allowedDriverModules = ['dashboard', 'plannings', 'vehicules'];
@@ -207,19 +207,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
         {
           title: '',
           items: [
-            {
-              key: 'dashboard',
-              label: 'Tableau de bord',
-              onClick: () => {
-                setCurrentModule('dashboard');
-              },
-              icon: (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                  <polyline points="9 22 9 12 15 12 15 22"/>
-                </svg>
-              )
-            },
             {
               key: 'reservations',
               label: 'Mes réservations',
@@ -239,21 +226,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
                   <line x1="7" y1="18" x2="7.01" y2="18" strokeWidth="2.5"/>
                   <line x1="12" y1="18" x2="12.01" y2="18" strokeWidth="2.5"/>
                   <line x1="17" y1="18" x2="17.01" y2="18" strokeWidth="2.5"/>
-                </svg>
-              )
-            },
-            {
-              key: 'nouvelle-reservation',
-              label: 'Nouvelle réservation',
-              onClick: () => {
-                setClientReservationViewMode('new');
-                setCurrentModule('reservations');
-              },
-              icon: (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="3"/>
-                  <line x1="12" y1="8" x2="12" y2="16"/>
-                  <line x1="8" y1="12" x2="16" y2="12"/>
                 </svg>
               )
             },
@@ -852,13 +824,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
               <div className="nav-group-list">
                 {group.items.map((item) => {
                   const isAction = 'isAction' in item && item.isAction;
-                  const isActive = !isAction && (
-                    item.key === 'nouvelle-reservation'
-                      ? currentModule === 'reservations' && clientReservationViewMode === 'new'
-                      : item.key === 'reservations'
-                        ? currentModule === 'reservations' && clientReservationViewMode !== 'new'
-                        : currentModule === item.key
-                  );
+                  const isActive = !isAction && currentModule === item.key;
                   
                   return (
                     <button
@@ -927,55 +893,57 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
               ☰
             </button>
 
-            <div 
-              className="header-brand-block" 
-              title={`Espace connecté : ${headerRole.fullLabel}`}
-              style={{ cursor: 'default' }}
-            >
+            {!isClient && (
               <div 
-                className="header-role-icon-badge" 
-                style={{ 
-                  width: '38px', 
-                  height: '38px', 
-                  borderRadius: '50%', 
-                  background: headerRole.badgeBg, 
-                  color: headerRole.badgeColor,
-                  border: `1.5px solid ${headerRole.borderColor}`,
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  flexShrink: 0,
-                  fontSize: '18px',
-                  boxShadow: '0 1px 4px rgba(0,0,0,0.06)'
-                }}
+                className="header-brand-block" 
+                title={`Espace connecté : ${headerRole.fullLabel}`}
+                style={{ cursor: 'default' }}
               >
-                <span>{headerRole.icon}</span>
-              </div>
-              <div className="header-brand-names">
-                <div className="brand-title-top" style={{ gap: '6px' }}>
-                  <span className="title-navy" style={{ fontSize: '15px', fontWeight: 850, letterSpacing: '0.3px' }}>
-                    {headerRole.title}
-                  </span>
-                  <span 
-                    className="header-role-full-label"
-                    style={{
-                      fontSize: '10px',
-                      fontWeight: 800,
-                      padding: '1px 7px',
-                      borderRadius: '10px',
-                      background: headerRole.badgeBg,
-                      color: headerRole.badgeColor,
-                      border: `1px solid ${headerRole.borderColor}`,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.4px'
-                    }}
-                  >
-                    {headerRole.fullLabel}
-                  </span>
+                <div 
+                  className="header-role-icon-badge" 
+                  style={{ 
+                    width: '38px', 
+                    height: '38px', 
+                    borderRadius: '50%', 
+                    background: headerRole.badgeBg, 
+                    color: headerRole.badgeColor,
+                    border: `1.5px solid ${headerRole.borderColor}`,
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    flexShrink: 0,
+                    fontSize: '18px',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.06)'
+                  }}
+                >
+                  <span>{headerRole.icon}</span>
                 </div>
-                <span className="brand-tagline">« {headerRole.tagline} »</span>
+                <div className="header-brand-names">
+                  <div className="brand-title-top" style={{ gap: '6px' }}>
+                    <span className="title-navy" style={{ fontSize: '15px', fontWeight: 850, letterSpacing: '0.3px' }}>
+                      {headerRole.title}
+                    </span>
+                    <span 
+                      className="header-role-full-label"
+                      style={{
+                        fontSize: '10px',
+                        fontWeight: 800,
+                        padding: '1px 7px',
+                        borderRadius: '10px',
+                        background: headerRole.badgeBg,
+                        color: headerRole.badgeColor,
+                        border: `1px solid ${headerRole.borderColor}`,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.4px'
+                      }}
+                    >
+                      {headerRole.fullLabel}
+                    </span>
+                  </div>
+                  <span className="brand-tagline">« {headerRole.tagline} »</span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Center: Live Status & Official Rate Pill */}
@@ -1006,219 +974,221 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
             </div>
           </div>
 
-          {/* Right: Notifications, User Profile Pill & Logout */}
-          <div className="header-right">
-            {/* Notification Bell with Dropdown */}
-            <div ref={notifDropdownRef} style={{ position: 'relative' }}>
-              <button 
-                type="button"
-                className="header-bell-btn" 
-                id="notificationBtn" 
-                onClick={() => setNotifDropdownOpen((prev) => !prev)}
-                title="Notifications & Alertes de service" 
-                aria-label="Notifications"
-                aria-expanded={notifDropdownOpen}
-              >
-                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                </svg>
-                {unreadNotifs.length > 0 && (
-                  <span className="header-red-badge">
-                    {unreadNotifs.length}
-                  </span>
-                )}
-              </button>
-
-              {notifDropdownOpen && (
-                <div 
-                  id="notifDropdown" 
-                  className="notif-dropdown shadow-2xl" 
-                  style={{
-                    display: 'block',
-                    position: 'absolute',
-                    right: 0,
-                    top: '46px',
-                    width: '340px',
-                    maxWidth: 'calc(100vw - 24px)',
-                    background: '#ffffff',
-                    boxShadow: '0 12px 30px rgba(8, 43, 112, 0.18)',
-                    borderRadius: '12px',
-                    border: '1px solid #cbd5e1',
-                    padding: '12px',
-                    zIndex: 1000
-                  }}
+          {/* Right: Notifications, User Profile Pill & Logout (Staff/Admin only) */}
+          {!isClient && (
+            <div className="header-right">
+              {/* Notification Bell with Dropdown */}
+              <div ref={notifDropdownRef} style={{ position: 'relative' }}>
+                <button 
+                  type="button"
+                  className="header-bell-btn" 
+                  id="notificationBtn" 
+                  onClick={() => setNotifDropdownOpen((prev) => !prev)}
+                  title="Notifications & Alertes de service" 
+                  aria-label="Notifications"
+                  aria-expanded={notifDropdownOpen}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #edf2f7', paddingBottom: '8px', marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <strong style={{ fontSize: '13px', color: '#082b70' }}>Notifications</strong>
-                      <span style={{ fontSize: '11px', background: '#eff6ff', color: '#1d4ed8', padding: '2px 6px', borderRadius: '10px', fontWeight: 600 }}>
-                        {unreadNotifs.length}
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {unreadNotifs.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => markAllNotificationsAsRead()}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#2563eb',
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            padding: '2px 4px',
-                            textDecoration: 'underline'
-                          }}
-                        >
-                          Tout marquer lu
-                        </button>
-                      )}
-                      {notifications.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => clearAllNotifications()}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#94a3b8',
-                            fontSize: '11px',
-                            cursor: 'pointer',
-                            padding: '2px 4px'
-                          }}
-                          title="Vider la liste"
-                        >
-                          Vider
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                  </svg>
+                  {unreadNotifs.length > 0 && (
+                    <span className="header-red-badge">
+                      {unreadNotifs.length}
+                    </span>
+                  )}
+                </button>
 
-                  <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
-                    {notifications.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '24px 0', fontSize: '12px', color: '#94a3b8' }}>
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2" style={{ margin: '0 auto 8px' }}>
-                          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                        </svg>
-                        Aucune nouvelle alerte
+                {notifDropdownOpen && (
+                  <div 
+                    id="notifDropdown" 
+                    className="notif-dropdown shadow-2xl" 
+                    style={{
+                      display: 'block',
+                      position: 'absolute',
+                      right: 0,
+                      top: '46px',
+                      width: '340px',
+                      maxWidth: 'calc(100vw - 24px)',
+                      background: '#ffffff',
+                      boxShadow: '0 12px 30px rgba(8, 43, 112, 0.18)',
+                      borderRadius: '12px',
+                      border: '1px solid #cbd5e1',
+                      padding: '12px',
+                      zIndex: 1000
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #edf2f7', paddingBottom: '8px', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <strong style={{ fontSize: '13px', color: '#082b70' }}>Notifications</strong>
+                        <span style={{ fontSize: '11px', background: '#eff6ff', color: '#1d4ed8', padding: '2px 6px', borderRadius: '10px', fontWeight: 600 }}>
+                          {unreadNotifs.length}
+                        </span>
                       </div>
-                    ) : (
-                      notifications.map((n) => (
-                        <div 
-                          key={n.id}
-                          onClick={() => handleOpenNotificationSource(n)}
-                          style={{
-                            padding: '10px 12px',
-                            borderRadius: '8px',
-                            background: n.read ? '#ffffff' : '#f0f9ff',
-                            border: n.read ? '1px solid #f1f5f9' : '1px solid #bae6fd',
-                            cursor: 'pointer',
-                            marginBottom: '6px',
-                            transition: 'all 0.15s ease',
-                            display: 'flex',
-                            gap: '10px',
-                            alignItems: 'flex-start'
-                          }}
-                          className="hover:bg-sky-50"
-                          title="Cliquez pour ouvrir directement le document source"
-                        >
-                          <div style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            marginTop: '5px',
-                            flexShrink: 0,
-                            background: n.read ? '#cbd5e1' : '#0284c7'
-                          }} />
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
-                              <div style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>{n.title}</div>
-                              <span style={{ fontSize: '10px', color: '#94a3b8' }}>Aujourd'hui</span>
-                            </div>
-                            <div style={{ fontSize: '11px', color: '#475569', marginTop: '2px', lineHeight: '1.4' }}>{n.message}</div>
-                            <div style={{ 
-                              marginTop: '6px', 
-                              display: 'inline-flex', 
-                              alignItems: 'center', 
-                              gap: '4px', 
-                              fontSize: '10.5px', 
-                              fontWeight: 700, 
-                              color: '#0369a1', 
-                              background: '#e0f2fe', 
-                              padding: '2px 8px', 
-                              borderRadius: '4px' 
-                            }}>
-                              <span>🔗 Ouvrir la source du document ➔</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {unreadNotifs.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => markAllNotificationsAsRead()}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#2563eb',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              padding: '2px 4px',
+                              textDecoration: 'underline'
+                            }}
+                          >
+                            Tout marquer lu
+                          </button>
+                        )}
+                        {notifications.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => clearAllNotifications()}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#94a3b8',
+                              fontSize: '11px',
+                              cursor: 'pointer',
+                              padding: '2px 4px'
+                            }}
+                            title="Vider la liste"
+                          >
+                            Vider
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                      {notifications.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '24px 0', fontSize: '12px', color: '#94a3b8' }}>
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2" style={{ margin: '0 auto 8px' }}>
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                          </svg>
+                          Aucune nouvelle alerte
+                        </div>
+                      ) : (
+                        notifications.map((n) => (
+                          <div 
+                            key={n.id}
+                            onClick={() => handleOpenNotificationSource(n)}
+                            style={{
+                              padding: '10px 12px',
+                              borderRadius: '8px',
+                              background: n.read ? '#ffffff' : '#f0f9ff',
+                              border: n.read ? '1px solid #f1f5f9' : '1px solid #bae6fd',
+                              cursor: 'pointer',
+                              marginBottom: '6px',
+                              transition: 'all 0.15s ease',
+                              display: 'flex',
+                              gap: '10px',
+                              alignItems: 'flex-start'
+                            }}
+                            className="hover:bg-sky-50"
+                            title="Cliquez pour ouvrir directement le document source"
+                          >
+                            <div style={{
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '50%',
+                              marginTop: '5px',
+                              flexShrink: 0,
+                              background: n.read ? '#cbd5e1' : '#0284c7'
+                            }} />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                                <div style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>{n.title}</div>
+                                <span style={{ fontSize: '10px', color: '#94a3b8' }}>Aujourd'hui</span>
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#475569', marginTop: '2px', lineHeight: '1.4' }}>{n.message}</div>
+                              <div style={{ 
+                                marginTop: '6px', 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: '4px', 
+                                fontSize: '10.5px', 
+                                fontWeight: 700, 
+                                color: '#0369a1', 
+                                background: '#e0f2fe', 
+                                padding: '2px 8px', 
+                                borderRadius: '4px' 
+                              }}>
+                                <span>🔗 Ouvrir la source du document ➔</span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))
-                    )}
+                        ))
+                      )}
+                    </div>
                   </div>
+                )}
+              </div>
+
+              {/* User Profile Pill with Avatar, Name, Admin badge & Chevron */}
+              <button 
+                type="button"
+                className="header-user-pill-exact"
+                id="profileBtn"
+                onClick={() => {
+                  if (role === 'client' || role === 'prospect') {
+                    setClientProfileModalOpen(true);
+                  } else {
+                    setCurrentModule('parametres');
+                  }
+                }}
+                title="Paramètres de profil utilisateur"
+              >
+                <div className="user-avatar-navy">
+                  {initialLetter}
                 </div>
-              )}
-            </div>
-
-            {/* User Profile Pill with Avatar, Name, Admin badge & Chevron */}
-            <button 
-              type="button"
-              className="header-user-pill-exact"
-              id="profileBtn"
-              onClick={() => {
-                if (role === 'client' || role === 'prospect') {
-                  setClientProfileModalOpen(true);
-                } else {
-                  setCurrentModule('parametres');
-                }
-              }}
-              title="Paramètres de profil utilisateur"
-            >
-              <div className="user-avatar-navy">
-                {initialLetter}
-              </div>
-              <div className="user-text-column">
-                <span className="user-title-text" title={userDisplayName}>
-                  {userDisplayName.length > 18 ? `${userDisplayName.slice(0, 16)}...` : userDisplayName}
+                <div className="user-text-column">
+                  <span className="user-title-text" title={userDisplayName}>
+                    {userDisplayName.length > 18 ? `${userDisplayName.slice(0, 16)}...` : userDisplayName}
+                  </span>
+                  <span className="user-badge-yellow">{roleDisplay}</span>
+                </div>
+                <span className="chevron-icon">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
                 </span>
-                <span className="user-badge-yellow">{roleDisplay}</span>
-              </div>
-              <span className="chevron-icon">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="6 9 12 15 18 9"/>
-                </svg>
-              </span>
-            </button>
+              </button>
 
-            {/* Logout button (square icon border) */}
-            <button 
-              type="button"
-              className="header-logout-square" 
-              id="headerLogoutBtn" 
-              title="Se déconnecter (Déconnexion immédiate)"
-              disabled={isLoggingOut}
-              onClick={async () => {
-                setIsLoggingOut(true);
-                try {
-                  await logout();
-                } catch (err) {
-                  console.warn('Logout fallback:', err);
-                } finally {
-                  setIsPublicLanding(true);
-                  showToast('Vous avez été déconnecté avec succès. À bientôt !', 'info');
-                  setIsLoggingOut(false);
-                }
-              }}
-              aria-label="Se déconnecter"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                <polyline points="16 17 21 12 16 7"/>
-                <line x1="21" y1="12" x2="9" y2="12"/>
-              </svg>
-            </button>
-          </div>
+              {/* Logout button (square icon border) */}
+              <button 
+                type="button"
+                className="header-logout-square" 
+                id="headerLogoutBtn" 
+                title="Se déconnecter (Déconnexion immédiate)"
+                disabled={isLoggingOut}
+                onClick={async () => {
+                  setIsLoggingOut(true);
+                  try {
+                    await logout();
+                  } catch (err) {
+                    console.warn('Logout fallback:', err);
+                  } finally {
+                    setIsPublicLanding(true);
+                    showToast('Vous avez été déconnecté avec succès. À bientôt !', 'info');
+                    setIsLoggingOut(false);
+                  }
+                }}
+                aria-label="Se déconnecter"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                  <polyline points="16 17 21 12 16 7"/>
+                  <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+              </button>
+            </div>
+          )}
         </header>
 
         {/* Dynamic Page Container */}

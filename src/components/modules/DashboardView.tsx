@@ -55,10 +55,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenModal }) => 
   }
 
   // =========================================================================
-  // 3. CLIENTS & PROSPECTS (MAQUETTE EXACTE : TABLEAU DE BORD DES RÉSERVATIONS AUTOMOBILES)
+  // 3. CLIENTS & PROSPECTS (ESPACE TABLEAU DE BORD CLIENT)
   // =========================================================================
   if (isClient) {
-    return <ClientReservationsView onOpenModal={onOpenModal} />;
+    return <ClientDashboard onOpenModal={onOpenModal} />;
   }
 
   // =========================================================================
