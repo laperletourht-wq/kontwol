@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { type Reservation } from '../../types';
+import { RowActionMenu, type ActionMenuItem } from '../common/RowActionMenu';
 
 interface ClientReservationsViewProps {
   onOpenModal?: (type: string, data?: any) => void;
@@ -1762,58 +1763,55 @@ export const ClientReservationsView: React.FC<ClientReservationsViewProps> = ({ 
 
                     {/* Actions */}
                     <td style={{ padding: '14px', textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                        {/* Eye Button: View Details */}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedResForDetail(r)}
-                          title="Consulter les détails de la réservation"
-                          style={{
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '8px',
-                            border: '1px solid #e2e8f0',
-                            background: '#ffffff',
-                            color: '#2563eb',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease'
-                          }}
-                        >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                            <circle cx="12" cy="12" r="3" />
-                          </svg>
-                        </button>
-
-                        {/* Document Button: View Proforma / Quote */}
-                        <button
-                          type="button"
-                          onClick={() => handleOpenProforma(r)}
-                          title="Voir le devis / proforma associé"
-                          style={{
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '8px',
-                            border: '1px solid #e2e8f0',
-                            background: '#ffffff',
-                            color: '#475569',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease'
-                          }}
-                        >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                            <polyline points="14 2 14 8 20 8" />
-                            <line x1="16" y1="13" x2="8" y2="13" />
-                            <line x1="16" y1="17" x2="8" y2="17" />
-                          </svg>
-                        </button>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                        <RowActionMenu 
+                          items={[
+                            {
+                              label: 'Consulter les détails',
+                              icon: (
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                  <circle cx="12" cy="12" r="3" />
+                                </svg>
+                              ),
+                              onClick: () => setSelectedResForDetail(r),
+                              variant: 'primary'
+                            },
+                            {
+                              label: 'Voir le devis / proforma associé',
+                              icon: (
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                  <polyline points="14 2 14 8 20 8" />
+                                  <line x1="16" y1="13" x2="8" y2="13" />
+                                  <line x1="16" y1="17" x2="8" y2="17" />
+                                </svg>
+                              ),
+                              onClick: () => handleOpenProforma(r)
+                            },
+                            {
+                              label: 'Télécharger / Imprimer la fiche',
+                              icon: (
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <polyline points="6 9 6 2 18 2 18 9" />
+                                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                                  <rect x="6" y="14" width="12" height="8" />
+                                </svg>
+                              ),
+                              onClick: () => setPrintSheetData({ type: 'reservation', data: r })
+                            },
+                            {
+                              label: 'Contacter la régulation WhatsApp',
+                              icon: (
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                                </svg>
+                              ),
+                              href: `https://wa.me/50944408687?text=${encodeURIComponent(`Bonjour LAPERLE TOUR HT, je vous contacte concernant ma réservation ${r.id} (${r.origin} -> ${r.destination}).`)}`
+                            }
+                          ]}
+                          title="Options de réservation" 
+                        />
                       </div>
                     </td>
                   </tr>

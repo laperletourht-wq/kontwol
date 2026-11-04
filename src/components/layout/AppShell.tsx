@@ -188,7 +188,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   // Guard current module: if user is on a module they are not permitted to see, redirect to dashboard
   useEffect(() => {
     if (isClient) {
-      const allowedClientModules = ['dashboard', 'reservations', 'proformas', 'factures', 'paiements'];
+      const allowedClientModules = ['dashboard', 'reservations', 'proformas', 'factures'];
       if (!allowedClientModules.includes(currentModule)) {
         setCurrentModule('dashboard');
       }
@@ -280,17 +280,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
                   <polyline points="14 2 14 8 20 8"/>
                   <line x1="16" y1="13" x2="8" y2="13"/>
                   <line x1="16" y1="17" x2="8" y2="17"/>
-                </svg>
-              )
-            },
-            {
-              key: 'paiements',
-              label: 'Mes paiements',
-              onClick: () => setCurrentModule('paiements'),
-              icon: (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="5" width="20" height="14" rx="2"/>
-                  <line x1="2" y1="10" x2="22" y2="10"/>
                 </svg>
               )
             },

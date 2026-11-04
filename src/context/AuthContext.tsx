@@ -81,7 +81,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'dashboard', 'reservations', 'proformas', 'factures', 'parametres'
   ],
   prospect: [
-    'dashboard', 'reservations', 'proformas', 'parametres'
+    'dashboard', 'reservations', 'proformas', 'factures', 'parametres'
   ],
   lecture_seule: [
     'dashboard', 'reservations', 'proformas', 'factures', 'clients', 
