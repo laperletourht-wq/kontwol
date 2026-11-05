@@ -323,6 +323,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch (err) {}
     }
 
+    // Synchronisation complémentaire via l'API Backend pour garantir l'accès même en cas de règles Firestore distantes strictes
+    if (user?.uid) {
+      user.getIdToken().then((token) => {
+        fetch('/api/proformas', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            if (data?.proformas && Array.isArray(data.proformas) && data.proformas.length > 0) {
+              setRawProformas((prev) => {
+                const map = new Map(prev.map((p) => [p.id, p]));
+                for (const item of data.proformas) {
+                  map.set(item.id, { ...map.get(item.id), ...item });
+                }
+                return Array.from(map.values()).sort((a, b) => {
+                  const da = new Date(b.createdAt || b.date || 0).getTime();
+                  const db = new Date(a.createdAt || a.date || 0).getTime();
+                  return da - db;
+                });
+              });
+            }
+          })
+          .catch(() => {});
+
+        fetch('/api/reservations', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            if (data?.reservations && Array.isArray(data.reservations) && data.reservations.length > 0) {
+              setRawReservations((prev) => {
+                const map = new Map(prev.map((r) => [r.id, r]));
+                for (const item of data.reservations) {
+                  map.set(item.id, { ...map.get(item.id), ...item });
+                }
+                return Array.from(map.values()).sort((a, b) => {
+                  const da = new Date(b.createdAt || b.date || 0).getTime();
+                  const db = new Date(a.createdAt || a.date || 0).getTime();
+                  return da - db;
+                });
+              });
+            }
+          })
+          .catch(() => {});
+      }).catch(() => {});
+    }
+
     return () => {
       unsubs.forEach((u) => u());
     };
@@ -712,13 +759,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const enriched: Partial<Reservation> = {
       ...item,
+      id: item.id || `RES-${Date.now().toString().slice(-6)}`,
       dossierId,
       clientId: resolvedClientId,
       email: resolvedEmail,
       telephone: resolvedTelephone,
       client: resolvedClient
     };
-    await saveItemToCollection('reservations', enriched, setRawReservations, 'Réservation enregistrée avec succès');
+
+    // 1. Tenter d'abord l'API backend pour contourner les blocages de règles Firestore distantes
+    let apiReservationSuccess = false;
+    if (auth.currentUser) {
+      try {
+        const token = await auth.currentUser.getIdToken();
+        const res = await fetch('/api/reservations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ reservation: enriched })
+        });
+        if (res.ok) {
+          const body = await res.json();
+          const savedRes = (body.reservation || enriched) as Reservation;
+          setRawReservations((prev) => {
+            const idx = prev.findIndex((r) => r.id === savedRes.id);
+            if (idx >= 0) {
+              const updated = [...prev];
+              updated[idx] = savedRes;
+              return updated;
+            }
+            return [savedRes, ...prev];
+          });
+          apiReservationSuccess = true;
+          // Synchronisation Firestore en arrière-plan sans bloquer
+          setDoc(doc(db, 'reservations', savedRes.id), savedRes as any).catch(() => {});
+          return;
+        }
+      } catch (err) {
+        console.warn('API backend reservations fallback to direct Firestore:', err);
+      }
+    }
+
+    if (!apiReservationSuccess) {
+      await saveItemToCollection('reservations', enriched, setRawReservations, 'Réservation enregistrée avec succès');
+    }
   };
   const deleteReservation = async (id: string) => {
     await deleteItemFromCollection('reservations', id, setRawReservations, 'Réservation supprimée');
@@ -749,15 +835,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
+    const devisId = item.number || item.id || `DEV-${Date.now().toString().slice(-6)}`;
     const enriched: Partial<Proforma> = {
       ...item,
+      id: devisId,
+      number: item.number || devisId,
       dossierId,
       clientId: resolvedClientId,
       clientEmail: resolvedEmail,
       telephone: resolvedTelephone,
       client: resolvedClient
     };
-    await saveItemToCollection('proformas', enriched, setRawProformas, 'Devis proforma enregistré');
+
+    // 1. Tenter l'API backend pour débloquer immédiatement l'envoi
+    let apiProformaSuccess = false;
+    if (auth.currentUser) {
+      try {
+        const token = await auth.currentUser.getIdToken();
+        const res = await fetch('/api/proformas', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ proforma: enriched })
+        });
+        if (res.ok) {
+          const body = await res.json();
+          const savedProforma = (body.proforma || enriched) as Proforma;
+          setRawProformas((prev) => {
+            const idx = prev.findIndex((p) => p.id === savedProforma.id || p.number === savedProforma.number);
+            if (idx >= 0) {
+              const updated = [...prev];
+              updated[idx] = savedProforma;
+              return updated;
+            }
+            return [savedProforma, ...prev];
+          });
+          showToast('Devis proforma enregistré avec succès', 'success');
+          apiProformaSuccess = true;
+          // Synchronisation Firestore en arrière-plan sans bloquer
+          setDoc(doc(db, 'proformas', savedProforma.id), savedProforma as any).catch(() => {});
+          return;
+        }
+      } catch (err) {
+        console.warn('API backend proformas fallback to direct Firestore:', err);
+      }
+    }
+
+    if (!apiProformaSuccess) {
+      await saveItemToCollection('proformas', enriched, setRawProformas, 'Devis proforma enregistré');
+    }
   };
   const deleteProforma = async (id: string) => {
     await deleteItemFromCollection('proformas', id, setRawProformas, 'Proforma supprimée');

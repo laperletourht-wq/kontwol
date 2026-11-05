@@ -203,60 +203,33 @@ export const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({
 
         {/* Right: Actions Top Bar */}
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* Action 1: Télécharger PDF */}
+          {/* Action 1: Télécharger en PDF */}
           <button
             type="button"
             onClick={handlePrintOrPdf}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '8px 14px',
+              gap: '7px',
+              padding: '8px 16px',
               borderRadius: '8px',
               border: '1px solid #cbd5e1',
               background: '#ffffff',
-              color: '#1e293b',
+              color: '#0f172a',
               fontSize: '13px',
-              fontWeight: 600,
+              fontWeight: 700,
               cursor: 'pointer',
               boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
             }}
             className="hover:bg-slate-50 transition-colors"
+            title="Télécharger ou enregistrer le document au format PDF"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
               <polyline points="7 10 12 15 17 10"/>
               <line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
-            <span>Télécharger (PDF)</span>
-          </button>
-
-          {/* Action 2: Imprimer */}
-          <button
-            type="button"
-            onClick={handlePrintOrPdf}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 14px',
-              borderRadius: '8px',
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: '#1e293b',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-            }}
-            className="hover:bg-slate-50 transition-colors"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="6 9 6 2 18 2 18 9"/>
-              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
-              <rect x="6" y="14" width="12" height="8"/>
-            </svg>
-            <span>Imprimer</span>
+            <span>Télécharger en PDF</span>
           </button>
 
           {/* Action 3: Partager */}
@@ -413,7 +386,7 @@ export const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({
             </div>
 
             {/* Rows list */}
-            <div style={{ padding: '4px 16px' }}>
+            <div style={{ padding: '4px 16px', width: '300px', boxSizing: 'border-box' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #f1f5f9', fontSize: '13px' }}>
                 <span style={{ color: '#64748b' }}>{isDevis ? 'N° de devis' : 'N° de facture'}</span>
                 <button
@@ -605,8 +578,8 @@ export const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({
             padding: '44px 48px 48px',
             position: 'relative',
             overflow: 'hidden',
-            width: '100%',
-            maxWidth: '794px',
+            width: '800px',
+            maxWidth: '800px',
             minHeight: '1123px',
             boxSizing: 'border-box',
             margin: '0 auto',
@@ -660,7 +633,12 @@ export const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({
                   letterSpacing: '1px',
                   padding: '6px 24px',
                   borderRadius: '6px',
-                  marginBottom: '10px'
+                  marginBottom: '10px',
+                  height: '34.4667px',
+                  width: '106.517px',
+                  paddingTop: '5px',
+                  marginLeft: '0px',
+                  boxSizing: 'border-box'
                 }}
               >
                 {isDevis ? 'DEVIS' : 'FACTURE'}

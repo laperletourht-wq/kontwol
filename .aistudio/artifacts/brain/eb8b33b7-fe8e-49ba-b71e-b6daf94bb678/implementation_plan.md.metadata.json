@@ -1,0 +1,6 @@
+{
+  "summary": "Plan court et ciblé pour la saisie libre et l'envoi de demande de devis par le client : remplacement des menus déroulants rigides par des champs texte libres avec suggestions (datalist), estimation automatique avec mention « À chiffrer par l'agence », boutons d'envoi accessibles et redirection immédiate vers « Mes devis » avec notification de confirmation.",
+  "updatedAt": "2026-11-05T18:20:57.672187535Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

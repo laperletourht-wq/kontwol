@@ -304,5 +304,22 @@ describe('Firestore Security Rules - LAPERLE TOUR HT', () => {
       expect(allowedClientProformaKeys.includes('amount')).toBe(false);
       expect(allowedClientFactureKeys.includes('amount')).toBe(false);
     });
+
+    it('CLIENT -> can create quote request (proforma) in En attente status for self', () => {
+      const canClientCreateProforma = (auth: any, incoming: any) => {
+        const isSelf = incoming.clientId === auth.uid || incoming.uid === auth.uid || (incoming.email && auth.token?.email && incoming.email.toLowerCase() === auth.token.email.toLowerCase());
+        const isPending = !incoming.status || ['En attente', 'Brouillon'].includes(incoming.status);
+        const hasValidAmount = typeof incoming.amount === 'number' && incoming.amount >= 0;
+        return Boolean(isSelf && isPending && hasValidAmount);
+      };
+
+      const validSelfQuote = { id: 'DEV-2025-0019', clientId: clientAuth.uid, status: 'En attente', amount: 45000 };
+      const invalidStatusQuote = { id: 'DEV-2025-0020', clientId: clientAuth.uid, status: 'Confirmée', amount: 45000 };
+      const invalidOtherUserQuote = { id: 'DEV-2025-0021', clientId: 'other_user', status: 'En attente', amount: 45000 };
+
+      expect(canClientCreateProforma(clientAuth, validSelfQuote)).toBe(true);
+      expect(canClientCreateProforma(clientAuth, invalidStatusQuote)).toBe(false);
+      expect(canClientCreateProforma(clientAuth, invalidOtherUserQuote)).toBe(false);
+    });
   });
 });

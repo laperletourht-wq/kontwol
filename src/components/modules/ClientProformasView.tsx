@@ -39,6 +39,7 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
   // Form states for the dedicated "Demande de devis" page
   const [reqOrigin, setReqOrigin] = useState('Port-au-Prince');
   const [reqDestination, setReqDestination] = useState('Cap-Haïtien');
+  const [reqPickupAddress, setReqPickupAddress] = useState('');
   const [reqDate, setReqDate] = useState('2025-01-28');
   const [reqTime, setReqTime] = useState('08:00');
   const [reqVehicle, setReqVehicle] = useState('Toyota Hiace');
@@ -119,7 +120,15 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
     }
   ], [clientName, profile?.telephone, profile?.email]);
 
-  const activeProformasList = proformas.length > 0 ? proformas : defaultClientProformas;
+  // Active proformas sorted with newest on top (row 1)
+  const activeProformasList = useMemo(() => {
+    const list = proformas.length > 0 ? proformas : defaultClientProformas;
+    return [...list].sort((a, b) => {
+      const timeA = new Date(a.createdAt || a.date || 0).getTime();
+      const timeB = new Date(b.createdAt || b.date || 0).getTime();
+      return timeB - timeA;
+    });
+  }, [proformas, defaultClientProformas]);
 
   // Dynamic Sequential IDs for the new quote request
   const nextDevisNumber = useMemo(() => {
@@ -146,39 +155,53 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
     return `DEM-2025-${String(nextSeq).padStart(4, '0')}`;
   }, [activeProformasList]);
 
-  // Dynamic price calculation based on route and vehicle
-  const estimatedAmount = useMemo(() => {
+  // Dynamic price calculation based on route and vehicle with standard status check
+  const priceCalculation = useMemo(() => {
     const o = (reqOrigin || '').trim().toLowerCase();
     const d = (reqDestination || '').trim().toLowerCase();
     let base = 35000;
+    let isStandardRoute = false;
 
     if ((o.includes('port-au-prince') && d.includes('cap')) || (d.includes('port-au-prince') && o.includes('cap'))) {
       base = 45000; // Matches exact screenshot 45 000,00 HTG
+      isStandardRoute = true;
     } else if ((o.includes('port-au-prince') && d.includes('jacmel')) || (d.includes('port-au-prince') && o.includes('jacmel'))) {
       base = 28500;
+      isStandardRoute = true;
     } else if ((o.includes('port-au-prince') && d.includes('cayes')) || (d.includes('port-au-prince') && o.includes('cayes'))) {
       base = 38000;
+      isStandardRoute = true;
     } else if ((o.includes('port-au-prince') && d.includes('gona')) || (d.includes('port-au-prince') && o.includes('gona'))) {
       base = 32000;
+      isStandardRoute = true;
     } else if ((o.includes('port-au-prince') && d.includes('ouanaminthe')) || (d.includes('port-au-prince') && o.includes('ouanaminthe'))) {
       base = 52000;
+      isStandardRoute = true;
     } else if (o.includes('pétion') || d.includes('pétion') || (o && d && o === d)) {
       base = 18000;
+      isStandardRoute = true;
     }
 
     let mult = 1.0;
-    if (reqVehicle.includes('Coaster') || reqVehicle.includes('Minibus')) {
+    const v = (reqVehicle || '').toLowerCase();
+    if (v.includes('coaster') || v.includes('30')) {
       mult = 1.6;
-    } else if (reqVehicle.includes('SUV') || reqVehicle.includes('Prado') || reqVehicle.includes('Lexus')) {
+    } else if (v.includes('suv') || v.includes('prado') || v.includes('lexus')) {
       mult = 1.25;
-    } else if (reqVehicle.includes('Noah') || reqVehicle.includes('Voxy')) {
+    } else if (v.includes('noah') || v.includes('voxy')) {
       mult = 0.85;
-    } else if (reqVehicle.includes('Berline')) {
+    } else if (v.includes('berline')) {
       mult = 0.75;
     }
 
-    return Math.round(base * mult);
+    return {
+      amount: Math.round(base * mult),
+      isStandard: isStandardRoute
+    };
   }, [reqOrigin, reqDestination, reqVehicle]);
+
+  const estimatedAmount = priceCalculation.amount;
+  const isStandardPricing = priceCalculation.isStandard;
 
   // Client display fields
   const displayClientName = customClientName.trim() || clientName;
@@ -319,6 +342,8 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
         client: displayClientName,
         telephone: displayClientPhone,
         clientEmail: displayClientEmail,
+        clientId: user?.uid,
+        uid: user?.uid,
         service: `${reqServiceType} (${reqOrigin} → ${reqDestination})`,
         date: todayFormatted,
         dueDate: validityFormatted,
@@ -333,6 +358,7 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
         destination: reqDestination,
         pickup: reqOrigin,
         dropoff: reqDestination,
+        pickupAddress: reqPickupAddress,
         travelDate: reqDate,
         travelTime: reqTime,
         vehicleType: reqVehicle,
@@ -350,10 +376,13 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
         phone: displayClientPhone,
         telephone: displayClientPhone,
         email: displayClientEmail,
+        clientId: user?.uid,
+        uid: user?.uid,
         origin: reqOrigin,
         destination: reqDestination,
         pickup: reqOrigin,
         dropoff: reqDestination,
+        pickupAddress: reqPickupAddress,
         date: reqDate,
         time: reqTime,
         passengers: reqPassengers,
@@ -376,8 +405,6 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
 
       await saveProforma(newDevis);
 
-      // User comment requirement:
-      // "EST ENVOYER A CEUX QUI ONT LE DROIT DE LE TRANFORMER EN FACTURE"
       // Send priority notification to administrators, direction, accounting, and secretary
       await addNotification({
         title: `Nouvelle demande de devis : ${nextDevisNumber}`,
@@ -389,11 +416,10 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
         authorUid: user?.uid
       });
 
-      showToast(`Votre demande de devis ${nextDevisNumber} a été envoyée avec succès aux responsables habilités !`, 'success');
+      showToast(`Votre demande de devis ${nextDevisNumber} a été envoyée avec succès à la régulation !`, 'success');
 
-      // User requirement:
-      // "Afficher le devis créé sur cette page avec statut En attente"
-      setSelectedProforma(newDevis);
+      // User confirmed decision: Redirect immediately to "Mes devis" list with new quote on row 1
+      setSelectedProforma(null);
       setViewMode('list');
     } catch (err: any) {
       console.error('Erreur envoi demande devis:', err);
@@ -577,14 +603,22 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {/* Lieu de départ (Origine) */}
+                {/* Lieu de départ (Origine) avec saisie libre et suggestions */}
                 <div>
-                  <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                    Lieu de prise en charge (Origine)
-                  </label>
-                  <select
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#334155' }}>
+                      Lieu de prise en charge (Origine)
+                    </label>
+                    <span style={{ fontSize: '11px', color: '#0052cc', fontWeight: 600 }}>
+                      Saisie libre ou suggestions
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    list="origins-list"
                     value={reqOrigin}
                     onChange={(e) => setReqOrigin(e.target.value)}
+                    placeholder="Tapez votre point de départ (ex: Port-au-Prince, Aéroport Toussaint Louverture, Pétion-Ville...)"
                     style={{
                       width: '100%',
                       padding: '10px 12px',
@@ -596,8 +630,10 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
                       color: '#0f172a',
                       outline: 'none'
                     }}
-                  >
-                    <option value="Port-au-Prince">Port-au-Prince</option>
+                  />
+                  <datalist id="origins-list">
+                    <option value="Port-au-Prince">Port-au-Prince (Centre-ville)</option>
+                    <option value="Aéroport International Toussaint Louverture">Aéroport Toussaint Louverture (PAP)</option>
                     <option value="Pétion-Ville">Pétion-Ville</option>
                     <option value="Cap-Haïtien">Cap-Haïtien</option>
                     <option value="Jacmel">Jacmel</option>
@@ -605,17 +641,28 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
                     <option value="Gonaïves">Gonaïves</option>
                     <option value="Ouanaminthe">Ouanaminthe</option>
                     <option value="Saint-Marc">Saint-Marc</option>
-                  </select>
+                    <option value="Montrouis (Côte des Arcadins)">Montrouis (Côte des Arcadins)</option>
+                    <option value="Delmas">Delmas</option>
+                    <option value="Tabarre">Tabarre</option>
+                  </datalist>
                 </div>
 
-                {/* Lieu d'arrivée (Destination) */}
+                {/* Lieu d'arrivée (Destination) avec saisie libre et suggestions */}
                 <div>
-                  <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                    Destination d'arrivée
-                  </label>
-                  <select
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#334155' }}>
+                      Destination d'arrivée
+                    </label>
+                    <span style={{ fontSize: '11px', color: '#0052cc', fontWeight: 600 }}>
+                      Saisie libre ou suggestions
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    list="destinations-list"
                     value={reqDestination}
                     onChange={(e) => setReqDestination(e.target.value)}
+                    placeholder="Tapez votre lieu d'arrivée (ex: Cap-Haïtien, Jacmel, Hôtel Karibe, Labadee...)"
                     style={{
                       width: '100%',
                       padding: '10px 12px',
@@ -627,16 +674,44 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
                       color: '#0f172a',
                       outline: 'none'
                     }}
-                  >
+                  />
+                  <datalist id="destinations-list">
                     <option value="Cap-Haïtien">Cap-Haïtien (Nord)</option>
                     <option value="Port-au-Prince">Port-au-Prince</option>
+                    <option value="Aéroport International Toussaint Louverture">Aéroport Toussaint Louverture (PAP)</option>
                     <option value="Jacmel">Jacmel (Sud-Est)</option>
                     <option value="Les Cayes">Les Cayes (Sud)</option>
                     <option value="Gonaïves">Gonaïves (Artibonite)</option>
                     <option value="Ouanaminthe">Ouanaminthe (Frontière Nord)</option>
                     <option value="Pétion-Ville">Pétion-Ville</option>
-                    <option value="Côte des Arcadins">Côte des Arcadins</option>
-                  </select>
+                    <option value="Côte des Arcadins (Montrouis)">Côte des Arcadins</option>
+                    <option value="Labadee">Labadee</option>
+                    <option value="Miragoâne">Miragoâne</option>
+                    <option value="Jérémie">Jérémie</option>
+                  </datalist>
+                </div>
+
+                {/* Adresse précise ou point de rendez-vous (Optionnel) */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                    Adresse précise ou repère de rendez-vous (Optionnel)
+                  </label>
+                  <input
+                    type="text"
+                    value={reqPickupAddress}
+                    onChange={(e) => setReqPickupAddress(e.target.value)}
+                    placeholder="Ex: N° rue, nom de l'hôtel, barrière, quartier..."
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      background: '#ffffff',
+                      fontSize: '13px',
+                      color: '#0f172a',
+                      outline: 'none'
+                    }}
+                  />
                 </div>
 
                 {/* Date & Heure */}
@@ -683,14 +758,22 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
                   </div>
                 </div>
 
-                {/* Véhicule souhaité */}
+                {/* Véhicule souhaité avec saisie libre */}
                 <div>
-                  <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                    Véhicule proposé / souhaité
-                  </label>
-                  <select
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#334155' }}>
+                      Véhicule proposé / souhaité
+                    </label>
+                    <span style={{ fontSize: '11px', color: '#0052cc', fontWeight: 600 }}>
+                      Saisie libre ou suggestions
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    list="vehicles-list"
                     value={reqVehicle}
                     onChange={(e) => setReqVehicle(e.target.value)}
+                    placeholder="Sélectionnez ou écrivez votre véhicule (ex: Toyota Hiace, SUV Lexus...)"
                     style={{
                       width: '100%',
                       padding: '10px 12px',
@@ -702,16 +785,19 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
                       color: '#0f172a',
                       outline: 'none'
                     }}
-                  >
+                  />
+                  <datalist id="vehicles-list">
                     <option value="Toyota Hiace">Toyota Hiace (Minibus 14 places climatisé)</option>
                     <option value="Minibus Coaster">Toyota Coaster VIP (30 places climatisé)</option>
                     <option value="Minivan Toyota Noah">Toyota Noah / Voxy (Minivan 7 places)</option>
                     <option value="SUV VIP Lexus / Prado">SUV VIP Prado / Lexus (4 places Premium)</option>
                     <option value="Berline Confort">Berline Confort (4 places)</option>
-                  </select>
+                    <option value="Autocar Grande Capacité">Autocar Grande Capacité (50 places)</option>
+                    <option value="Pick-up 4x4 Sécurisé">Pick-up 4x4 Sécurisé</option>
+                  </datalist>
                 </div>
 
-                {/* Passagers & Type de prestation */}
+                {/* Passagers & Type de prestation avec saisie libre */}
                 <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '10px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
@@ -740,9 +826,12 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
                     <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
                       Catégorie de prestation
                     </label>
-                    <select
+                    <input
+                      type="text"
+                      list="services-list"
                       value={reqServiceType}
                       onChange={(e) => setReqServiceType(e.target.value)}
+                      placeholder="Ex: Transport de personnes, Navette VIP..."
                       style={{
                         width: '100%',
                         padding: '9px 10px',
@@ -753,13 +842,15 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
                         color: '#0f172a',
                         outline: 'none'
                       }}
-                    >
+                    />
+                    <datalist id="services-list">
                       <option value="Transport de personnes">Transport de personnes</option>
                       <option value="Transfert VIP Aéroport">Transfert VIP Aéroport</option>
                       <option value="Circuit Découverte Touristique">Circuit Découverte Touristique</option>
                       <option value="Délégation & Événement">Délégation & Événement</option>
                       <option value="Navette Scolaire & Entreprise">Navette Scolaire & Entreprise</option>
-                    </select>
+                      <option value="Mise à disposition avec chauffeur">Mise à disposition avec chauffeur</option>
+                    </datalist>
                   </div>
                 </div>
 
@@ -1002,9 +1093,9 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
                     background: '#f8fafc',
                     border: '1px solid #cbd5e1',
                     color: '#0f172a',
-                    padding: '5px 12px',
+                    padding: '6px 14px',
                     borderRadius: '6px',
-                    fontSize: '12px',
+                    fontSize: '12.5px',
                     fontWeight: 700,
                     cursor: 'pointer',
                     display: 'inline-flex',
@@ -1012,14 +1103,14 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
                     gap: '6px'
                   }}
                   className="hover:bg-slate-100 transition-colors"
-                  title="Imprimer ou générer le PDF officiel"
+                  title="Télécharger l'aperçu officiel du devis au format PDF"
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                    <polyline points="6 9 6 2 18 2 18 9" />
-                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-                    <rect x="6" y="14" width="12" height="8" />
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
                   </svg>
-                  <span>Imprimer / PDF</span>
+                  <span>Télécharger en PDF</span>
                 </button>
               </div>
             </div>
@@ -1195,6 +1286,12 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
                         <strong style={{ color: '#0f172a' }}>Trajet :</strong>
                         <span style={{ color: '#0f172a', fontWeight: 600 }}>{reqOrigin} → {reqDestination}</span>
                       </div>
+                      {reqPickupAddress && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <strong style={{ color: '#0f172a' }}>Point de prise en charge :</strong>
+                          <span style={{ color: '#475569' }}>{reqPickupAddress}</span>
+                        </div>
+                      )}
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                         <strong style={{ color: '#0f172a' }}>Date :</strong>
                         <span style={{ color: '#475569' }}>{displayTravelDateTime}</span>
@@ -1230,6 +1327,7 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
                           </div>
                           <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
                             {reqOrigin} → {reqDestination} ({reqVehicle})
+                            {reqPickupAddress ? ` · ${reqPickupAddress}` : ''}
                           </div>
                         </td>
                         <td style={{ padding: '14px', textAlign: 'center', color: '#0f172a', fontWeight: 600, fontSize: '13.5px' }}>
@@ -1248,7 +1346,7 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
 
                 {/* Totals Section */}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '28px' }}>
-                  <div style={{ width: '310px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ width: '330px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#475569' }}>
                       <span style={{ fontWeight: 700 }}>Sous-total</span>
                       <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
@@ -1270,7 +1368,14 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
                         marginTop: '4px'
                       }}
                     >
-                      <span style={{ fontWeight: 800, fontSize: '14px', color: '#0052cc' }}>Total du devis</span>
+                      <div>
+                        <span style={{ fontWeight: 800, fontSize: '14px', color: '#0052cc', display: 'block' }}>Total du devis</span>
+                        {!isStandardPricing && (
+                          <span style={{ fontSize: '10.5px', color: '#1e40af', fontWeight: 700, display: 'block', marginTop: '1px' }}>
+                            Estimation · À chiffrer par l'agence
+                          </span>
+                        )}
+                      </div>
                       <span style={{ fontWeight: 900, fontSize: '18px', color: '#0052cc', fontVariantNumeric: 'tabular-nums' }}>
                         {estimatedAmount.toLocaleString('fr-FR')},00 HTG
                       </span>
@@ -1789,15 +1894,18 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
                       }
                     ] : []),
                     {
-                      label: 'Télécharger / Imprimer',
+                      label: 'Télécharger en PDF',
                       icon: (
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polyline points="6 9 6 2 18 2 18 9" />
-                          <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-                          <rect x="6" y="14" width="12" height="8" />
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                          <polyline points="7 10 12 15 17 10" />
+                          <line x1="12" y1="15" x2="12" y2="3" />
                         </svg>
                       ),
-                      onClick: () => setPrintSheetData({ type: 'proforma', data: p })
+                      onClick: () => {
+                        setSelectedProforma(p);
+                        setTimeout(() => window.print(), 350);
+                      }
                     },
                     {
                       label: 'Demander la facture officielle',

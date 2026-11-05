@@ -635,7 +635,16 @@ service cloud.firestore {
           (('clientId' in existing()) && existing().clientId == request.auth.uid) ||
           (('uid' in existing()) && existing().uid == request.auth.uid)
         ));
-      allow create: if (canManageFinances() || isSecretaire() || isVendeur()) && isValidId(proformaId) && isValidProforma(incoming());
+      allow create: if isValidId(proformaId) && (
+        canManageFinances() || isSecretaire() || isVendeur() ||
+        (isSignedIn() && (
+          isClientDoc(incoming()) ||
+          (('clientId' in incoming()) && incoming().clientId == request.auth.uid) ||
+          (('uid' in incoming()) && incoming().uid == request.auth.uid)
+        ) && (
+          !('status' in incoming()) || incoming().status in ['En attente', 'Brouillon']
+        ))
+      ) && isValidProforma(incoming());
       allow update: if isValidId(proformaId) && (
         ((canManageFinances() || isSecretaire() || isVendeur()) && isValidProforma(incoming())) ||
         (isSignedIn() && isClientDoc(existing()) &&
@@ -651,7 +660,16 @@ service cloud.firestore {
     }
     match /quotes/{quoteId} {
       allow get, list: if canReadFinances() || (isSignedIn() && (isClientDoc(existing()) || (('clientId' in existing()) && existing().clientId == request.auth.uid)));
-      allow create, update: if (canManageFinances() || isSecretaire() || isVendeur()) && isValidId(quoteId);
+      allow create, update: if isValidId(quoteId) && (
+        canManageFinances() || isSecretaire() || isVendeur() ||
+        (isSignedIn() && (
+          isClientDoc(incoming()) ||
+          (('clientId' in incoming()) && incoming().clientId == request.auth.uid) ||
+          (('uid' in incoming()) && incoming().uid == request.auth.uid)
+        ) && (
+          !('status' in incoming()) || incoming().status in ['En attente', 'Brouillon']
+        ))
+      );
       allow delete: if isAdmin() && isValidId(quoteId);
     }
 

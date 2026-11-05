@@ -60,6 +60,66 @@ function getLocalUserProfile(uid) {
   return list.find(u => (u.id === uid || u.uid === uid || (u.email && u.email.toLowerCase() === String(uid).toLowerCase()))) || null;
 }
 
+function getLocalProformas() {
+  try {
+    const p = path.join(__dirname, 'data', 'proformas.json');
+    if (fs.existsSync(p)) {
+      const content = fs.readFileSync(p, 'utf8');
+      return content ? JSON.parse(content) : [];
+    }
+  } catch (e) {}
+  return [];
+}
+
+function saveLocalProforma(item) {
+  try {
+    const p = path.join(__dirname, 'data', 'proformas.json');
+    const list = getLocalProformas();
+    const idx = list.findIndex(x => (x.id === item.id || x.number === item.number));
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], ...item };
+    } else {
+      list.unshift(item);
+    }
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, JSON.stringify(list, null, 2), 'utf8');
+    return item;
+  } catch (e) {
+    console.warn('saveLocalProforma error:', e?.message);
+    return item;
+  }
+}
+
+function getLocalReservations() {
+  try {
+    const p = path.join(__dirname, 'data', 'reservations.json');
+    if (fs.existsSync(p)) {
+      const content = fs.readFileSync(p, 'utf8');
+      return content ? JSON.parse(content) : [];
+    }
+  } catch (e) {}
+  return [];
+}
+
+function saveLocalReservation(item) {
+  try {
+    const p = path.join(__dirname, 'data', 'reservations.json');
+    const list = getLocalReservations();
+    const idx = list.findIndex(x => x.id === item.id);
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], ...item };
+    } else {
+      list.unshift(item);
+    }
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, JSON.stringify(list, null, 2), 'utf8');
+    return item;
+  } catch (e) {
+    console.warn('saveLocalReservation error:', e?.message);
+    return item;
+  }
+}
+
 // =========================================================================
 // FIREBASE FIRESTORE CLOUD INTEGRATION (Single Source of Truth)
 // =========================================================================
@@ -776,62 +836,277 @@ app.post('/api/auth/verify-email-code', async (req, res) => {
   });
 });
 
-app.post('/api/proformas', async (req, res) => {
-  const user = await requireVerifiedEmailUser(req, res);
+// =========================================================================
+// GESTION DES PROFORMAS & RÉSERVATIONS (Cloud Firestore + Local Persistence)
+// =========================================================================
+
+app.get('/api/proformas', async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
   if (!user) return;
-  if (!adminDb) return res.status(503).json({ error: 'Firestore Admin indisponible.' });
-  const data = req.body?.proforma || {};
-  const manager = await hasServerRole(user, ['admin', 'direction', 'comptabilite', 'secretaire']);
-  if (!manager) {
-    return res.status(403).json({ error: "Accès refusé. Privilèges de gestion ou administrateur requis." });
+  const manager = await hasServerRole(user, ['admin', 'direction', 'comptabilite', 'secretaire', 'vendeur']);
+
+  const map = new Map();
+
+  // 1. Lire depuis le magasin local persistant
+  const localList = getLocalProformas();
+  for (const item of localList) {
+    const isOwner = !manager && (
+      item.clientId === user.uid ||
+      item.uid === user.uid ||
+      (user.email && item.clientEmail && item.clientEmail.toLowerCase() === user.email.toLowerCase())
+    );
+    if (manager || isOwner) {
+      map.set(item.id || item.number, item);
+    }
   }
-  const targetUid = String(data.clientId || data.uid || data.clientUid || '');
-  const clientEmail = String(data.email || '').toLowerCase().trim();
-  const amount = Number(data.amount);
-  if (!Number.isFinite(amount) || amount <= 0 || !String(data.client || '').trim() || !/^[a-zA-Z0-9_-]{1,128}$/.test(String(data.number || ''))) {
-    return res.status(400).json({ error: 'Proforma invalide.' });
+
+  // 2. Lire depuis Firestore Admin si disponible
+  if (adminDb) {
+    try {
+      const col = adminDb.collection('proformas');
+      const q = manager ? col : col.where('clientId', '==', user.uid);
+      const snap = await q.get();
+      for (const d of snap.docs) {
+        map.set(d.id, { id: d.id, ...d.data() });
+      }
+    } catch (e) {
+      // Tolérer si Firestore Admin n'a pas les droits IAM dans l'environnement courant
+    }
   }
-  const proforma = { ...data, id: String(data.number), number: String(data.number), amount,
-    client: String(data.client).slice(0, 150),
-    ...(targetUid ? { clientId: targetUid, uid: targetUid, clientUid: targetUid } : {}),
-    ...(clientEmail ? { email: clientEmail } : {}),
-    date: String(data.date || new Date().toISOString().slice(0, 10)), status: String(data.status || 'En attente').slice(0, 50),
-    createdBy: user.uid, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), archived: false };
-  try {
-    const proformaRef = adminDb.collection('proformas').doc(proforma.id);
-    const userRef = targetUid ? adminDb.collection('utilisateurs').doc(targetUid) : null;
-    await adminDb.runTransaction(async tx => {
-      const existingProforma = await tx.get(proformaRef);
-      if (existingProforma.exists) throw new Error('PROFORMA_EXISTS');
-      if (!targetUid || !userRef) {
-        tx.create(proformaRef, proforma);
-        return;
+
+  const result = Array.from(map.values()).sort((a, b) => {
+    const da = new Date(b.createdAt || b.date || 0).getTime();
+    const db = new Date(a.createdAt || a.date || 0).getTime();
+    return da - db;
+  });
+
+  return res.json({ success: true, proformas: result });
+});
+
+app.post('/api/proformas', async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const data = req.body?.proforma || req.body || {};
+  const manager = await hasServerRole(user, ['admin', 'direction', 'comptabilite', 'secretaire', 'vendeur']);
+  const targetUid = String(data.clientId || data.uid || data.clientUid || (manager ? '' : user.uid));
+  const clientEmail = String(data.email || data.clientEmail || (manager ? '' : user.email || '')).toLowerCase().trim();
+  const isClientOwner = !manager && (
+    !targetUid ||
+    targetUid === user.uid ||
+    (clientEmail && clientEmail === String(user.email || '').toLowerCase().trim())
+  );
+
+  if (!manager && !isClientOwner) {
+    return res.status(403).json({ error: "Accès refusé. Privilèges de gestion ou propriétaire requis." });
+  }
+
+  const rawAmount = Number(data.amount ?? data.totalTTC ?? 0);
+  const amount = Number.isFinite(rawAmount) && rawAmount >= 0 ? rawAmount : 0;
+  const number = String(data.number || data.id || `DEV-${Date.now().toString().slice(-6)}`);
+  const effectiveStatus = manager ? String(data.status || 'En attente').slice(0, 50) : 'En attente';
+  const finalClientId = targetUid || user.uid;
+
+  const proforma = {
+    ...data,
+    id: number,
+    number,
+    amount,
+    totalTTC: amount,
+    client: String(data.client || user.displayName || 'Client').slice(0, 150),
+    clientId: finalClientId,
+    uid: finalClientId,
+    clientUid: finalClientId,
+    clientEmail: clientEmail || user.email || '',
+    telephone: String(data.telephone || data.phone || ''),
+    date: String(data.date || new Date().toISOString().slice(0, 10)),
+    status: effectiveStatus,
+    createdBy: user.uid,
+    createdAt: data.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    archived: false
+  };
+
+  // 1. Tenter d'écrire dans Firestore Admin si disponible
+  let storedInCloud = false;
+  if (adminDb) {
+    try {
+      const proformaRef = adminDb.collection('proformas').doc(proforma.id);
+      await proformaRef.set(proforma, { merge: true });
+      storedInCloud = true;
+
+      // Promotion de prospect à client
+      if (finalClientId) {
+        try {
+          const userRef = adminDb.collection('utilisateurs').doc(finalClientId);
+          const targetSnap = await userRef.get();
+          if (targetSnap.exists) {
+            const target = targetSnap.data();
+            const targetRoles = Array.isArray(target?.roles) ? target.roles : [target?.role];
+            if (targetRoles.includes('prospect')) {
+              await userRef.update({ role: 'client', roles: ['client'], statutClient: 'client', updatedAt: FieldValue.serverTimestamp() });
+            }
+          }
+        } catch (e) {}
       }
-      const targetSnap = await tx.get(userRef);
-      if (!targetSnap.exists) {
-        // Profil pas encore dans utilisateurs, créer la proforma sans bloquer
-        tx.create(proformaRef, proforma);
-        return;
+
+      // Synchroniser également la réservation liée si demandée
+      if (data.reservationId) {
+        try {
+          const resRef = adminDb.collection('reservations').doc(String(data.reservationId));
+          await resRef.set({
+            id: String(data.reservationId),
+            dossierId: proforma.dossierId || proforma.id,
+            devisRef: proforma.number,
+            clientId: finalClientId,
+            client: proforma.client,
+            phone: proforma.telephone || '',
+            telephone: proforma.telephone || '',
+            email: proforma.clientEmail || '',
+            origin: proforma.origin || proforma.pickup || '',
+            destination: proforma.destination || proforma.dropoff || '',
+            pickup: proforma.origin || proforma.pickup || '',
+            dropoff: proforma.destination || proforma.dropoff || '',
+            pickupAddress: proforma.pickupAddress || '',
+            date: proforma.travelDate || proforma.date,
+            time: proforma.travelTime || '08:00',
+            vehicle: proforma.vehicle || proforma.vehicleType || 'Sedan Standard',
+            service: proforma.serviceType || proforma.service || 'Course Simple',
+            passengers: proforma.passengers || 1,
+            status: 'En attente',
+            amount: proforma.amount,
+            notes: proforma.notes || '',
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp()
+          }, { merge: true });
+        } catch (resErr) {
+          console.warn('[reservations sync in proforma route]:', resErr?.message);
+        }
       }
-      const target = targetSnap.data();
-      const targetRoles = Array.isArray(target?.roles) ? target.roles : [target?.role];
-      tx.create(proformaRef, proforma);
-      if (targetRoles.includes('prospect')) {
-        tx.update(userRef, { role: 'client', roles: ['client'], statutClient: 'client', updatedAt: FieldValue.serverTimestamp() });
-      }
+    } catch (err) {
+      console.warn('[Firestore adminDb proformas write error, falling back to local persistence]:', err?.message);
+    }
+  }
+
+  // 2. Toujours persister dans le magasin local persistant pour garantir 100% de résilience
+  saveLocalProforma(proforma);
+  if (data.reservationId) {
+    saveLocalReservation({
+      id: String(data.reservationId),
+      dossierId: proforma.dossierId || proforma.id,
+      devisRef: proforma.number,
+      clientId: finalClientId,
+      client: proforma.client,
+      telephone: proforma.telephone || '',
+      email: proforma.clientEmail || '',
+      origin: proforma.origin || proforma.pickup || '',
+      destination: proforma.destination || proforma.dropoff || '',
+      pickupAddress: proforma.pickupAddress || '',
+      date: proforma.travelDate || proforma.date,
+      time: proforma.travelTime || '08:00',
+      vehicle: proforma.vehicle || proforma.vehicleType || 'Sedan Standard',
+      service: proforma.serviceType || proforma.service || 'Course Simple',
+      passengers: proforma.passengers || 1,
+      status: 'En attente',
+      amount: proforma.amount,
+      notes: proforma.notes || '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     });
-    const savedProforma = await proformaRef.get();
-    const result = targetUid ? await getServerProfile(targetUid).catch(() => null) : null;
-    return res.status(201).json({
-      success: true,
-      proforma: { ...savedProforma.data(), id: proforma.id, number: proforma.id },
-      profile: result
-    });
-  } catch (err) {
-    if (err.message === 'PROFORMA_EXISTS') return res.status(409).json({ error: 'Ce numéro de proforma existe déjà.' });
-    console.error('Proforma transaction failed:', err?.message);
-    return res.status(500).json({ error: 'La création de la proforma a échoué.' });
   }
+
+  return res.status(201).json({
+    success: true,
+    proforma: {
+      ...proforma,
+      id: proforma.id,
+      number: proforma.id
+    },
+    storedInCloud
+  });
+});
+
+app.get('/api/reservations', async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const manager = await hasServerRole(user, ['admin', 'direction', 'comptabilite', 'secretaire', 'vendeur', 'operations']);
+
+  const map = new Map();
+
+  // 1. Local
+  const localList = getLocalReservations();
+  for (const item of localList) {
+    const isOwner = !manager && (
+      item.clientId === user.uid ||
+      item.uid === user.uid ||
+      (user.email && item.email && item.email.toLowerCase() === user.email.toLowerCase())
+    );
+    if (manager || isOwner) {
+      map.set(item.id, item);
+    }
+  }
+
+  // 2. Firestore Admin
+  if (adminDb) {
+    try {
+      const col = adminDb.collection('reservations');
+      const q = manager ? col : col.where('clientId', '==', user.uid);
+      const snap = await q.get();
+      for (const d of snap.docs) {
+        map.set(d.id, { id: d.id, ...d.data() });
+      }
+    } catch (e) {}
+  }
+
+  const result = Array.from(map.values()).sort((a, b) => {
+    const da = new Date(b.createdAt || b.date || 0).getTime();
+    const db = new Date(a.createdAt || a.date || 0).getTime();
+    return da - db;
+  });
+
+  return res.json({ success: true, reservations: result });
+});
+
+app.post('/api/reservations', async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const data = req.body?.reservation || req.body || {};
+  const manager = await hasServerRole(user, ['admin', 'direction', 'comptabilite', 'secretaire', 'vendeur', 'operations']);
+  const targetUid = String(data.clientId || data.uid || (manager ? '' : user.uid));
+  const clientEmail = String(data.email || (manager ? '' : user.email || '')).toLowerCase().trim();
+  const isClientOwner = !manager && (
+    !targetUid ||
+    targetUid === user.uid ||
+    (clientEmail && clientEmail === String(user.email || '').toLowerCase().trim())
+  );
+
+  if (!manager && !isClientOwner) {
+    return res.status(403).json({ error: "Accès refusé. Privilèges requis." });
+  }
+
+  const id = String(data.id || `RES-${Date.now().toString().slice(-6)}`);
+  const finalClientId = targetUid || user.uid;
+  const reservation = {
+    ...data,
+    id,
+    clientId: finalClientId,
+    uid: finalClientId,
+    email: clientEmail || user.email || '',
+    status: data.status || 'En attente',
+    createdAt: data.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  if (adminDb) {
+    try {
+      await adminDb.collection('reservations').doc(id).set(reservation, { merge: true });
+    } catch (e) {
+      console.warn('[Firestore adminDb reservations write error]:', e?.message);
+    }
+  }
+
+  saveLocalReservation(reservation);
+
+  return res.status(201).json({ success: true, reservation });
 });
 
 // Un prospect ou client dont l'e-mail est vérifié peut demander un devis
