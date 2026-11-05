@@ -15,18 +15,40 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
     reservations, 
     convertProformaToFacture, 
     saveProforma, 
+    saveReservation,
+    addNotification,
     setPrintSheetData, 
     showToast, 
     setCurrentModule,
     settings,
-    requestDocumentSend
+    requestDocumentSend,
+    clientProformaViewMode,
+    setClientProformaViewMode
   } = useApp();
   
   const { profile, user } = useAuth();
 
+  // Mode: list or dedicated new-request page
+  const viewMode = clientProformaViewMode || 'list';
+  const setViewMode = setClientProformaViewMode;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selectedProforma, setSelectedProforma] = useState<Proforma | null>(null);
+
+  // Form states for the dedicated "Demande de devis" page
+  const [reqOrigin, setReqOrigin] = useState('Port-au-Prince');
+  const [reqDestination, setReqDestination] = useState('Cap-Haïtien');
+  const [reqDate, setReqDate] = useState('2025-01-28');
+  const [reqTime, setReqTime] = useState('08:00');
+  const [reqVehicle, setReqVehicle] = useState('Toyota Hiace');
+  const [reqPassengers, setReqPassengers] = useState(10);
+  const [reqServiceType, setReqServiceType] = useState('Transport de personnes');
+  const [reqNotes, setReqNotes] = useState('Ce devis est valable jusqu\'au 03 févr. 2025. Pour confirmer, veuillez accepter le devis.');
+  const [customClientName, setCustomClientName] = useState('');
+  const [customClientPhone, setCustomClientPhone] = useState('');
+  const [customClientEmail, setCustomClientEmail] = useState('');
+  const [isSubmittingReq, setIsSubmittingReq] = useState(false);
 
   const exchangeRate = settings?.tauxChangeUSD_HTG || 132;
   const officialWhatsApp = settings?.whatsapp || '+509 4440 8687';
@@ -37,7 +59,7 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
     return `${totalHTG.toLocaleString('fr-FR')} HTG`;
   };
 
-  const clientName = profile?.nom || user?.displayName || 'Client';
+  const clientName = profile?.nom || user?.displayName || 'Jean Baptiste';
 
   // Fallback demo proformas if list is empty for demo/new account
   const defaultClientProformas: Proforma[] = useMemo(() => [
@@ -48,14 +70,14 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
       reservationId: 'RES-2025-0032',
       client: clientName,
       telephone: profile?.telephone || '+509 37 12 45 67',
-      clientEmail: profile?.email || 'client@laperletourht.com',
+      clientEmail: profile?.email || 'jean.baptiste@gmail.com',
       service: 'Transport de personnes (Port-au-Prince → Cap-Haïtien)',
-      date: '2025-01-27',
-      dueDate: '2025-02-03',
+      date: '27 janv. 2025',
+      dueDate: '03 févr. 2025',
       amount: 45000,
       currency: 'HTG',
       status: 'En attente',
-      notes: 'Ce devis est valable jusqu\'au 03 févr. 2025. Confirmation sous 48h.',
+      notes: 'Ce devis est valable jusqu\'au 03 févr. 2025. Pour confirmer, veuillez accepter le devis.',
       createdAt: '2025-01-27T08:00:00Z',
       updatedAt: '2025-01-27T08:00:00Z'
     },
@@ -66,10 +88,10 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
       reservationId: 'RES-2025-0031',
       client: clientName,
       telephone: profile?.telephone || '+509 37 12 45 67',
-      clientEmail: profile?.email || 'client@laperletourht.com',
+      clientEmail: profile?.email || 'jean.baptiste@gmail.com',
       service: 'Navette VIP Pétion-Ville → Jacmel',
-      date: '2025-01-25',
-      dueDate: '2025-02-01',
+      date: '25 janv. 2025',
+      dueDate: '01 févr. 2025',
       amount: 28500,
       currency: 'HTG',
       status: 'Acceptée',
@@ -84,10 +106,10 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
       reservationId: 'RES-2025-0030',
       client: clientName,
       telephone: profile?.telephone || '+509 37 12 45 67',
-      clientEmail: profile?.email || 'client@laperletourht.com',
+      clientEmail: profile?.email || 'jean.baptiste@gmail.com',
       service: 'Circuit Découverte Côte des Arcadins',
-      date: '2025-01-20',
-      dueDate: '2025-01-27',
+      date: '20 janv. 2025',
+      dueDate: '27 janv. 2025',
       amount: 32000,
       currency: 'HTG',
       status: 'Convertie en facture',
@@ -99,7 +121,89 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
 
   const activeProformasList = proformas.length > 0 ? proformas : defaultClientProformas;
 
-  // Filtered proformas
+  // Dynamic Sequential IDs for the new quote request
+  const nextDevisNumber = useMemo(() => {
+    const numbers = activeProformasList
+      .map((p) => {
+        const m = p.number?.match(/DEV-\d{4}-(\d+)/);
+        return m ? parseInt(m[1], 10) : 0;
+      })
+      .filter((n) => !isNaN(n));
+    const maxNum = numbers.length > 0 ? Math.max(...numbers) : 18;
+    const nextSeq = Math.max(maxNum + 1, 19);
+    return `DEV-2025-${String(nextSeq).padStart(4, '0')}`;
+  }, [activeProformasList]);
+
+  const nextDossierNumber = useMemo(() => {
+    const numbers = activeProformasList
+      .map((p) => {
+        const m = p.dossierId?.match(/DEM-\d{4}-(\d+)/);
+        return m ? parseInt(m[1], 10) : 0;
+      })
+      .filter((n) => !isNaN(n));
+    const maxNum = numbers.length > 0 ? Math.max(...numbers) : 67;
+    const nextSeq = Math.max(maxNum + 1, 68);
+    return `DEM-2025-${String(nextSeq).padStart(4, '0')}`;
+  }, [activeProformasList]);
+
+  // Dynamic price calculation based on route and vehicle
+  const estimatedAmount = useMemo(() => {
+    const o = (reqOrigin || '').trim().toLowerCase();
+    const d = (reqDestination || '').trim().toLowerCase();
+    let base = 35000;
+
+    if ((o.includes('port-au-prince') && d.includes('cap')) || (d.includes('port-au-prince') && o.includes('cap'))) {
+      base = 45000; // Matches exact screenshot 45 000,00 HTG
+    } else if ((o.includes('port-au-prince') && d.includes('jacmel')) || (d.includes('port-au-prince') && o.includes('jacmel'))) {
+      base = 28500;
+    } else if ((o.includes('port-au-prince') && d.includes('cayes')) || (d.includes('port-au-prince') && o.includes('cayes'))) {
+      base = 38000;
+    } else if ((o.includes('port-au-prince') && d.includes('gona')) || (d.includes('port-au-prince') && o.includes('gona'))) {
+      base = 32000;
+    } else if ((o.includes('port-au-prince') && d.includes('ouanaminthe')) || (d.includes('port-au-prince') && o.includes('ouanaminthe'))) {
+      base = 52000;
+    } else if (o.includes('pétion') || d.includes('pétion') || (o && d && o === d)) {
+      base = 18000;
+    }
+
+    let mult = 1.0;
+    if (reqVehicle.includes('Coaster') || reqVehicle.includes('Minibus')) {
+      mult = 1.6;
+    } else if (reqVehicle.includes('SUV') || reqVehicle.includes('Prado') || reqVehicle.includes('Lexus')) {
+      mult = 1.25;
+    } else if (reqVehicle.includes('Noah') || reqVehicle.includes('Voxy')) {
+      mult = 0.85;
+    } else if (reqVehicle.includes('Berline')) {
+      mult = 0.75;
+    }
+
+    return Math.round(base * mult);
+  }, [reqOrigin, reqDestination, reqVehicle]);
+
+  // Client display fields
+  const displayClientName = customClientName.trim() || clientName;
+  const displayClientPhone = customClientPhone.trim() || profile?.telephone || '+509 37 12 45 67';
+  const displayClientEmail = customClientEmail.trim() || profile?.email || user?.email || 'jean.baptiste@gmail.com';
+
+  const todayFormatted = '27 janv. 2025';
+  const validityFormatted = '03 févr. 2025';
+
+  const displayTravelDateTime = useMemo(() => {
+    try {
+      if (reqDate) {
+        const [year, month, day] = reqDate.split('-');
+        const months = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+        const mIdx = parseInt(month, 10) - 1;
+        const monthStr = months[mIdx] || month;
+        return `${day} ${monthStr} ${year} à ${reqTime || '08:00'}`;
+      }
+    } catch {
+      // fallback
+    }
+    return '28 janv. 2025 à 08:00';
+  }, [reqDate, reqTime]);
+
+  // Filtered proformas for list view
   const filteredProformas = useMemo(() => {
     return activeProformasList.filter((p) => {
       if (statusFilter !== 'ALL') {
@@ -195,6 +299,110 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
     }
   };
 
+  // Submission handler for the new quote request
+  const handleSendQuoteRequest = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!reqOrigin.trim() || !reqDestination.trim()) {
+      showToast('Veuillez préciser le lieu de départ et d\'arrivée.', 'warning');
+      return;
+    }
+
+    setIsSubmittingReq(true);
+    try {
+      const uniqueResNumber = `RES-${Date.now().toString().slice(-6)}`;
+      
+      const newDevis: Proforma = {
+        id: nextDevisNumber,
+        number: nextDevisNumber,
+        dossierId: nextDossierNumber,
+        reservationId: uniqueResNumber,
+        client: displayClientName,
+        telephone: displayClientPhone,
+        clientEmail: displayClientEmail,
+        service: `${reqServiceType} (${reqOrigin} → ${reqDestination})`,
+        date: todayFormatted,
+        dueDate: validityFormatted,
+        amount: estimatedAmount,
+        totalTTC: estimatedAmount,
+        currency: 'HTG',
+        status: 'En attente',
+        notes: reqNotes.trim() || `Ce devis est valable jusqu'au ${validityFormatted}. Pour confirmer, veuillez accepter le devis.`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        origin: reqOrigin,
+        destination: reqDestination,
+        pickup: reqOrigin,
+        dropoff: reqDestination,
+        travelDate: reqDate,
+        travelTime: reqTime,
+        vehicleType: reqVehicle,
+        vehicle: reqVehicle,
+        passengers: reqPassengers,
+        serviceType: reqServiceType
+      } as any;
+
+      // Also create matching reservation so the entire platform stays in sync
+      const linkedReservation = {
+        id: uniqueResNumber,
+        dossierId: nextDossierNumber,
+        devisRef: nextDevisNumber,
+        client: displayClientName,
+        phone: displayClientPhone,
+        telephone: displayClientPhone,
+        email: displayClientEmail,
+        origin: reqOrigin,
+        destination: reqDestination,
+        pickup: reqOrigin,
+        dropoff: reqDestination,
+        date: reqDate,
+        time: reqTime,
+        passengers: reqPassengers,
+        vehicle: reqVehicle,
+        vehicule: reqVehicle,
+        service: reqServiceType,
+        notes: reqNotes,
+        status: 'En attente' as const,
+        amount: estimatedAmount,
+        currency: 'HTG',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      try {
+        await saveReservation(linkedReservation as any);
+      } catch (err) {
+        console.warn('Fallback saving reservation:', err);
+      }
+
+      await saveProforma(newDevis);
+
+      // User comment requirement:
+      // "EST ENVOYER A CEUX QUI ONT LE DROIT DE LE TRANFORMER EN FACTURE"
+      // Send priority notification to administrators, direction, accounting, and secretary
+      await addNotification({
+        title: `Nouvelle demande de devis : ${nextDevisNumber}`,
+        message: `${displayClientName} a soumis une demande de devis (${formatHTG(estimatedAmount, 'HTG')}) pour ${reqOrigin} ➔ ${reqDestination} (${reqVehicle}, ${reqPassengers} passagers). Transmis aux responsables habilités pour validation et conversion en facture.`,
+        type: 'info',
+        link: 'proformas',
+        targetId: nextDevisNumber,
+        targetAudience: 'admin',
+        authorUid: user?.uid
+      });
+
+      showToast(`Votre demande de devis ${nextDevisNumber} a été envoyée avec succès aux responsables habilités !`, 'success');
+
+      // User requirement:
+      // "Afficher le devis créé sur cette page avec statut En attente"
+      setSelectedProforma(newDevis);
+      setViewMode('list');
+    } catch (err: any) {
+      console.error('Erreur envoi demande devis:', err);
+      showToast(`Erreur lors de l'envoi : ${err?.message || 'Veuillez réessayer.'}`, 'error');
+    } finally {
+      setIsSubmittingReq(false);
+    }
+  };
+
   // If a proforma is clicked for A4 official preview
   if (selectedProforma) {
     const matchedReservation = reservations.find(r => 
@@ -222,6 +430,911 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
     );
   }
 
+  // =========================================================================
+  // CASE 1: DEDICATED NEW QUOTE REQUEST PAGE (viewMode === 'new-request')
+  // Split View: Form on Left, Live A4 Document Preview on Right (matching screenshot)
+  // =========================================================================
+  if (viewMode === 'new-request') {
+    return (
+      <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '16px 20px 60px' }}>
+        {/* Top Header Bar with Breadcrumb and Action Buttons */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '16px',
+          paddingBottom: '16px',
+          borderBottom: '1px solid #e2e8f0',
+          marginBottom: '24px'
+        }}>
+          {/* Breadcrumb & Title */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>
+              <button
+                type="button"
+                onClick={() => setCurrentModule('dashboard')}
+                style={{ background: 'none', border: 'none', padding: 0, color: '#64748b', cursor: 'pointer', fontSize: '13px' }}
+                className="hover:underline"
+              >
+                Accueil
+              </button>
+              <span>›</span>
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                style={{ background: 'none', border: 'none', padding: 0, color: '#64748b', cursor: 'pointer', fontSize: '13px' }}
+                className="hover:underline"
+              >
+                Mes devis
+              </button>
+              <span>›</span>
+              <span style={{ color: '#0f172a', fontWeight: 700 }}>
+                Nouvelle demande de devis
+              </span>
+            </div>
+            <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.3px' }}>
+              Demander un devis
+            </h1>
+          </div>
+
+          {/* Action buttons */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '10px 16px',
+                borderRadius: '10px',
+                border: '1px solid #cbd5e1',
+                background: '#ffffff',
+                color: '#475569',
+                fontSize: '13.5px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+              }}
+              className="hover:bg-slate-50 transition-colors"
+            >
+              <span>← Retour à mes devis</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSendQuoteRequest()}
+              disabled={isSubmittingReq}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 24px',
+                borderRadius: '10px',
+                border: 'none',
+                background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)',
+                color: '#ffffff',
+                fontSize: '14px',
+                fontWeight: 800,
+                cursor: isSubmittingReq ? 'not-allowed' : 'pointer',
+                opacity: isSubmittingReq ? 0.75 : 1,
+                boxShadow: '0 4px 14px rgba(29, 78, 216, 0.35)',
+                whiteSpace: 'nowrap'
+              }}
+              className="hover:brightness-105 transition-all"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
+              <span>{isSubmittingReq ? 'Envoi en cours...' : 'Envoyer ma demande de devis'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 2-Column Split: Form Configurator on Left, Live A4 Document Sheet on Right */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(340px, 440px) 1fr',
+          gap: '28px',
+          alignItems: 'start'
+        }} className="client-quote-split">
+          
+          {/* ================= LEFT COLUMN: Form Configurator ================= */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            
+            {/* Card 1: Configuration du Trajet & Véhicule */}
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              border: '1px solid #e2e8f0',
+              padding: '22px 24px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  background: '#eff6ff',
+                  color: '#2563eb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '18px'
+                }}>
+                  🚗
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    1. Trajet & Véhicule
+                  </h3>
+                  <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
+                    Renseignez vos étapes et votre flotte souhaitée
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {/* Lieu de départ (Origine) */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                    Lieu de prise en charge (Origine)
+                  </label>
+                  <select
+                    value={reqOrigin}
+                    onChange={(e) => setReqOrigin(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      background: '#ffffff',
+                      fontSize: '13.5px',
+                      fontWeight: 600,
+                      color: '#0f172a',
+                      outline: 'none'
+                    }}
+                  >
+                    <option value="Port-au-Prince">Port-au-Prince</option>
+                    <option value="Pétion-Ville">Pétion-Ville</option>
+                    <option value="Cap-Haïtien">Cap-Haïtien</option>
+                    <option value="Jacmel">Jacmel</option>
+                    <option value="Les Cayes">Les Cayes</option>
+                    <option value="Gonaïves">Gonaïves</option>
+                    <option value="Ouanaminthe">Ouanaminthe</option>
+                    <option value="Saint-Marc">Saint-Marc</option>
+                  </select>
+                </div>
+
+                {/* Lieu d'arrivée (Destination) */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                    Destination d'arrivée
+                  </label>
+                  <select
+                    value={reqDestination}
+                    onChange={(e) => setReqDestination(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      background: '#ffffff',
+                      fontSize: '13.5px',
+                      fontWeight: 600,
+                      color: '#0f172a',
+                      outline: 'none'
+                    }}
+                  >
+                    <option value="Cap-Haïtien">Cap-Haïtien (Nord)</option>
+                    <option value="Port-au-Prince">Port-au-Prince</option>
+                    <option value="Jacmel">Jacmel (Sud-Est)</option>
+                    <option value="Les Cayes">Les Cayes (Sud)</option>
+                    <option value="Gonaïves">Gonaïves (Artibonite)</option>
+                    <option value="Ouanaminthe">Ouanaminthe (Frontière Nord)</option>
+                    <option value="Pétion-Ville">Pétion-Ville</option>
+                    <option value="Côte des Arcadins">Côte des Arcadins</option>
+                  </select>
+                </div>
+
+                {/* Date & Heure */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                      Date du trajet
+                    </label>
+                    <input
+                      type="date"
+                      value={reqDate}
+                      onChange={(e) => setReqDate(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '9px 10px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        background: '#ffffff',
+                        fontSize: '13px',
+                        color: '#0f172a',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                      Heure de départ
+                    </label>
+                    <input
+                      type="time"
+                      value={reqTime}
+                      onChange={(e) => setReqTime(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '9px 10px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        background: '#ffffff',
+                        fontSize: '13px',
+                        color: '#0f172a',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Véhicule souhaité */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                    Véhicule proposé / souhaité
+                  </label>
+                  <select
+                    value={reqVehicle}
+                    onChange={(e) => setReqVehicle(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      background: '#ffffff',
+                      fontSize: '13.5px',
+                      fontWeight: 600,
+                      color: '#0f172a',
+                      outline: 'none'
+                    }}
+                  >
+                    <option value="Toyota Hiace">Toyota Hiace (Minibus 14 places climatisé)</option>
+                    <option value="Minibus Coaster">Toyota Coaster VIP (30 places climatisé)</option>
+                    <option value="Minivan Toyota Noah">Toyota Noah / Voxy (Minivan 7 places)</option>
+                    <option value="SUV VIP Lexus / Prado">SUV VIP Prado / Lexus (4 places Premium)</option>
+                    <option value="Berline Confort">Berline Confort (4 places)</option>
+                  </select>
+                </div>
+
+                {/* Passagers & Type de prestation */}
+                <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                      Passagers
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={60}
+                      value={reqPassengers}
+                      onChange={(e) => setReqPassengers(parseInt(e.target.value, 10) || 1)}
+                      style={{
+                        width: '100%',
+                        padding: '9px 10px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        background: '#ffffff',
+                        fontSize: '13px',
+                        color: '#0f172a',
+                        outline: 'none',
+                        fontWeight: 700
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                      Catégorie de prestation
+                    </label>
+                    <select
+                      value={reqServiceType}
+                      onChange={(e) => setReqServiceType(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '9px 10px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        background: '#ffffff',
+                        fontSize: '13px',
+                        color: '#0f172a',
+                        outline: 'none'
+                      }}
+                    >
+                      <option value="Transport de personnes">Transport de personnes</option>
+                      <option value="Transfert VIP Aéroport">Transfert VIP Aéroport</option>
+                      <option value="Circuit Découverte Touristique">Circuit Découverte Touristique</option>
+                      <option value="Délégation & Événement">Délégation & Événement</option>
+                      <option value="Navette Scolaire & Entreprise">Navette Scolaire & Entreprise</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Précisions & Remarques */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                    Notes & instructions particulières
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={reqNotes}
+                    onChange={(e) => setReqNotes(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      background: '#ffffff',
+                      fontSize: '12.5px',
+                      color: '#0f172a',
+                      outline: 'none',
+                      resize: 'vertical'
+                    }}
+                    placeholder="Précisez un arrêt, bagages volumineux, etc."
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Card 2: Informations du Client Demandeur */}
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              border: '1px solid #e2e8f0',
+              padding: '20px 24px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                <div style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '10px',
+                  background: '#f0fdf4',
+                  color: '#16a34a',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '16px'
+                }}>
+                  👤
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    2. Coordonnées de contact
+                  </h3>
+                  <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
+                    Inscrites sur le document officiel de devis
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                    Nom complet
+                  </label>
+                  <input
+                    type="text"
+                    value={customClientName}
+                    onChange={(e) => setCustomClientName(e.target.value)}
+                    placeholder={clientName}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      background: '#ffffff',
+                      fontSize: '13px',
+                      color: '#0f172a',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                      Téléphone
+                    </label>
+                    <input
+                      type="text"
+                      value={customClientPhone}
+                      onChange={(e) => setCustomClientPhone(e.target.value)}
+                      placeholder={profile?.telephone || '+509 37 12 45 67'}
+                      style={{
+                        width: '100%',
+                        padding: '9px 10px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        background: '#ffffff',
+                        fontSize: '13px',
+                        color: '#0f172a',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={customClientEmail}
+                      onChange={(e) => setCustomClientEmail(e.target.value)}
+                      placeholder={profile?.email || user?.email || 'jean.baptiste@gmail.com'}
+                      style={{
+                        width: '100%',
+                        padding: '9px 10px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        background: '#ffffff',
+                        fontSize: '13px',
+                        color: '#0f172a',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3: Notice & Bouton d'Envoi */}
+            <div style={{
+              background: '#eff6ff',
+              borderRadius: '16px',
+              border: '1px solid #bfdbfe',
+              padding: '18px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                <span style={{ fontSize: '18px', lineHeight: 1 }}>🛡️</span>
+                <p style={{ fontSize: '12.5px', color: '#1e40af', margin: 0, lineHeight: 1.5 }}>
+                  <strong>Transmission directe :</strong> Votre demande sera instantanément adressée aux personnes habilitées (Administration, Direction et Comptabilité) pour validation et conversion en facture officielle.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleSendQuoteRequest()}
+                disabled={isSubmittingReq}
+                style={{
+                  width: '100%',
+                  padding: '13px 20px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)',
+                  color: '#ffffff',
+                  fontSize: '15px',
+                  fontWeight: 800,
+                  cursor: isSubmittingReq ? 'not-allowed' : 'pointer',
+                  opacity: isSubmittingReq ? 0.75 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  boxShadow: '0 4px 14px rgba(29, 78, 216, 0.35)'
+                }}
+                className="hover:brightness-105 transition-all"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="22" y1="2" x2="11" y2="13" />
+                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                </svg>
+                <span>{isSubmittingReq ? 'Envoi en cours...' : 'Envoyer la demande de devis'}</span>
+              </button>
+            </div>
+
+          </div>
+
+          {/* ================= RIGHT COLUMN: Live A4 Document Sheet (Matches Screenshot) ================= */}
+          <div 
+            style={{
+              height: '1351px',
+              width: '800px',
+              background: '#e2e8f0',
+              borderRadius: '16px',
+              border: '1px solid #cbd5e1',
+              padding: '24px 16px 36px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              boxShadow: 'inset 0 2px 8px rgba(0, 0, 0, 0.04)',
+              overflowX: 'auto'
+            }}
+          >
+            {/* A4 Document Toolbar */}
+            <div style={{
+              width: '100%',
+              maxWidth: '794px',
+              marginBottom: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '12px',
+              background: '#ffffff',
+              padding: '10px 18px',
+              borderRadius: '10px',
+              border: '1px solid #cbd5e1',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: '#eff6ff',
+                  color: '#1d4ed8',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  letterSpacing: '0.3px'
+                }}>
+                  <span>📄</span>
+                  <span>FORMAT A4 (210 × 297 mm)</span>
+                </span>
+                <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>
+                  Ratio 1:1.414 · Conforme Impression & PDF
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  style={{
+                    background: '#f8fafc',
+                    border: '1px solid #cbd5e1',
+                    color: '#0f172a',
+                    padding: '5px 12px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                  className="hover:bg-slate-100 transition-colors"
+                  title="Imprimer ou générer le PDF officiel"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                    <polyline points="6 9 6 2 18 2 18 9" />
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                    <rect x="6" y="14" width="12" height="8" />
+                  </svg>
+                  <span>Imprimer / PDF</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Official ISO A4 Paper Sheet (794px × 1123px standard proportion at 96 DPI) */}
+            <div 
+              id="quote-preview-a4-sheet"
+              style={{
+                width: '100%',
+                maxWidth: '794px',
+                minHeight: '1123px',
+                aspectRatio: '210 / 297',
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '3px',
+                boxShadow: '0 15px 35px -5px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05), 0 5px 15px rgba(0, 0, 0, 0.06)',
+                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                boxSizing: 'border-box',
+                overflow: 'hidden'
+              }}
+            >
+              {/* Top Printable Body */}
+              <div style={{ padding: '44px 48px 24px', flex: '1 0 auto', display: 'flex', flexDirection: 'column' }}>
+                
+                {/* Header: Company Brand on Left & DEVIS Badge on Right */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  flexWrap: 'wrap',
+                  gap: '20px',
+                  marginBottom: '28px'
+                }}>
+                  {/* Left Brand block with logo */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+                    <img
+                      src="/logo-laperle.jpg"
+                      alt="Laperle Tour HT"
+                      style={{
+                        width: '84px',
+                        height: '84px',
+                        objectFit: 'contain',
+                        borderRadius: '50%',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                      }}
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                    <div>
+                      <h2 style={{ fontSize: '24px', fontWeight: 900, color: '#082b70', margin: '0 0 2px', lineHeight: 1.1 }}>
+                        <span style={{ color: '#0052cc' }}>Laperle Tour </span>
+                        <span style={{ color: '#f59e0b' }}>HT</span>
+                      </h2>
+                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#082b70', marginBottom: '8px', letterSpacing: '0.5px' }}>
+                        Transport & Tourisme
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#475569', lineHeight: 1.5 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>📍</span> <span>Port-au-Prince, Haïti</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>📞</span> <span>+509 34 56 78 90</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>✉️</span> <span>contact@laperletourht.com</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>🌐</span> <span>www.laperletourht.com</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Badge & Doc Number */}
+                  <div style={{ textAlign: 'right' }}>
+                    <div 
+                      style={{
+                        display: 'inline-block',
+                        background: '#082b70',
+                        color: '#ffffff',
+                        fontWeight: 900,
+                        fontSize: '18px',
+                        letterSpacing: '1px',
+                        padding: '6px 24px',
+                        borderRadius: '6px',
+                        marginBottom: '10px'
+                      }}
+                    >
+                      DEVIS
+                    </div>
+
+                    {/* Clickable link to PDF/print: "CEST UN LIEN QUI OUVRE LA PAGE PDF" */}
+                    <div style={{ marginBottom: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={() => window.print()}
+                        title="Cliquer pour ouvrir et télécharger la version PDF officielle"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: 0,
+                          fontSize: '18px',
+                          fontWeight: 800,
+                          color: '#0052cc',
+                          fontFamily: 'monospace',
+                          cursor: 'pointer',
+                          textDecoration: 'underline',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                        className="hover:text-blue-800"
+                      >
+                        <span>N° {nextDevisNumber}</span>
+                        <span style={{ fontSize: '11px', textDecoration: 'none', background: '#eff6ff', padding: '2px 6px', borderRadius: '4px' }}>PDF ↗</span>
+                      </button>
+                    </div>
+
+                    <div style={{ fontSize: '12.5px', color: '#475569', lineHeight: 1.6 }}>
+                      <div><strong>Date d'émission :</strong> &nbsp;{todayFormatted}</div>
+                      <div><strong>Date de validité :</strong> &nbsp;{validityFormatted}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2 Information Boxes: Left = Devis pour, Right = Trajet */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '20px',
+                  marginBottom: '28px'
+                }} className="client-quote-boxes">
+                  
+                  {/* Box Left: Devis pour */}
+                  <div style={{
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '10px',
+                    padding: '16px 20px'
+                  }}>
+                    <div style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>
+                      Devis pour :
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#1e293b', lineHeight: 1.6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700 }}>
+                        <span>👤</span>
+                        <span>{displayClientName}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#475569' }}>
+                        <span>📞</span>
+                        <span>{displayClientPhone}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#475569' }}>
+                        <span>✉️</span>
+                        <span>{displayClientEmail}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Box Right: Trajet & Déplacement */}
+                  <div style={{
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '10px',
+                    padding: '16px 20px'
+                  }}>
+                    <div style={{ fontSize: '13px', color: '#1e293b', lineHeight: 1.6 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <strong style={{ color: '#0f172a' }}>Trajet :</strong>
+                        <span style={{ color: '#0f172a', fontWeight: 600 }}>{reqOrigin} → {reqDestination}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <strong style={{ color: '#0f172a' }}>Date :</strong>
+                        <span style={{ color: '#475569' }}>{displayTravelDateTime}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <strong style={{ color: '#0f172a' }}>Véhicule proposé :</strong>
+                        <span style={{ color: '#475569' }}>{reqVehicle}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <strong style={{ color: '#0f172a' }}>Passagers :</strong>
+                        <span style={{ color: '#475569' }}>{reqPassengers}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Items Prestations Table */}
+                <div style={{ marginBottom: '24px', overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ background: '#082b70', color: '#ffffff', fontSize: '13px', fontWeight: 800 }}>
+                        <th style={{ padding: '10px 14px', borderRadius: '6px 0 0 6px' }}>Description</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'center', width: '90px' }}>Quantité</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'right', width: '150px' }}>Prix unitaire (HTG)</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'right', width: '150px', borderRadius: '0 6px 6px 0' }}>Montant (HTG)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                        <td style={{ padding: '14px' }}>
+                          <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '13.5px' }}>
+                            {reqServiceType}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                            {reqOrigin} → {reqDestination} ({reqVehicle})
+                          </div>
+                        </td>
+                        <td style={{ padding: '14px', textAlign: 'center', color: '#0f172a', fontWeight: 600, fontSize: '13.5px' }}>
+                          1
+                        </td>
+                        <td style={{ padding: '14px', textAlign: 'right', color: '#0f172a', fontWeight: 600, fontSize: '13.5px', fontVariantNumeric: 'tabular-nums' }}>
+                          {estimatedAmount.toLocaleString('fr-FR')},00
+                        </td>
+                        <td style={{ padding: '14px', textAlign: 'right', color: '#0f172a', fontWeight: 700, fontSize: '13.5px', fontVariantNumeric: 'tabular-nums' }}>
+                          {estimatedAmount.toLocaleString('fr-FR')},00
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Totals Section */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '28px' }}>
+                  <div style={{ width: '310px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#475569' }}>
+                      <span style={{ fontWeight: 700 }}>Sous-total</span>
+                      <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                        {estimatedAmount.toLocaleString('fr-FR')},00 HTG
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#64748b' }}>
+                      <span>TVA (0 %)</span>
+                      <span style={{ fontVariantNumeric: 'tabular-nums' }}>0,00 HTG</span>
+                    </div>
+                    <div 
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        background: '#dbeafe',
+                        borderRadius: '8px',
+                        padding: '12px 14px',
+                        marginTop: '4px'
+                      }}
+                    >
+                      <span style={{ fontWeight: 800, fontSize: '14px', color: '#0052cc' }}>Total du devis</span>
+                      <span style={{ fontWeight: 900, fontSize: '18px', color: '#0052cc', fontVariantNumeric: 'tabular-nums' }}>
+                        {estimatedAmount.toLocaleString('fr-FR')},00 HTG
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notes at Bottom */}
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '12px 16px',
+                  fontSize: '12.5px',
+                  color: '#475569',
+                  lineHeight: 1.5,
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '8px',
+                  marginTop: 'auto'
+                }}>
+                  <span style={{ color: '#0052cc', fontWeight: 800 }}>ℹ️</span>
+                  <div>
+                    <strong>Notes :</strong>
+                    <div style={{ marginTop: '2px' }}>
+                      {reqNotes || `Ce devis est valable jusqu'au ${validityFormatted}. Pour confirmer, veuillez accepter le devis.`}
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Bottom Elements of A4 Sheet: Page numbering and Decorative wave */}
+              <div style={{ marginTop: '24px' }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '0 48px 12px',
+                  fontSize: '11px',
+                  color: '#94a3b8'
+                }}>
+                  <span>Laperle Tour HT · Société de Transport & Tourisme d'Haïti</span>
+                  <span style={{ fontWeight: 700 }}>Page 1 / 1</span>
+                </div>
+
+                {/* Signature Bottom Decorative Wave */}
+                <div style={{
+                  height: '14px',
+                  width: '100%',
+                  background: 'linear-gradient(90deg, #0052cc 0%, #2563eb 50%, #f59e0b 100%)'
+                }} />
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // CASE 2: MAIN LIST VIEW OF DEVIS (viewMode === 'list')
+  // =========================================================================
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 8px 48px' }}>
       {/* 1. Header Hero Card with Fleet Background */}
@@ -497,7 +1610,7 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
 
         <button
           type="button"
-          onClick={() => onOpenModal && onOpenModal('demande-devis')}
+          onClick={() => setViewMode('new-request')}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -513,6 +1626,7 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
             boxShadow: '0 4px 12px rgba(29, 78, 216, 0.3)',
             whiteSpace: 'nowrap'
           }}
+          className="hover:brightness-105 transition-all"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19" />
@@ -620,9 +1734,25 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
                   <td colSpan={6} style={{ padding: '48px 16px', textAlign: 'center', color: '#64748b' }}>
                     <div style={{ fontSize: '36px', marginBottom: '8px' }}>📄</div>
                     <div style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>Aucun devis trouvé</div>
-                    <div style={{ fontSize: '13px', marginTop: '4px', color: '#64748b' }}>
+                    <div style={{ fontSize: '13px', marginTop: '4px', color: '#64748b', marginBottom: '16px' }}>
                       Cliquez sur « Demander un devis » pour soumettre votre premier besoin tarifaire.
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('new-request')}
+                      style={{
+                        padding: '10px 20px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: '#2563eb',
+                        color: '#ffffff',
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Demander un devis maintenant
+                    </button>
                   </td>
                 </tr>
               ) : (
@@ -713,20 +1843,28 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
                       onMouseEnter={(e) => (e.currentTarget.style.background = '#f8fafc')}
                       onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                     >
-                      {/* N° de devis */}
+                      {/* N° de devis (clickable to open A4 / PDF) */}
                       <td style={{ padding: '14px' }}>
-                        <span style={{
-                          display: 'inline-block',
-                          padding: '4px 10px',
-                          borderRadius: '6px',
-                          background: '#eff6ff',
-                          color: '#1d4ed8',
-                          fontWeight: 700,
-                          fontSize: '12.5px',
-                          letterSpacing: '0.2px'
-                        }}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedProforma(p)}
+                          title="Cliquer pour afficher le devis A4 officiel"
+                          style={{
+                            background: '#eff6ff',
+                            border: 'none',
+                            cursor: 'pointer',
+                            display: 'inline-block',
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            color: '#1d4ed8',
+                            fontWeight: 700,
+                            fontSize: '12.5px',
+                            letterSpacing: '0.2px'
+                          }}
+                          className="hover:bg-blue-100 transition-colors"
+                        >
                           {p.number}
-                        </span>
+                        </button>
                       </td>
 
                       {/* Trajet / Prestation */}

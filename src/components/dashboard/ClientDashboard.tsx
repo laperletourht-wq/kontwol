@@ -18,6 +18,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({ onOpenModal })
     abonnements,
     setCurrentModule,
     setClientReservationViewMode,
+    setClientProformaViewMode,
     requestReservationDoc,
     completeReservationByDriver
   } = useApp();
@@ -84,7 +85,10 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({ onOpenModal })
           <button 
             type="button" 
             className="client-btn-secondary"
-            onClick={() => onOpenModal('demande-devis')}
+            onClick={() => {
+              setClientProformaViewMode('new-request');
+              setCurrentModule('proformas');
+            }}
           >
             <span>Demander un Devis</span>
           </button>

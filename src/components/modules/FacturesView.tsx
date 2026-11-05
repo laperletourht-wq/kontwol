@@ -24,6 +24,11 @@ export const FacturesView: React.FC<FacturesViewProps> = ({ onOpenModal }) => {
     showToast
   } = useApp();
   const { role, isSuperAdmin } = useAuth();
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedFacture, setSelectedFacture] = useState<Facture | null>(null);
+  const [proofFacture, setProofFacture] = useState<Facture | null>(null);
+
   const isAdmin = role === 'admin' || isSuperAdmin;
   const isClient = role === 'client' || role === 'prospect';
 
@@ -31,11 +36,6 @@ export const FacturesView: React.FC<FacturesViewProps> = ({ onOpenModal }) => {
   if (isClient) {
     return <ClientFacturesView onOpenModal={onOpenModal} />;
   }
-
-  const [statusFilter, setStatusFilter] = useState('ALL');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedFacture, setSelectedFacture] = useState<Facture | null>(null);
-  const [proofFacture, setProofFacture] = useState<Facture | null>(null);
 
   const exchangeRate = settings?.tauxChangeUSD_HTG || 132;
   const officialWhatsApp = settings?.whatsapp || '+509 4440 8687';

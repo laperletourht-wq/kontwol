@@ -22,6 +22,10 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
     showToast
   } = useApp();
   const { role, isSuperAdmin } = useAuth();
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [assignModalRes, setAssignModalRes] = useState<any | null>(null);
+
   const isAdmin = role === 'admin' || isSuperAdmin;
   const isClient = role === 'client' || role === 'prospect';
 
@@ -29,10 +33,6 @@ export const ReservationsView: React.FC<ReservationsViewProps> = ({ onOpenModal 
   if (isClient) {
     return <ClientReservationsView onOpenModal={onOpenModal} />;
   }
-
-  const [statusFilter, setStatusFilter] = useState('ALL');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [assignModalRes, setAssignModalRes] = useState<any | null>(null);
 
   const exchangeRate = settings?.tauxChangeUSD_HTG || 132;
   const officialWhatsApp = settings?.whatsapp || '+509 4440 8687';

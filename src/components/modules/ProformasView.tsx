@@ -25,6 +25,10 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenModal }) => 
     setCurrentModule
   } = useApp();
   const { role, isSuperAdmin } = useAuth();
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedProforma, setSelectedProforma] = useState<Proforma | null>(null);
+
   const isAdmin = role === 'admin' || isSuperAdmin;
   const isClient = role === 'client' || role === 'prospect';
 
@@ -32,10 +36,6 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenModal }) => 
   if (isClient) {
     return <ClientProformasView onOpenModal={onOpenModal} />;
   }
-
-  const [statusFilter, setStatusFilter] = useState('ALL');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedProforma, setSelectedProforma] = useState<Proforma | null>(null);
 
   const exchangeRate = settings?.tauxChangeUSD_HTG || 132;
   const officialWhatsApp = settings?.whatsapp || '+509 4440 8687';

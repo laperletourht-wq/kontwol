@@ -25,15 +25,24 @@ import { UtilisateursView } from './components/modules/UtilisateursView';
 import { VitrineCMSView } from './components/modules/VitrineCMSView';
 import { ParametresView } from './components/modules/ParametresView';
 import { DashboardVendeur } from './components/dashboard/DashboardVendeur';
+import { ClientReservationsView } from './components/modules/ClientReservationsView';
+import { ClientProformasView } from './components/modules/ClientProformasView';
+import { ClientFacturesView } from './components/modules/ClientFacturesView';
 import { useAuth } from './context/AuthContext';
 
 const MainRouter: React.FC = () => {
-  const { isPublicLanding, currentModule, toast } = useApp();
-  const { canAccess } = useAuth();
+  const { isPublicLanding, currentModule, toast, setCurrentModule, setClientProformaViewMode } = useApp();
+  const { canAccess, role } = useAuth();
+  const isClient = role === 'client' || role === 'prospect';
   const [modalType, setModalType] = useState<string | null>(null);
   const [modalData, setModalData] = useState<any>(null);
 
   const handleOpenModal = (type: string, data?: any) => {
+    if (isClient && type === 'demande-devis') {
+      setClientProformaViewMode('new-request');
+      setCurrentModule('proformas');
+      return;
+    }
     setModalType(type);
     setModalData(data || null);
   };
@@ -49,11 +58,23 @@ const MainRouter: React.FC = () => {
       case 'vendeur':
         return <DashboardVendeur onOpenModal={handleOpenModal} />;
       case 'reservations':
-        return <ReservationsView onOpenModal={handleOpenModal} />;
+        return isClient ? (
+          <ClientReservationsView onOpenModal={handleOpenModal} />
+        ) : (
+          <ReservationsView onOpenModal={handleOpenModal} />
+        );
       case 'proformas':
-        return <ProformasView onOpenModal={handleOpenModal} />;
+        return isClient ? (
+          <ClientProformasView onOpenModal={handleOpenModal} />
+        ) : (
+          <ProformasView onOpenModal={handleOpenModal} />
+        );
       case 'factures':
-        return <FacturesView onOpenModal={handleOpenModal} />;
+        return isClient ? (
+          <ClientFacturesView onOpenModal={handleOpenModal} />
+        ) : (
+          <FacturesView onOpenModal={handleOpenModal} />
+        );
       case 'clients':
         return <ClientsView onOpenModal={handleOpenModal} />;
       case 'eleves':
@@ -67,7 +88,11 @@ const MainRouter: React.FC = () => {
       case 'plannings':
         return <PlanningsView onOpenModal={handleOpenModal} />;
       case 'paiements':
-        return <PaiementsView onOpenModal={handleOpenModal} />;
+        return isClient ? (
+          <ClientFacturesView onOpenModal={handleOpenModal} />
+        ) : (
+          <PaiementsView onOpenModal={handleOpenModal} />
+        );
       case 'finances':
         return <FinancesView />;
       case 'utilisateurs':
@@ -100,7 +125,7 @@ const MainRouter: React.FC = () => {
         data={modalData}
         onClose={() => setModalType(null)}
       />
-      {modalType === 'demande-envoi' && (
+      {modalType === 'demande-envoi' && modalData && (
         <DemandeEnvoiModal
           data={modalData}
           onClose={() => setModalType(null)}

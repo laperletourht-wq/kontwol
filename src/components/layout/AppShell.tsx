@@ -864,10 +864,22 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
         <button
           type="button"
           className="sidebar-logout-btn"
-          onClick={() => {
-            logout();
+          onClick={async () => {
+            try {
+              await logout();
+            } finally {
+              setIsPublicLanding(true);
+              setCurrentModule('dashboard');
+            }
           }}
           title="Se déconnecter"
+          style={{
+            boxSizing: 'border-box',
+            width: 'calc(100% - 24px)',
+            maxWidth: 'calc(100% - 24px)',
+            margin: 'auto 12px 18px 12px',
+            flexShrink: 0
+          }}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>

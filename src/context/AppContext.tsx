@@ -69,6 +69,8 @@ interface AppContextType {
   setCurrentModule: (mod: string) => void;
   clientReservationViewMode: 'list' | 'new';
   setClientReservationViewMode: (mode: 'list' | 'new') => void;
+  clientProformaViewMode: 'list' | 'new-request';
+  setClientProformaViewMode: (mode: 'list' | 'new-request') => void;
   isPublicLanding: boolean;
   setIsPublicLanding: (val: boolean) => void;
   authModalOpen: boolean;
@@ -174,6 +176,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Navigation states
   const [currentModule, setCurrentModule] = useState<string>('dashboard');
   const [clientReservationViewMode, setClientReservationViewMode] = useState<'list' | 'new'>('list');
+  const [clientProformaViewMode, setClientProformaViewMode] = useState<'list' | 'new-request'>('list');
   const [isPublicLanding, setIsPublicLanding] = useState<boolean>(true);
   const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
   const [authView, setAuthView] = useState<'login' | 'register' | 'verify' | 'forgot'>('login');
@@ -207,11 +210,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 4000);
   }, []);
 
-  // When user logs in, show dashboard by default
+  // When user auth changes: show dashboard on login, or return to landing page on logout
   useEffect(() => {
     if (user) {
       setIsPublicLanding(false);
       setAuthModalOpen(false);
+    } else {
+      setIsPublicLanding(true);
+      setCurrentModule('dashboard');
     }
   }, [user]);
 
@@ -1725,6 +1731,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentModule,
         clientReservationViewMode,
         setClientReservationViewMode,
+        clientProformaViewMode,
+        setClientProformaViewMode,
         isPublicLanding,
         setIsPublicLanding,
         authModalOpen,

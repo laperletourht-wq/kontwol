@@ -56,15 +56,15 @@ export const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({
   const status = (docItem.status || docItem.statut || (isDevis ? 'En attente' : 'Payée'));
 
   // Linked reservation / demand info
-  const demandOrResNumber = reservation?.id || docItem.dossierId || (docItem as any).reservationId || (isDevis ? 'DEM-2025-0067' : 'RES-2025-0032');
-  const origin = reservation?.origin || 'Port-au-Prince';
-  const destination = reservation?.destination || 'Cap-Haïtien';
+  const demandOrResNumber = reservation?.id || (docItem as any).dossierId || (docItem as any).demandNumber || (docItem as any).reservationId || (isDevis ? 'DEM-2025-0067' : 'RES-2025-0032');
+  const origin = reservation?.origin || (docItem as any).origin || (docItem as any).pickup || 'Port-au-Prince';
+  const destination = reservation?.destination || (docItem as any).destination || (docItem as any).dropoff || 'Cap-Haïtien';
   const trajetDisplay = `${origin} → ${destination}`;
   const dateTimeDisplay = reservation?.date && reservation?.time 
     ? `${reservation.date} à ${reservation.time}` 
-    : '28 janv. 2025 à 08:00';
-  const vehiculeDisplay = reservation?.vehicle || reservation?.vehicule || 'Toyota Hiace';
-  const passagersDisplay = reservation?.passengers || 10;
+    : ((docItem as any).travelDate ? `${(docItem as any).travelDate} à ${(docItem as any).travelTime || '08:00'}` : '28 janv. 2025 à 08:00');
+  const vehiculeDisplay = reservation?.vehicle || reservation?.vehicule || (docItem as any).vehicleType || (docItem as any).vehicle || 'Toyota Hiace';
+  const passagersDisplay = reservation?.passengers || (docItem as any).passengers || 10;
 
   // Customer info
   const clientName = docItem.client || profile?.nom || profile?.name || user?.displayName || 'Jean Baptiste';
@@ -414,9 +414,32 @@ export const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({
 
             {/* Rows list */}
             <div style={{ padding: '4px 16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #f1f5f9', fontSize: '13px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #f1f5f9', fontSize: '13px' }}>
                 <span style={{ color: '#64748b' }}>{isDevis ? 'N° de devis' : 'N° de facture'}</span>
-                <strong style={{ color: '#0f172a', fontFamily: 'monospace', fontSize: '13.5px' }}>{docNumber}</strong>
+                <button
+                  type="button"
+                  onClick={handlePrintOrPdf}
+                  title="Cliquer pour ouvrir et télécharger la version PDF officielle"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '2px 6px',
+                    color: '#0052cc',
+                    cursor: 'pointer',
+                    fontFamily: 'monospace',
+                    fontSize: '13.5px',
+                    fontWeight: 800,
+                    textDecoration: 'underline',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    borderRadius: '4px'
+                  }}
+                  className="hover:bg-blue-50"
+                >
+                  <span>{docNumber}</span>
+                  <span style={{ fontSize: '11px', textDecoration: 'none' }}>↗ PDF</span>
+                </button>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #f1f5f9', fontSize: '13px' }}>
@@ -576,12 +599,20 @@ export const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({
           className="official-doc-sheet"
           style={{
             background: '#ffffff',
-            borderRadius: '16px',
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 10px 30px rgba(0, 82, 204, 0.05)',
-            padding: '36px 40px 48px',
+            borderRadius: '4px',
+            border: '1px solid #cbd5e1',
+            boxShadow: '0 15px 35px -5px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+            padding: '44px 48px 48px',
             position: 'relative',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            width: '100%',
+            maxWidth: '794px',
+            minHeight: '1123px',
+            boxSizing: 'border-box',
+            margin: '0 auto',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between'
           }}
         >
           {/* Header of Official Sheet */}
@@ -634,9 +665,30 @@ export const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({
               >
                 {isDevis ? 'DEVIS' : 'FACTURE'}
               </div>
-              <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace', marginBottom: '6px' }}>
-                N° {docNumber}
-              </div>
+              <button
+                type="button"
+                onClick={handlePrintOrPdf}
+                title="Cliquer pour ouvrir et télécharger la version PDF officielle"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  fontSize: '18px',
+                  fontWeight: 800,
+                  color: '#0052cc',
+                  fontFamily: 'monospace',
+                  marginBottom: '6px',
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+                className="hover:text-blue-700"
+              >
+                <span>N° {docNumber}</span>
+                <span style={{ fontSize: '11.5px', fontWeight: 600, color: '#2563eb', textDecoration: 'none' }}>↗ PDF</span>
+              </button>
               <div style={{ fontSize: '12px', color: '#475569', lineHeight: 1.6 }}>
                 <div>Date d'émission : <strong style={{ color: '#0f172a' }}>{dateEmission}</strong></div>
                 <div>{isDevis ? 'Date de validité :' : 'Date d\'échéance :'} <strong style={{ color: '#0f172a' }}>{dateValiditeOrEcheance}</strong></div>

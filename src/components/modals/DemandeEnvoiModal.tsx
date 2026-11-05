@@ -14,9 +14,8 @@ export const DemandeEnvoiModal: React.FC<DemandeEnvoiModalProps> = ({ data, onCl
   const { requestDocumentSend, settings, factures, proformas, reservations } = useApp();
   const { user, profile } = useAuth();
 
-  if (!data) return null;
-
-  const { type, doc: initialDoc } = data;
+  const type = data?.type || 'facture';
+  const initialDoc = data?.doc;
   const isFacture = type === 'facture';
   const clientName = profile?.nom || profile?.name || user?.displayName || initialDoc?.client || 'Client';
 
@@ -43,6 +42,8 @@ export const DemandeEnvoiModal: React.FC<DemandeEnvoiModalProps> = ({ data, onCl
       setSelectedDocId(initialDoc.id || initialDoc.number);
     }
   }, [initialDoc]);
+
+  if (!data) return null;
 
   // Resolve current document info
   let activeDoc = initialDoc;

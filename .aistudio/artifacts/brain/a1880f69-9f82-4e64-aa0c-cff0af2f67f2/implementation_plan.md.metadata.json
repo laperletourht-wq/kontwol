@@ -1,0 +1,6 @@
+{
+  "summary": "Plan d'implémentation court et précis pour la page dédiée de demande de devis client : passage en page complète avec vue scindée (formulaire interactif à gauche, aperçu officiel A4 à droite), bouton Envoyer, et affichage immédiat du devis généré au statut « En attente ».",
+  "updatedAt": "2026-11-05T16:14:50.050321661Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

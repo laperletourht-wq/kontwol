@@ -22,6 +22,10 @@ export const PaiementsView: React.FC<PaiementsViewProps> = ({ onOpenModal }) => 
     showToast
   } = useApp();
   const { role, isSuperAdmin } = useAuth();
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'VALID' | 'PENDING' | 'REJECTED'>('ALL');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [zoomedProofImage, setZoomedProofImage] = useState<string | null>(null);
+
   const isAdmin = role === 'admin' || isSuperAdmin;
   const isClient = role === 'client' || role === 'prospect';
 
@@ -29,10 +33,6 @@ export const PaiementsView: React.FC<PaiementsViewProps> = ({ onOpenModal }) => 
   if (isClient) {
     return <ClientFacturesView onOpenModal={onOpenModal} />;
   }
-
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'VALID' | 'PENDING' | 'REJECTED'>('ALL');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [zoomedProofImage, setZoomedProofImage] = useState<string | null>(null);
 
   const exchangeRate = settings?.tauxChangeUSD_HTG || 132;
   const officialWhatsApp = settings?.whatsapp || '+509 4440 8687';
