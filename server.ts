@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const { default: app } = await import('./services/apiApp.js');
-  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  const port = 3000;
   const isProd = process.env.NODE_ENV === 'production';
 
   if (!isProd) {
