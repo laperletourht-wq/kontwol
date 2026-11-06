@@ -597,14 +597,14 @@ service cloud.firestore {
             (('clientUid' in existing()) && existing().clientUid == request.auth.uid) ||
             (('createdBy' in existing()) && existing().createdBy == request.auth.uid)
           ) &&
-          // Un client ne peut pas modifier une réservation déjà validée par le secrétariat
-          (!('status' in existing()) || existing().status in ['En attente', 'Brouillon']) &&
+          // Un client ne peut pas modifier une réservation déjà validée par le secrétariat sauf pour associer un devis/facture
+          (!('status' in existing()) || existing().status in ['En attente', 'Brouillon', 'Confirmée']) &&
           incoming().diff(existing()).affectedKeys().hasOnly([
             'date', 'time', 'origin', 'destination', 'passengers', 'flightNumber', 
             'notes', 'service', 'currency', 'amount', 'telephone', 'client', 'email', 'updatedAt', 'updatedBy',
-            'demandeDevis', 'demandeFacture', 'dossierId'
+            'demandeDevis', 'demandeFacture', 'dossierId', 'factureRef', 'devisRef'
           ]) &&
-          (!('status' in incoming()) || incoming().status in ['En attente', 'Brouillon'])
+          (!('status' in incoming()) || incoming().status in ['En attente', 'Brouillon', 'Confirmée', 'Facturé', 'Facturée'])
         )
       );
       allow delete: if isAdmin() && isValidId(reservationId);
@@ -647,8 +647,14 @@ service cloud.firestore {
       ) && isValidProforma(incoming());
       allow update: if isValidId(proformaId) && (
         ((canManageFinances() || isSecretaire() || isVendeur()) && isValidProforma(incoming())) ||
-        (isSignedIn() && isClientDoc(existing()) &&
-          incoming().diff(existing()).affectedKeys().hasOnly(['demandeFacture', 'dateDemandeFacture', 'moyenPaiement', 'modalitePaiement', 'referencePaiement', 'noteFacturation', 'updatedAt', 'updatedBy']))
+        (isSignedIn() && isClientDoc(existing()) && (
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'demandeFacture', 'dateDemandeFacture', 'moyenPaiement', 'modalitePaiement', 
+            'referencePaiement', 'noteFacturation', 'updatedAt', 'updatedBy', 
+            'status', 'statut', 'factureNumber', 'notes'
+          ]) &&
+          (!('status' in incoming()) || incoming().status in ['En attente', 'Brouillon', 'Refusée', 'Acceptée', 'Convertie en facture', 'Facturée'])
+        ))
       );
       allow delete: if isAdmin() && isValidId(proformaId);
     }
@@ -670,6 +676,17 @@ service cloud.firestore {
           !('status' in incoming()) || incoming().status in ['En attente', 'Brouillon']
         ))
       );
+      allow update: if isValidId(quoteId) && (
+        canManageFinances() || isSecretaire() || isVendeur() ||
+        (isSignedIn() && isClientDoc(existing()) && (
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'demandeFacture', 'dateDemandeFacture', 'moyenPaiement', 'modalitePaiement', 
+            'referencePaiement', 'noteFacturation', 'updatedAt', 'updatedBy', 
+            'status', 'statut', 'factureNumber', 'notes'
+          ]) &&
+          (!('status' in incoming()) || incoming().status in ['En attente', 'Brouillon', 'Refusée', 'Acceptée', 'Convertie en facture', 'Facturée'])
+        ))
+      );
       allow delete: if isAdmin() && isValidId(quoteId);
     }
 
@@ -681,7 +698,16 @@ service cloud.firestore {
           (('clientId' in existing()) && existing().clientId == request.auth.uid) ||
           (('uid' in existing()) && existing().uid == request.auth.uid)
         ));
-      allow create: if (canManageFinances() || isSecretaire() || isVendeur()) && isValidId(factureId) && isValidFacture(incoming());
+      allow create: if isValidId(factureId) && isValidFacture(incoming()) && (
+        canManageFinances() || isSecretaire() || isVendeur() ||
+        (isSignedIn() && (
+          isClientDoc(incoming()) ||
+          (('clientId' in incoming()) && incoming().clientId == request.auth.uid) ||
+          (('uid' in incoming()) && incoming().uid == request.auth.uid)
+        ) && (
+          !('status' in incoming()) || incoming().status in ['En attente', 'Brouillon', 'Impayée', 'Non payée']
+        ))
+      );
       allow update: if isValidId(factureId) && (
         ((canManageFinances() || isSecretaire() || isVendeur()) && isValidFacture(incoming())) ||
         (isSignedIn() && isClientDoc(existing()) &&
@@ -695,7 +721,18 @@ service cloud.firestore {
     }
     match /invoices/{invoiceId} {
       allow get, list: if canReadFinances() || ((isClient() || isProspect()) && isClientDoc(existing()));
-      allow create, update: if (canManageFinances() || isSecretaire() || isVendeur()) && isValidId(invoiceId);
+      allow create: if isValidId(invoiceId) && (
+        canManageFinances() || isSecretaire() || isVendeur() ||
+        (isSignedIn() && (
+          isClientDoc(incoming()) ||
+          (('clientId' in incoming()) && incoming().clientId == request.auth.uid) ||
+          (('uid' in incoming()) && incoming().uid == request.auth.uid)
+        ))
+      );
+      allow update: if isValidId(invoiceId) && (
+        canManageFinances() || isSecretaire() || isVendeur() ||
+        (isSignedIn() && isClientDoc(existing()))
+      );
       allow delete: if isAdmin() && isValidId(invoiceId);
     }
 

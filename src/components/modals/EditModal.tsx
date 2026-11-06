@@ -289,7 +289,7 @@ export const EditModal: React.FC<EditModalProps> = ({ type, data, onClose }) => 
           }
           const targetId = formData.id || formData.uid || `usr-${Date.now().toString().slice(-6)}`;
           const userRole = (formData.role as UserRole) || 'client';
-          const allowedModules = formData.allowedModules || (ROLE_PERMISSIONS[userRole] || ['dashboard']);
+          const allowedModules = formData.allowedModules || (ROLE_PERMISSIONS[userRole] || ['reservations']);
           await updateUserRoleAndZones(targetId, userRole, allowedModules, formData.status || 'actif');
           showToast(`Compte de ${formData.nom || formData.email} enregistré avec succès`, 'success');
           break;

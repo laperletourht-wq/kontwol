@@ -43,7 +43,7 @@ export const UtilisateursView: React.FC<UtilisateursViewProps> = ({ onOpenModal 
       nom: 'Service Comptabilité & Trésorerie',
       role: 'comptabilite',
       roles: ['comptabilite'],
-      allowedModules: ['dashboard', 'proformas', 'factures', 'clients', 'abonnements', 'paiements', 'finances'],
+      allowedModules: ['proformas', 'factures', 'clients', 'abonnements', 'paiements', 'finances'],
       status: 'actif'
     },
     {
@@ -52,7 +52,7 @@ export const UtilisateursView: React.FC<UtilisateursViewProps> = ({ onOpenModal 
       nom: 'Bureau Dispatch & Accueil',
       role: 'secretaire',
       roles: ['secretaire'],
-      allowedModules: ['dashboard', 'reservations', 'proformas', 'factures', 'clients', 'eleves', 'abonnements', 'plannings'],
+      allowedModules: ['reservations', 'proformas', 'factures', 'clients', 'eleves', 'abonnements', 'plannings'],
       status: 'actif'
     }
   ];
@@ -75,7 +75,7 @@ export const UtilisateursView: React.FC<UtilisateursViewProps> = ({ onOpenModal 
       return u.allowedModules;
     }
     const r = u.role || 'client';
-    return ROLE_PERMISSIONS[r] || ['dashboard'];
+    return ROLE_PERMISSIONS[r] || ['reservations'];
   };
 
   return (

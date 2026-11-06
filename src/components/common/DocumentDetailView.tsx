@@ -25,6 +25,7 @@ export const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({
   const { settings, showToast, setCurrentModule } = useApp();
   const { profile, user } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [confirmRefuse, setConfirmRefuse] = useState(false);
 
   const isDevis = type === 'devis';
   const proforma = isDevis ? (docItem as Proforma) : null;
@@ -111,13 +112,12 @@ export const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({
 
   const handleRefuse = async () => {
     if (!proforma || !onRefuseDevis) return;
-    if (window.confirm(`Confirmez-vous le refus du devis ${docNumber} ?`)) {
-      setIsProcessing(true);
-      try {
-        await onRefuseDevis(proforma);
-      } finally {
-        setIsProcessing(false);
-      }
+    setIsProcessing(true);
+    try {
+      await onRefuseDevis(proforma);
+      setConfirmRefuse(false);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -178,7 +178,7 @@ export const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({
             <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }} className="flex items-center gap-1.5">
               <button 
                 type="button" 
-                onClick={() => setCurrentModule('dashboard')} 
+                onClick={() => setCurrentModule('reservations')} 
                 style={{ background: 'none', border: 'none', padding: 0, color: '#64748b', cursor: 'pointer', fontSize: '12px' }}
                 className="hover:underline"
               >
@@ -290,28 +290,70 @@ export const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({
               </button>
 
               {status !== 'Convertie en facture' && status !== 'Acceptée' && status !== 'Refusée' && (
-                <button
-                  type="button"
-                  onClick={handleRefuse}
-                  disabled={isProcessing}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '8px 14px',
-                    borderRadius: '8px',
-                    border: '1.5px solid #ef4444',
-                    background: '#ffffff',
-                    color: '#dc2626',
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                  }}
-                  className="hover:bg-red-50 transition-colors"
-                >
-                  <span>✕</span>
-                  <span>Refuser le devis</span>
-                </button>
+                !confirmRefuse ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmRefuse(true)}
+                    disabled={isProcessing}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      border: '1.5px solid #ef4444',
+                      background: '#ffffff',
+                      color: '#dc2626',
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                    className="hover:bg-red-50 transition-colors"
+                  >
+                    <span>✕</span>
+                    <span>Refuser le devis</span>
+                  </button>
+                ) : (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#fef2f2', padding: '4px 8px', borderRadius: '8px', border: '1px solid #fecaca' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#991b1b' }}>Confirmer le refus ?</span>
+                    <button
+                      type="button"
+                      onClick={handleRefuse}
+                      disabled={isProcessing}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        background: '#dc2626',
+                        color: '#ffffff',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                      className="hover:bg-red-700 transition-colors"
+                    >
+                      {isProcessing ? 'En cours...' : 'Oui, refuser'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmRefuse(false)}
+                      disabled={isProcessing}
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        background: '#ffffff',
+                        color: '#475569',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                      className="hover:bg-slate-100 transition-colors"
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                )
               )}
             </>
           )}

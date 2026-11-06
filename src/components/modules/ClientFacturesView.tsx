@@ -691,18 +691,43 @@ export const ClientFacturesView: React.FC<ClientFacturesViewProps> = ({ onOpenMo
                     >
                       {/* N° de facture */}
                       <td style={{ padding: '14px' }}>
-                        <span style={{
-                          display: 'inline-block',
-                          padding: '4px 10px',
-                          borderRadius: '6px',
-                          background: '#eff6ff',
-                          color: '#1d4ed8',
-                          fontWeight: 700,
-                          fontSize: '12.5px',
-                          letterSpacing: '0.2px'
-                        }}>
-                          {f.number}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedFacture(f)}
+                          title={`Cliquer pour afficher la facture officielle A4 N° ${f.number}`}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '5px 11px',
+                            borderRadius: '6px',
+                            background: '#eff6ff',
+                            color: '#1d4ed8',
+                            fontWeight: 700,
+                            fontSize: '12.5px',
+                            letterSpacing: '0.2px',
+                            border: '1px solid #bfdbfe',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#dbeafe';
+                            e.currentTarget.style.color = '#1e40af';
+                            e.currentTarget.style.borderColor = '#93c5fd';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#eff6ff';
+                            e.currentTarget.style.color = '#1d4ed8';
+                            e.currentTarget.style.borderColor = '#bfdbfe';
+                          }}
+                        >
+                          <span>{f.number}</span>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7 }}>
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                            <polyline points="15 3 21 3 21 9" />
+                            <line x1="10" y1="14" x2="21" y2="3" />
+                          </svg>
+                        </button>
                       </td>
 
                       {/* Dossier / Prestation */}

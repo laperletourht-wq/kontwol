@@ -63,7 +63,7 @@ export const UserRoleModal: React.FC<UserRoleModalProps> = ({ userToEdit, onClos
   };
 
   const handleDeselectAll = () => {
-    setSelectedZones(['dashboard']); // Always keep dashboard as minimum
+    setSelectedZones([]);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -77,8 +77,7 @@ export const UserRoleModal: React.FC<UserRoleModalProps> = ({ userToEdit, onClos
     setErrorMessage(null);
 
     try {
-      // Ensure dashboard is always accessible
-      const finalZones = Array.from(new Set([...selectedZones, 'dashboard']));
+      const finalZones = Array.from(new Set(selectedZones));
 
       await updateUserRoleAndZones(userToEdit.id, selectedRole, finalZones, status);
       showToast(`Rôle et accès aux zones mis à jour pour ${userToEdit.nom || userToEdit.email}`, 'success');
@@ -231,7 +230,6 @@ export const UserRoleModal: React.FC<UserRoleModalProps> = ({ userToEdit, onClos
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
                       {zonesInCat.map((z) => {
                         const isChecked = selectedZones.includes(z.key);
-                        const isDashboard = z.key === 'dashboard'; // Tableau de bord toujours inclus
 
                         return (
                           <label
@@ -244,14 +242,14 @@ export const UserRoleModal: React.FC<UserRoleModalProps> = ({ userToEdit, onClos
                               borderRadius: '8px',
                               background: isChecked ? '#eff6ff' : '#ffffff',
                               border: isChecked ? '1.5px solid #3b82f6' : '1px solid #e2e8f0',
-                              cursor: isAdmin ? (isDashboard ? 'default' : 'pointer') : 'not-allowed',
+                              cursor: isAdmin ? 'pointer' : 'not-allowed',
                               transition: 'all 0.15s ease'
                             }}
                           >
                             <input
                               type="checkbox"
-                              checked={isChecked || isDashboard}
-                              disabled={!isAdmin || isDashboard || isSaving}
+                              checked={isChecked}
+                              disabled={!isAdmin || isSaving}
                               onChange={() => handleToggleZone(z.key)}
                               style={{ marginTop: '2px', accentColor: '#082b70', width: '16px', height: '16px', cursor: isAdmin ? 'pointer' : 'not-allowed' }}
                             />

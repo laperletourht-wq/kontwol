@@ -9,7 +9,6 @@ import { LiveChatModal } from './components/modals/LiveChatModal';
 import { EditModal } from './components/modals/EditModal';
 import { DemandeEnvoiModal } from './components/modals/DemandeEnvoiModal';
 
-import { DashboardView } from './components/modules/DashboardView';
 import { ReservationsView } from './components/modules/ReservationsView';
 import { ProformasView } from './components/modules/ProformasView';
 import { FacturesView } from './components/modules/FacturesView';
@@ -32,8 +31,9 @@ import { useAuth } from './context/AuthContext';
 
 const MainRouter: React.FC = () => {
   const { isPublicLanding, currentModule, toast, setCurrentModule, setClientProformaViewMode } = useApp();
-  const { canAccess, role } = useAuth();
+  const { canAccess, role, loading } = useAuth();
   const isClient = role === 'client' || role === 'prospect';
+  const isChauffeur = role === 'chauffeur';
   const [modalType, setModalType] = useState<string | null>(null);
   const [modalData, setModalData] = useState<any>(null);
 
@@ -47,14 +47,18 @@ const MainRouter: React.FC = () => {
     setModalData(data || null);
   };
 
+  const renderDefaultModule = () => {
+    if (isChauffeur) return <PlanningsView onOpenModal={handleOpenModal} />;
+    if (isClient) return <ClientReservationsView onOpenModal={handleOpenModal} />;
+    return <ReservationsView onOpenModal={handleOpenModal} />;
+  };
+
   const renderModule = () => {
     // Strict RBAC route guard
-    if (currentModule !== 'dashboard' && !canAccess(currentModule)) {
-      return <DashboardView onOpenModal={handleOpenModal} />;
+    if (!canAccess(currentModule)) {
+      return renderDefaultModule();
     }
     switch (currentModule) {
-      case 'dashboard':
-        return <DashboardView onOpenModal={handleOpenModal} />;
       case 'vendeur':
         return <DashboardVendeur onOpenModal={handleOpenModal} />;
       case 'reservations':
@@ -102,9 +106,42 @@ const MainRouter: React.FC = () => {
       case 'parametres':
         return <ParametresView />;
       default:
-        return <DashboardView onOpenModal={handleOpenModal} />;
+        return renderDefaultModule();
     }
   };
+
+  if (loading) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#06193d',
+        color: '#ffffff',
+        fontFamily: 'Plus Jakarta Sans, sans-serif'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '44px',
+            height: '44px',
+            border: '3px solid rgba(255,255,255,0.2)',
+            borderTopColor: '#f97316',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+            margin: '0 auto 16px'
+          }} />
+          <div style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '0.2px' }}>
+            LAPERLE TOUR HT
+          </div>
+          <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
+            Chargement en cours...
+          </div>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

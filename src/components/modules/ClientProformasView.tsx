@@ -479,7 +479,7 @@ export const ClientProformasView: React.FC<ClientProformasViewProps> = ({ onOpen
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>
               <button
                 type="button"
-                onClick={() => setCurrentModule('dashboard')}
+                onClick={() => setCurrentModule('reservations')}
                 style={{ background: 'none', border: 'none', padding: 0, color: '#64748b', cursor: 'pointer', fontSize: '13px' }}
                 className="hover:underline"
               >

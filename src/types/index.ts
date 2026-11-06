@@ -50,9 +50,8 @@ export interface SystemZoneDefinition {
 }
 
 export const ALL_SYSTEM_ZONES: SystemZoneDefinition[] = [
-  { key: 'dashboard', label: 'Tableau de Bord', icon: '📊', category: 'Vue Globale', description: 'Vue générale, indicateurs clés et activités en direct' },
-  { key: 'plannings', label: 'Planning & Dispatch', icon: '📅', category: 'Vue Globale', description: 'Calendrier des trajets, courses assignées et dispatch chauffeurs' },
   { key: 'reservations', label: 'Réservations & Courses', icon: '🚗', category: 'Transport & Flotte', description: 'Prise en charge de passagers, courses privées et transferts VIP' },
+  { key: 'plannings', label: 'Planning & Dispatch', icon: '📅', category: 'Vue Globale', description: 'Calendrier des trajets, courses assignées et dispatch chauffeurs' },
   { key: 'vehicules', label: 'Flotte Véhicules', icon: '🚘', category: 'Transport & Flotte', description: 'Suivi du parc automobile, statut de disponibilité et assignations' },
   { key: 'chauffeurs', label: 'Chauffeurs & Personnel', icon: '👔', category: 'Transport & Flotte', description: 'Gestion des chauffeurs assermentés, permis et contacts directs' },
   { key: 'eleves', label: 'Élèves & Ramassage', icon: '🎒', category: 'Scolaire', description: 'Inscriptions scolaires, écoles partenaires et arrêts de navette' },

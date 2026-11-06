@@ -174,7 +174,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const { user, profile, role, roles, isSuperAdmin } = useAuth();
 
   // Navigation states
-  const [currentModule, setCurrentModule] = useState<string>('dashboard');
+  const [currentModule, setCurrentModule] = useState<string>('reservations');
   const [clientReservationViewMode, setClientReservationViewMode] = useState<'list' | 'new'>('list');
   const [clientProformaViewMode, setClientProformaViewMode] = useState<'list' | 'new-request'>('list');
   const [isPublicLanding, setIsPublicLanding] = useState<boolean>(true);
@@ -210,14 +210,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 4000);
   }, []);
 
-  // When user auth changes: show dashboard on login, or return to landing page on logout
+  // When user auth changes: show reservations on login, or return to landing page on logout
   useEffect(() => {
     if (user) {
       setIsPublicLanding(false);
       setAuthModalOpen(false);
     } else {
       setIsPublicLanding(true);
-      setCurrentModule('dashboard');
+      setCurrentModule('reservations');
     }
   }, [user]);
 
@@ -928,7 +928,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       telephone: resolvedTelephone,
       client: resolvedClient
     };
-    await saveItemToCollection('factures', enriched, setRawFactures, 'Facture enregistrée');
+
+    // 1. Tenter l'API backend pour enregistrement fiable immédiat
+    let apiFactureSuccess = false;
+    if (auth.currentUser) {
+      try {
+        const token = await auth.currentUser.getIdToken();
+        const res = await fetch('/api/factures', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ facture: enriched })
+        });
+        if (res.ok) {
+          const body = await res.json();
+          const savedFacture = (body.facture || enriched) as Facture;
+          setRawFactures((prev) => {
+            const idx = prev.findIndex((f) => f.id === savedFacture.id || f.number === savedFacture.number);
+            if (idx >= 0) {
+              const updated = [...prev];
+              updated[idx] = savedFacture;
+              return updated;
+            }
+            return [savedFacture, ...prev];
+          });
+          showToast('Facture enregistrée avec succès', 'success');
+          apiFactureSuccess = true;
+          // Synchronisation Firestore en tâche de fond
+          setDoc(doc(db, 'factures', savedFacture.id), savedFacture as any).catch(() => {});
+          return;
+        }
+      } catch (err) {
+        console.warn('API backend factures fallback to direct Firestore:', err);
+      }
+    }
+
+    if (!apiFactureSuccess) {
+      await saveItemToCollection('factures', enriched, setRawFactures, 'Facture enregistrée');
+    }
   };
   const deleteFacture = async (id: string) => {
     await deleteItemFromCollection('factures', id, setRawFactures, 'Facture supprimée');
@@ -1224,6 +1263,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const convertProformaToFacture = async (proforma: Proforma) => {
+    // 1. Tenter la conversion sécurisée côté serveur (règles et droits complets)
+    if (auth.currentUser) {
+      try {
+        const token = await auth.currentUser.getIdToken();
+        const res = await fetch(`/api/proformas/${encodeURIComponent(proforma.id || proforma.number)}/accept`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (res.ok) {
+          const body = await res.json();
+          const newFacture = body.facture as Facture;
+          const updatedProforma = (body.proforma || { ...proforma, status: 'Convertie en facture', factureNumber: body.factureNumber }) as Proforma;
+          
+          setRawFactures(prev => [newFacture, ...prev.filter(f => f.id !== newFacture.id && f.number !== newFacture.number)]);
+          setRawProformas(prev => prev.map(p => (p.id === updatedProforma.id || p.number === updatedProforma.number) ? updatedProforma : p));
+          if (proforma.reservationId) {
+            setRawReservations(prev => prev.map(r => r.id === proforma.reservationId ? { ...r, factureRef: body.factureNumber, status: 'Facturé', demandeFacture: false } : r));
+          }
+
+          showToast(`Devis ${proforma.number} accepté ! Facture ${body.factureNumber} émise avec succès.`, 'success');
+          setCurrentModule('factures');
+          return newFacture;
+        }
+      } catch (e) {
+        console.warn('Accept devis via API backend fallback to Firestore:', e);
+      }
+    }
+
     const factureNumber = `FAC-${Date.now().toString().slice(-6)}`;
     const newFacture: Facture = {
       id: factureNumber,

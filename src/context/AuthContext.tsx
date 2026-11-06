@@ -51,31 +51,31 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   admin: [
-    'dashboard', 'vendeur', 'reservations', 'proformas', 'factures', 'clients', 
+    'reservations', 'proformas', 'factures', 'clients', 
     'eleves', 'abonnements', 'vehicules', 'chauffeurs', 'plannings', 
-    'paiements', 'finances', 'utilisateurs', 'vitrine', 'parametres'
+    'paiements', 'finances', 'utilisateurs', 'vitrine', 'parametres', 'vendeur'
   ],
   direction: [
-    'dashboard', 'vendeur', 'reservations', 'proformas', 'factures', 'clients', 
+    'reservations', 'proformas', 'factures', 'clients', 
     'eleves', 'abonnements', 'vehicules', 'chauffeurs', 'plannings', 
-    'paiements', 'finances', 'vitrine', 'parametres'
+    'paiements', 'finances', 'vitrine', 'parametres', 'vendeur'
   ],
   comptabilite: [
-    'dashboard', 'proformas', 'factures', 'clients', 'abonnements', 
+    'proformas', 'factures', 'clients', 'abonnements', 
     'paiements', 'finances'
   ],
   secretaire: [
-    'dashboard', 'reservations', 'proformas', 'factures', 'clients', 
+    'reservations', 'proformas', 'factures', 'clients', 
     'eleves', 'abonnements', 'plannings', 'paiements'
   ],
   operations: [
-    'dashboard', 'reservations', 'vehicules', 'chauffeurs', 'plannings'
+    'reservations', 'vehicules', 'chauffeurs', 'plannings'
   ],
   vendeur: [
-    'dashboard', 'vendeur', 'proformas', 'factures', 'clients', 'reservations', 'parametres'
+    'vendeur', 'proformas', 'factures', 'clients', 'reservations', 'parametres'
   ],
   chauffeur: [
-    'dashboard', 'plannings', 'vehicules', 'parametres'
+    'plannings', 'vehicules', 'parametres'
   ],
   client: [
     'reservations', 'proformas', 'factures', 'parametres'
@@ -84,7 +84,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'reservations', 'proformas', 'factures', 'parametres'
   ],
   lecture_seule: [
-    'dashboard', 'reservations', 'proformas', 'factures', 'clients', 
+    'reservations', 'proformas', 'factures', 'clients', 
     'eleves', 'abonnements', 'vehicules', 'chauffeurs', 'plannings', 
     'paiements', 'finances'
   ]

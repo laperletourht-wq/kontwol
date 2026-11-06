@@ -120,6 +120,36 @@ function saveLocalReservation(item) {
   }
 }
 
+function getLocalFactures() {
+  try {
+    const p = path.join(__dirname, 'data', 'factures.json');
+    if (fs.existsSync(p)) {
+      const content = fs.readFileSync(p, 'utf8');
+      return content ? JSON.parse(content) : [];
+    }
+  } catch (e) {}
+  return [];
+}
+
+function saveLocalFacture(item) {
+  try {
+    const p = path.join(__dirname, 'data', 'factures.json');
+    const list = getLocalFactures();
+    const idx = list.findIndex(x => (x.id === item.id || x.number === item.number));
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], ...item };
+    } else {
+      list.unshift(item);
+    }
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, JSON.stringify(list, null, 2), 'utf8');
+    return item;
+  } catch (e) {
+    console.warn('saveLocalFacture error:', e?.message);
+    return item;
+  }
+}
+
 // =========================================================================
 // FIREBASE FIRESTORE CLOUD INTEGRATION (Single Source of Truth)
 // =========================================================================
@@ -903,7 +933,12 @@ app.post('/api/proformas', async (req, res) => {
   const rawAmount = Number(data.amount ?? data.totalTTC ?? 0);
   const amount = Number.isFinite(rawAmount) && rawAmount >= 0 ? rawAmount : 0;
   const number = String(data.number || data.id || `DEV-${Date.now().toString().slice(-6)}`);
-  const effectiveStatus = manager ? String(data.status || 'En attente').slice(0, 50) : 'En attente';
+  let effectiveStatus = 'En attente';
+  if (manager) {
+    effectiveStatus = String(data.status || 'En attente').slice(0, 50);
+  } else if (data.status && ['Refusée', 'Acceptée', 'Convertie en facture', 'Facturée', 'En attente', 'Brouillon'].includes(data.status)) {
+    effectiveStatus = data.status;
+  }
   const finalClientId = targetUid || user.uid;
 
   const proforma = {
@@ -1023,6 +1058,310 @@ app.post('/api/proformas', async (req, res) => {
     },
     storedInCloud
   });
+});
+
+// Accepter un devis proforma -> Génération automatique de la facture officielle
+app.post('/api/proformas/:id/accept', async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const proformaId = req.params.id;
+  const manager = await hasServerRole(user, ['admin', 'direction', 'comptabilite', 'secretaire', 'vendeur']);
+
+  let proforma = null;
+  if (adminDb) {
+    try {
+      const snap = await adminDb.collection('proformas').doc(proformaId).get();
+      if (snap.exists) proforma = snap.data();
+    } catch (e) {}
+  }
+  if (!proforma) {
+    const localList = getLocalProformas();
+    proforma = localList.find(p => p.id === proformaId || p.number === proformaId) || null;
+  }
+  if (!proforma && adminDb) {
+    try {
+      const qSnap = await adminDb.collection('proformas').where('number', '==', proformaId).limit(1).get();
+      if (!qSnap.empty) proforma = qSnap.docs[0].data();
+    } catch (e) {}
+  }
+
+  if (!proforma) {
+    return res.status(404).json({ error: "Devis proforma introuvable" });
+  }
+
+  const isOwner = !manager && (
+    proforma.clientId === user.uid ||
+    proforma.uid === user.uid ||
+    (proforma.clientEmail && proforma.clientEmail.toLowerCase() === (user.email || '').toLowerCase())
+  );
+
+  if (!manager && !isOwner) {
+    return res.status(403).json({ error: "Accès refusé. Vous devez être le client titulaire de ce devis." });
+  }
+
+  const factureNumber = `FAC-${Date.now().toString().slice(-6)}`;
+  const nowStr = new Date().toISOString();
+  const dateStr = nowStr.slice(0, 10);
+  const dueDateStr = new Date(Date.now() + 86400000 * 15).toISOString().slice(0, 10);
+  const amount = Number(proforma.totalTTC || proforma.amount || 0);
+
+  const facture = {
+    id: factureNumber,
+    number: factureNumber,
+    proformaNumber: proforma.number || proforma.id,
+    reservationId: proforma.reservationId || '',
+    dossierId: proforma.dossierId || proforma.reservationId || factureNumber,
+    client: proforma.client || user.displayName || 'Client',
+    clientId: proforma.clientId || user.uid,
+    clientEmail: proforma.clientEmail || user.email || '',
+    telephone: proforma.telephone || '',
+    service: proforma.service || 'Service de transport',
+    date: dateStr,
+    dueDate: dueDateStr,
+    amount: amount,
+    currency: proforma.currency || 'USD',
+    paidAmount: 0,
+    status: 'En attente',
+    items: proforma.items || [],
+    createdAt: nowStr,
+    updatedAt: nowStr
+  };
+
+  const updatedProforma = {
+    ...proforma,
+    status: 'Convertie en facture',
+    factureNumber: factureNumber,
+    updatedAt: nowStr,
+    updatedBy: user.uid
+  };
+
+  if (adminDb) {
+    try {
+      await adminDb.collection('factures').doc(factureNumber).set(facture);
+      await adminDb.collection('proformas').doc(proforma.id || proformaId).set(updatedProforma, { merge: true });
+
+      if (proforma.reservationId) {
+        try {
+          await adminDb.collection('reservations').doc(String(proforma.reservationId)).set({
+            factureRef: factureNumber,
+            status: 'Facturé',
+            demandeFacture: false,
+            updatedAt: FieldValue.serverTimestamp()
+          }, { merge: true });
+        } catch (rErr) {}
+      }
+
+      try {
+        const notifId = `NOTIF-${Date.now().toString().slice(-6)}`;
+        await adminDb.collection('notifications').doc(notifId).set({
+          id: notifId,
+          title: `Devis ${proforma.number || proforma.id} accepté par le client`,
+          message: `${facture.client} a validé le devis. Facture ${factureNumber} émise ($${amount} USD).`,
+          type: 'success',
+          link: 'factures',
+          targetId: factureNumber,
+          targetAudience: 'admin',
+          authorUid: user.uid,
+          createdAt: FieldValue.serverTimestamp()
+        });
+      } catch (nErr) {}
+    } catch (err) {
+      console.warn('[AdminDb accept proforma error, local fallback]:', err?.message);
+    }
+  }
+
+  saveLocalFacture(facture);
+  saveLocalProforma(updatedProforma);
+  if (proforma.reservationId) {
+    const resList = getLocalReservations();
+    const rIdx = resList.findIndex(r => r.id === proforma.reservationId);
+    if (rIdx >= 0) {
+      resList[rIdx] = { ...resList[rIdx], factureRef: factureNumber, status: 'Facturé', demandeFacture: false, updatedAt: nowStr };
+      const p = path.join(__dirname, 'data', 'reservations.json');
+      try { fs.writeFileSync(p, JSON.stringify(resList, null, 2), 'utf8'); } catch (e) {}
+    }
+  }
+
+  return res.json({
+    success: true,
+    message: `Devis accepté avec succès. Facture ${factureNumber} émise.`,
+    factureNumber,
+    facture,
+    proforma: updatedProforma
+  });
+});
+
+// Refuser un devis proforma
+app.post('/api/proformas/:id/refuse', async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const proformaId = req.params.id;
+  const manager = await hasServerRole(user, ['admin', 'direction', 'comptabilite', 'secretaire', 'vendeur']);
+
+  let proforma = null;
+  if (adminDb) {
+    try {
+      const snap = await adminDb.collection('proformas').doc(proformaId).get();
+      if (snap.exists) proforma = snap.data();
+    } catch (e) {}
+  }
+  if (!proforma) {
+    const localList = getLocalProformas();
+    proforma = localList.find(p => p.id === proformaId || p.number === proformaId) || null;
+  }
+  if (!proforma && adminDb) {
+    try {
+      const qSnap = await adminDb.collection('proformas').where('number', '==', proformaId).limit(1).get();
+      if (!qSnap.empty) proforma = qSnap.docs[0].data();
+    } catch (e) {}
+  }
+
+  if (!proforma) {
+    return res.status(404).json({ error: "Devis proforma introuvable" });
+  }
+
+  const isOwner = !manager && (
+    proforma.clientId === user.uid ||
+    proforma.uid === user.uid ||
+    (proforma.clientEmail && proforma.clientEmail.toLowerCase() === (user.email || '').toLowerCase())
+  );
+
+  if (!manager && !isOwner) {
+    return res.status(403).json({ error: "Accès refusé. Vous devez être le client titulaire de ce devis." });
+  }
+
+  const nowStr = new Date().toISOString();
+  const updatedProforma = {
+    ...proforma,
+    status: 'Refusée',
+    updatedAt: nowStr,
+    updatedBy: user.uid
+  };
+
+  if (adminDb) {
+    try {
+      await adminDb.collection('proformas').doc(proforma.id || proformaId).set(updatedProforma, { merge: true });
+      try {
+        const notifId = `NOTIF-${Date.now().toString().slice(-6)}`;
+        await adminDb.collection('notifications').doc(notifId).set({
+          id: notifId,
+          title: `Devis ${proforma.number || proforma.id} décliné`,
+          message: `${proforma.client || 'Le client'} a décliné le devis ${proforma.number || proforma.id}.`,
+          type: 'warning',
+          link: 'proformas',
+          targetId: proforma.id || proformaId,
+          targetAudience: 'admin',
+          authorUid: user.uid,
+          createdAt: FieldValue.serverTimestamp()
+        });
+      } catch (nErr) {}
+    } catch (err) {
+      console.warn('[AdminDb refuse proforma error, local fallback]:', err?.message);
+    }
+  }
+
+  saveLocalProforma(updatedProforma);
+
+  return res.json({
+    success: true,
+    message: `Le devis ${proforma.number || proforma.id} a été marqué comme refusé.`,
+    proforma: updatedProforma
+  });
+});
+
+// Factures API
+app.get('/api/factures', async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const manager = await hasServerRole(user, ['admin', 'direction', 'comptabilite', 'secretaire', 'vendeur']);
+
+  const map = new Map();
+  const localList = getLocalFactures();
+  for (const item of localList) {
+    const isOwner = !manager && (
+      item.clientId === user.uid ||
+      item.uid === user.uid ||
+      (item.clientEmail && item.clientEmail.toLowerCase() === (user.email || '').toLowerCase())
+    );
+    if (manager || isOwner) {
+      map.set(item.id || item.number, item);
+    }
+  }
+
+  if (adminDb) {
+    try {
+      const col = adminDb.collection('factures');
+      const queryRef = manager ? col : col.where('clientId', '==', user.uid);
+      const snap = await queryRef.limit(150).get();
+      snap.forEach(doc => {
+        map.set(doc.id, { ...doc.data(), id: doc.id });
+      });
+    } catch (err) {
+      console.warn('[Firestore adminDb factures query error]:', err?.message);
+    }
+  }
+
+  const result = Array.from(map.values()).sort((a, b) => {
+    const da = new Date(b.createdAt || b.date || 0).getTime();
+    const db = new Date(a.createdAt || a.date || 0).getTime();
+    return da - db;
+  });
+
+  return res.json({ success: true, factures: result });
+});
+
+app.post('/api/factures', async (req, res) => {
+  const user = await requireFirebaseUser(req, res);
+  if (!user) return;
+  const data = req.body?.facture || req.body || {};
+  const manager = await hasServerRole(user, ['admin', 'direction', 'comptabilite', 'secretaire', 'vendeur']);
+  const targetUid = String(data.clientId || data.uid || (manager ? '' : user.uid));
+  const clientEmail = String(data.email || data.clientEmail || (manager ? '' : user.email || '')).toLowerCase().trim();
+  const isClientOwner = !manager && (
+    !targetUid ||
+    targetUid === user.uid ||
+    (clientEmail && clientEmail === String(user.email || '').toLowerCase().trim())
+  );
+
+  if (!manager && !isClientOwner) {
+    return res.status(403).json({ error: "Accès refusé. Privilèges de gestion ou propriétaire requis." });
+  }
+
+  const number = String(data.number || data.id || `FAC-${Date.now().toString().slice(-6)}`);
+  const rawAmount = Number(data.amount ?? data.totalTTC ?? 0);
+  const amount = Number.isFinite(rawAmount) && rawAmount >= 0 ? rawAmount : 0;
+  const finalClientId = targetUid || user.uid;
+
+  const facture = {
+    ...data,
+    id: number,
+    number,
+    amount,
+    client: String(data.client || user.displayName || 'Client').slice(0, 150),
+    clientId: finalClientId,
+    uid: finalClientId,
+    clientEmail: clientEmail || user.email || '',
+    telephone: String(data.telephone || data.phone || ''),
+    date: String(data.date || new Date().toISOString().slice(0, 10)),
+    status: String(data.status || 'En attente'),
+    createdBy: user.uid,
+    createdAt: data.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    archived: false
+  };
+
+  let storedInCloud = false;
+  if (adminDb) {
+    try {
+      await adminDb.collection('factures').doc(facture.id).set(facture, { merge: true });
+      storedInCloud = true;
+    } catch (err) {
+      console.warn('[Firestore adminDb factures write error]:', err?.message);
+    }
+  }
+
+  saveLocalFacture(facture);
+  return res.status(201).json({ success: true, facture, storedInCloud });
 });
 
 app.get('/api/reservations', async (req, res) => {

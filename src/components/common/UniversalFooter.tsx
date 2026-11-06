@@ -213,21 +213,6 @@ export const UniversalFooter: React.FC<UniversalFooterProps> = ({ variant = 'pub
                 </button>
                 <button
                   type="button"
-                  onClick={() => setCurrentModule('dashboard')}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#64748b',
-                    cursor: 'pointer',
-                    padding: '4px 6px',
-                    fontWeight: 600,
-                    fontSize: '12px'
-                  }}
-                >
-                  Tableau de bord
-                </button>
-                <button
-                  type="button"
                   onClick={() => setCurrentModule('reservations')}
                   style={{
                     background: 'none',

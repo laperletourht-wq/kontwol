@@ -193,9 +193,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
         setCurrentModule('reservations');
       }
     } else if (isChauffeur) {
-      const allowedDriverModules = ['dashboard', 'plannings', 'vehicules'];
+      const allowedDriverModules = ['plannings', 'vehicules'];
       if (!allowedDriverModules.includes(currentModule)) {
-        setCurrentModule('dashboard');
+        setCurrentModule('plannings');
       }
     }
   }, [isClient, isChauffeur, currentModule, setCurrentModule]);
@@ -292,20 +292,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           title: 'ESPACE CHAUFFEUR',
           items: [
             {
-              key: 'dashboard',
-              label: 'Mes Missions du Jour',
-              icon: (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="7" height="7" rx="1.5"/>
-                  <rect x="14" y="3" width="7" height="7" rx="1.5"/>
-                  <rect x="14" y="14" width="7" height="7" rx="1.5"/>
-                  <rect x="3" y="14" width="7" height="7" rx="1.5"/>
-                </svg>
-              )
-            },
-            {
               key: 'plannings',
-              label: 'Feuille de Route',
+              label: 'Feuille de Route (Missions)',
               icon: (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
@@ -355,8 +343,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           title: 'ESPACE COMMERCIAL',
           items: [
             {
-              key: 'dashboard',
-              label: 'Tableau Commercial',
+              key: 'vendeur',
+              label: 'Espace Vendeur & KPI',
               icon: (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="3" width="7" height="7" rx="1.5"/>
@@ -440,37 +428,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
     // Default: Staff / Administration / Direction / Comptabilité
     return [
       {
-        title: 'VUE GLOBALE',
-        items: [
-          {
-            key: 'dashboard',
-            label: 'Tableau de Bord',
-            icon: (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="7" height="7" rx="1.5"/>
-                <rect x="14" y="3" width="7" height="7" rx="1.5"/>
-                <rect x="14" y="14" width="7" height="7" rx="1.5"/>
-                <rect x="3" y="14" width="7" height="7" rx="1.5"/>
-              </svg>
-            )
-          },
-          ...(canAccess('plannings') ? [
-            {
-              key: 'plannings',
-              label: 'Planning & Dispatch',
-              icon: (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                  <line x1="16" y1="2" x2="16" y2="6"/>
-                  <line x1="8" y1="2" x2="8" y2="6"/>
-                  <line x1="3" y1="10" x2="21" y2="10"/>
-                </svg>
-              )
-            }
-          ] : [])
-        ]
-      },
-      {
         title: 'TRANSPORT & OPÉRATIONS',
         items: [
           ...(canAccess('reservations') ? [
@@ -487,6 +444,21 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
               )
             }
           ] : []),
+          ...(canAccess('plannings') ? [
+            {
+              key: 'plannings',
+              label: 'Planning & Dispatch',
+              icon: (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                  <line x1="16" y1="2" x2="16" y2="6"/>
+                  <line x1="8" y1="2" x2="8" y2="6"/>
+                  <line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+              )
+            }
+          ] : []),
+
           ...(canAccess('vehicules') ? [
             {
               key: 'vehicules',
@@ -869,7 +841,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
               await logout();
             } finally {
               setIsPublicLanding(true);
-              setCurrentModule('dashboard');
+              setCurrentModule('reservations');
             }
           }}
           title="Se déconnecter"
